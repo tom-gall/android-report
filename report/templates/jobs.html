@@ -73,7 +73,7 @@
     <td>
         {% with job_result.results as results %}
         {% for testcase in results %}
-        {{ testcase.name }},{{ testcase.result }},{{ testcase.measurement|default_if_none:"" }},{{ testcase.unit|default_if_none:"" }} <br/>
+        {{ testcase.name }} {{ testcase.result }} {{ testcase.measurement|default_if_none:"" }} {{ testcase.unit|default_if_none:"" }} <br/>
         {% endfor %}
         {% endwith %}
     </td>

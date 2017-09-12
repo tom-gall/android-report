@@ -103,6 +103,8 @@ def get_yaml_result(job_id, server):
 
             if test.get("name") in names_ignore:
                 continue
+            if test.get("measurement") and test.get("measurement") == "None":
+                test["measurement"] = None
             ## print "%s" % str(test)
             tests_res.append(test)
 
