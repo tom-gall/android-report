@@ -1,0 +1,87 @@
+<div align="center">
+<title>Results for build: {{ build_info.build_name }}-{{ build_info.build_no }} </title>
+<h1>Results for build: {{ build_info.build_name }}-{{ build_info.build_no }} </h1>
+
+<h2>Build Info</h2>
+<table border="2">
+    <tr>
+        <th align="left">Build Name</th>
+        <td>{{ build_info.build_name }} </td>
+    </tr>
+    <tr>
+        <th align="left">Build No.</th>
+        <td>{{ build_info.build_no }} </td>
+    </tr>
+    <tr>
+        <th align="left">CI Link</th>
+        <td><a href="{{ build_info.ci_url_base }}/{{ build_info.build_name }}">{{ build_info.ci_url_base }}/{{ build_info.build_name }} </a></td>
+    </tr>
+    <tr>
+        <th align="left">Snapshot Image</th>
+        <td><a href="{{ build_info.snapshot_url_base }}/{{ build_info.build_name }}/{{ build_info.build_no }}">{{ build_info.snapshot_url_base }}/{{ build_info.build_name }}/{{ build_info.build_no }} </a></td>
+    </tr>
+    <tr>
+        <th align="left">Android Based Tag</th>
+        <td>{{ build_info.android_tag }} </td>
+    </tr>
+    <tr>
+        <th align="left">Android Build Configs</th>
+        <td><a href="{{ build_info.build_config_url }}">{{ build_info.build_config_url }}</a></td>
+    </tr>
+
+</table>
+<h2>Failed Jobs list/Total Jobs: {{ jobs_failed|length }}/{{ jobs_result|length }}</h2>
+<table border="2">
+<tr>
+    <th>Job Name</th>
+    <th>Job Ids</th>
+    <th>Resubmit latest</th>
+    <th>bug link</th>
+</tr>
+{% for job in jobs_failed %}
+<tr>
+    <td>{{ job.name }}</td>
+    <td>
+        {% for id_status in job.id_status_list %}
+        <a href="{{ lava_server_job_prefix }}/{{ id_status.0 }}"> {{ id_status.0 }}</a>: {{ id_status.1 }} <br>
+        {% endfor %}
+    </td>
+    <td>
+        <button name="resubmit_latest">Resubmit {% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %} </button>
+    </td>
+    <td>--</td>
+</tr>
+{% endfor %}
+</table>
+<h2>Results List from lava jobs</h2>
+<table border="2">
+<tr>
+    <th>Job Name</th>
+    <th>Job Ids</th>
+    <th>Result</th>
+    <th>Resubmit latest</th>
+    <th>bug link</th>
+</tr>
+{% for job_result in jobs_result %}
+<tr>
+    <td>{{ job_result.job_name }}</td>
+    <td>
+        {% for id_status in job_result.id_status_list %}
+        <a href="{{ lava_server_job_prefix }}/{{ id_status.0 }}"> {{ id_status.0 }}</a>: {{ id_status.1 }} <br>
+        {% endfor %}
+    </td>
+    <td>
+        {% with job_result.results as results %}
+        {% for testcase in results %}
+        {{ testcase.name }},{{ testcase.result }},{{ testcase.measurement|default_if_none:"" }},{{ testcase.unit|default_if_none:"" }} <br/>
+        {% endfor %}
+        {% endwith %}
+    </td>
+    <td>
+        <button name="resubmit_latest">Resubmit {% with job_result.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %} </button>
+    </td>
+    <td>--</td>
+</tr>
+{% endfor %}
+</table>
+</div>
