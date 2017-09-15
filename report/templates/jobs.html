@@ -2,6 +2,19 @@
 <title>Results for build: {{ build_info.build_name }}-{{ build_info.build_no }} </title>
 <h1>Results for build: {{ build_info.build_name }}-{{ build_info.build_no }} </h1>
 
+<table>
+<tr>
+{% for build_no in build_info.build_numbers %}
+    {% ifequal build_no build_info.build_no %}
+        <td>{{ build_no }} </td>
+    {% else %}
+        <td><a href="/report/?build_name={{ build_info.build_name}}&&build_no={{ build_no }}">{{ build_no}} </a></td>
+    {% endifequal %}
+{% endfor %}
+
+</tr>
+</table>
+
 <h2>Build Info</h2>
 <table border="2">
     <tr>
@@ -30,7 +43,9 @@
     </tr>
 
 </table>
-<h2>Failed Jobs list/Total Jobs: {{ jobs_failed|length }}/{{ jobs_result|length }}</h2>
+{% with jobs_failed|length as number_of_failed %}
+<h2>Failed Jobs list/Total Jobs: {{ number_of_failed }}/{{ jobs_result|length|add:number_of_failed }}</h2>
+{% endwith %}
 <table border="2">
 <tr>
     <th>Job Name</th>
@@ -47,7 +62,9 @@
         {% endfor %}
     </td>
     <td>
-        <button name="resubmit_latest">Resubmit {% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %} </button>
+        <button name="resubmit_latest" onclick="this.disabled=true; window.location='/report/resubmit-job/?job_id={% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}'">
+            Resubmit {% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}
+        </button>
     </td>
     <td>--</td>
 </tr>
@@ -62,9 +79,9 @@
     <th>Resubmit latest</th>
     <th>bug link</th>
 </tr>
-{% for job_result in jobs_result %}
+{% for job_name, job_result in jobs_result %}
 <tr>
-    <td>{{ job_result.job_name }}</td>
+    <td>{{ job_name }}</td>
     <td>
         {% for id_status in job_result.id_status_list %}
         <a href="{{ lava_server_job_prefix }}/{{ id_status.0 }}"> {{ id_status.0 }}</a>: {{ id_status.1 }} <br>
@@ -72,13 +89,15 @@
     </td>
     <td>
         {% with job_result.results as results %}
-        {% for testcase in results %}
-        {{ testcase.name }} {{ testcase.result }} {{ testcase.measurement|default_if_none:"" }} {{ testcase.unit|default_if_none:"" }} <br/>
+        {% for testcase_name, testcase in results.items %}
+        {{ testcase_name }} {{ testcase.result }} {{ testcase.measurement|default_if_none:"" }} {{ testcase.unit|default_if_none:"" }} <br/>
         {% endfor %}
         {% endwith %}
     </td>
     <td>
-        <button name="resubmit_latest">Resubmit {% with job_result.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %} </button>
+        <button name="resubmit_latest" onclick="this.disabled=true; window.location='/report/resubmit-job/?job_id={% with job_result.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}'">
+            Resubmit {% with job_result.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}
+        </button>
     </td>
     <td>--</td>
 </tr>

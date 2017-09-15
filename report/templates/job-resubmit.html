@@ -1,0 +1,12 @@
+<div align="center">
+{% if errors %}
+<title>Job resubmitted failed </title>
+Please specify the job id to be resubmitted
+Back to check the <a href="/report">lava result report</a>
+{% else %}
+<title>Job resubmitted successfully </title>
+
+The new job is: <a href="{{ lava_server_job_prefix }}/{{ job_id }}">{{ job_id }}</a> <br/>
+Back to check the <a href="/report">lava result report</a>
+{% endif %}
+</div>

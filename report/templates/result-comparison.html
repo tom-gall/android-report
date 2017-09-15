@@ -1,0 +1,55 @@
+<div align="center">
+<form action="/report/compare/" method="post">
+    {% csrf_token %} 
+    <label>{{ build_info.build_name }}</label>
+    <select name="build_no_1">
+        {% for build_no in form.possible_numbers %}
+            {% ifequal build_no form.build_no_1 %}
+            <option value="{{ build_no }}" selected="true"> {{ build_no }} </option>
+            {% else %}
+            <option value="{{ build_no }}"> {{ build_no }} </option>
+            {% endifequal %}
+        {% endfor %}
+    </select>
+
+    <select name="build_no_2">
+        {% for build_no in form.possible_numbers %}
+            {% ifequal build_no form.build_no_2 %}
+            <option value="{{ build_no }}" selected="true"> {{ build_no }} </option>
+            {% else %}
+            <option value="{{ build_no }}"> {{ build_no }} </option>
+            {% endifequal %}
+        {% endfor %}
+    </select>
+    <input type="hidden" id="build_name" value="{{ build_info.build_name }}" />
+    <input type="submit" id="submit_btn" value="Compare" />
+</form>
+</div>
+{% if compare_results %}
+<div align="center">
+<table border="2">
+    <tr>
+        <th>Job Name</th>
+        <th>TestCase Name</th>
+        <th>Units</th>
+        <th>Build 1<br/>Result/Measurements</th>
+        <th>Build 2<br/>Result/Measurements</th>
+        <th>Difference</th>
+        <th>%</th>
+    </tr>
+    {% for job_name, result in compare_results %}
+        {% for test_name, result_diff in result.result_diff %}
+        <tr>
+        <td>{{ job_name }}</td>
+        <td>{{ test_name }}</td>
+        <td>{{ result_diff.unit | default_if_none:"--" }}</td>
+        <td>{{ result_diff.result_measurement_1 | default_if_none:"--" }}</td>
+        <td>{{ result_diff.result_measurement_2 | default_if_none:"--" }}</td>
+        <td>{{ result_diff.difference }}</td>
+        <td>{{ result_diff.percentage }}</td>
+        </tr>
+        {% endfor %}
+    {% endfor %}
+</table>
+</div>
+{% endif %}
