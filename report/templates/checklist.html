@@ -1,0 +1,55 @@
+<div align="center">
+<form action="/report/checklist/" method="post">
+    {% csrf_token %} 
+    <input type="text" id="build_name" value="{{ build_info.build_name }}" disabled="true"/>
+    <select name="job_name">
+        {% for name in form.possible_jobs %}
+            {% ifequal name form.job_name %}
+            <option value="{{ name }}" selected="true"> {{ name }} </option>
+            {% else %}
+            <option value="{{ name }}"> {{ name }} </option>
+            {% endifequal %}
+        {% endfor %}
+    </select>
+
+    <input type="submit" id="submit_btn" value="Display Checklist Result" />
+</form>
+</div>
+{% if checklist_results %}
+<div align="center">
+<table border="2">
+    <tr>
+        <th>Job Name</th>
+        <th>TestCase Name</th>
+        {% for build_no in all_build_numbers %}
+        <th>#{{ build_no }}</th>
+        {% endfor %}
+    </tr>
+    {% for job_name, job_checklist in checklist_results.items %}
+        {% for test_name, testcase_result in job_checklist.items %}
+            {% with testcase_result.builds_res as testcase_builds_res %}
+        <tr>
+            <td>{{ job_name }}</td>
+            <td>{{ test_name }}</td>
+            {% for build_no in all_build_numbers %}
+                {% if build_no in testcase_builds_res %}
+                    {% for testcase_build_no, testcase_res in testcase_builds_res.items %}
+                        {% ifequal build_no testcase_build_no %}
+                            {% if testcase_res.measurement %}
+                            <td>{{ testcase_res.measurement|floatformat:-2 }} </td>
+                            {% else %}
+                            <td>{{ testcase_res.result }} </td>
+                            {% endif %}
+                        {% endifequal %}
+                    {% endfor %}
+                {% else %}
+                    <td> -- </td>
+                {% endif %}
+            {% endfor %}
+        </tr>
+            {% endwith %}
+        {% endfor %}
+    {% endfor %}
+</table>
+</div>
+{% endif %}

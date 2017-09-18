@@ -58,67 +58,58 @@ def get_possible_builds(build_name="android-lcr-reference-hikey-o"):
     all_builds.reverse()
     return all_builds
 
+def get_possible_templates(build_name="android-lcr-reference-hikey-o"):
+    job_name_template_dir = { "android-lcr-reference-hikey-o": "hikey-v2" }
+    url = 'https://git.linaro.org/qa/test-plans.git/tree/android/%s' % job_name_template_dir[build_name]
+    response = urllib2.urlopen(url)
+    html = response.read()
 
-jobs_checked = [
-                    "andebenchpro2015",
-                    "antutu6",
-                    "basic",
-                    "benchmarkpi",
-                    "boottime",
-                    "caffeinemark",
-                    "cf-bench",
-                    "cts-focused1-v7a",
-                    "cts-focused1-v8a",
-                    "cts-focused2-v7a",
-                    "cts-focused2-v8a",
-                    "cts-media2-v7a",
-                    "cts-media2-v8a",
-                    "cts-media-v7a",
-                    "cts-media-v8a",
-                    "cts-opengl-v7a",
-                    "cts-opengl-v8a",
-                    "cts-part1-v7a",
-                    "cts-part1-v8a",
-                    "cts-part2-v7a",
-                    "cts-part2-v8a",
-                    "cts-part3-v7a",
-                    "cts-part3-v8a",
-                    "cts-part4-v7a",
-                    "cts-part4-v8a",
-                    "cts-part5-v7a",
-                    "cts-part5-v8a",
-                    "gearses2eclair",
-                    "geekbench3",
-                    "glbenchmark25",
-                    "javawhetstone",
-                    "jbench",
-                    "linpack",
-                    "optee",
-                    "quadrantpro",
-                    "rl-sqlite",
-                    "scimark",
-                    "vellamo3",
-                    "weekly",
-               ]
-def get_jobs(build_name, build_no, server):
-    search_condition = "description__icontains__%s-%s" % (build_name, build_no)
+    pat = re.compile("'>(?P<template_name>template\S*.yaml)</a>")
+    template_names = pat.findall(html)
+    return sorted(template_names)
+
+def get_possible_job_names(build_name="android-lcr-reference-hikey-o"):
+    templates = get_possible_templates(build_name)
+    url_prefix = "https://git.linaro.org/qa/test-plans.git/plain/android/hikey-v2/"
+    pat = re.compile('job_name: "%%JOB_NAME%%-%%ANDROID_META_BUILD%%-(\S+)"')
+    job_names = []
+    for template in templates:
+        url = '%s/%s' % (url_prefix, template)
+        response = urllib2.urlopen(url)
+        html = response.read()
+        job_names.extend(pat.findall(html))
+
+    return job_names
+
+
+def get_jobs(build_name, build_no, server, job_name_list=[]):
+    jobs_to_be_checked = get_possible_job_names(build_name=build_name)
+    if job_name_list is None or len(job_name_list) == 0 or len(job_name_list) > 1:
+        search_condition = "description__icontains__%s-%s" % (build_name, build_no)
+    elif len(job_name_list) == 1:
+        search_condition = "description__icontains__%s-%s-%s" % (build_name, build_no, job_name_list[0])
     jobs_from_lava = server.results.make_custom_query("testjob", search_condition)
     jobs = { }
     for job in jobs_from_lava:
         job_id = job.get("id")
         job_description = job.get("description")
         job_status = job.get("status")
-        job_name = job_description.replace("%s-%s-" % (build_name, build_no), "")
+        if job_name_list is None or len(job_name_list) == 0 or len(job_name_list) > 1:
+            local_job_name = job_description.replace("%s-%s-" % (build_name, build_no), "")
 
-        if job_name not in jobs_checked:
-            continue
+            if local_job_name not in jobs_to_be_checked:
+                continue
+            if len(job_name_list) > 1 and local_job_name not in job_name_list:
+                continue
+        else:
+            local_job_name = job_name_list[0]
 
-        job_exist = jobs.get(job_name)
+        job_exist = jobs.get(local_job_name)
         if job_exist is not None:
             job_exist.get("id_list").append(job_id)
             job_exist.get("status_list").append(job_status)
         else:
-            jobs[job_name] = {
+            jobs[local_job_name] = {
                                 "id_list": [job_id],
                                 "status_list": [job_status],
                              }
@@ -203,11 +194,11 @@ def get_default_build_no( all_build_numbers=[], defaut_build_no=None):
         return 0
 
 
-def get_test_results_for_build(build_name, build_no, lava_server):
+def get_test_results_for_build(build_name, build_no, lava_server, job_name_list=[]):
     jobs_failed = []
     total_tests_res = {}
 
-    jobs = jobs_dict_to_sorted_tuple(get_jobs(build_name, build_no, lava_server))
+    jobs = jobs_dict_to_sorted_tuple(get_jobs(build_name, build_no, lava_server, job_name_list=job_name_list))
     for job in jobs:
         id_status_list = job.get("id_status_list")
         job_total_res = {}
@@ -230,6 +221,7 @@ def get_test_results_for_build(build_name, build_no, lava_server):
                                      "job_name": job.get("name"),
                                      "id_status_list": job.get("id_status_list"),
                                      "result_job_id_status": result_job_id_status,
+                                     "build_no": build_no,
                                      "results": job_total_res}
 
     return (jobs_failed, total_tests_res)
@@ -262,11 +254,6 @@ def jobs(request):
                    'build_info': build_info,
                   }
         )
-
-class CompareForm(forms.Form):
-    build_name = forms.CharField(widget=forms.HiddenInput())
-    build_no_1 = forms.ChoiceField(label="",  choices=[])
-    build_no_2 = forms.ChoiceField(label="",  choices=[])
 
 
 def compare_results_func(tests_result_1, tests_result_2):
@@ -382,12 +369,6 @@ def compare(request):
         all_build_numbers = get_possible_builds(build_name)
         build_no_1 = request.POST.get("build_no_1", "0")
         build_no_2 = request.POST.get("build_no_2", "0")
-        #if form.is_valid():
-        #form.build_name = forms.CharField(widget=forms.HiddenInput()), initial=build_name)
-        #form.build_no_1 = forms.ChoiceField(label="",  choices=[(build_no, build_no) for build_no in all_build_numbers], initial=build_no_1)
-        #form.fields['build_no_1'].choices = [(build_no, build_no) for build_no in all_build_numbers]
-        #form.fields['build_no_2'].choices = [(build_no, build_no) for build_no in all_build_numbers]
-        #form.build_no_2 = forms.ChoiceField(label="",  choices=[(build_no, build_no) for build_no in all_build_numbers], initial=build_no_2)
         (failed_jobs_1, tests_result_1) = get_test_results_for_build(build_name, build_no_1, server)
         (failed_jobs_2, tests_result_2) = get_test_results_for_build(build_name, build_no_2, server)
         compare_results = compare_results_func(tests_result_1, tests_result_2)
@@ -396,12 +377,6 @@ def compare(request):
         all_build_numbers = get_possible_builds(build_name)
         build_no_1 = request.GET.get("build_no_1", "0")
         build_no_2 = request.GET.get("build_no_2", "0")
-        # form = CompareForm(request)
-        #form.build_name = forms.CharField(widget=forms.HiddenInput(), initial=build_name)
-        #form.build_no_1 = forms.ChoiceField(label="",  choices=[(build_no, build_no) for build_no in get_possible_builds()])
-        #form.build_no_2 = forms.ChoiceField(label="",  choices=[(build_no, build_no) for build_no in get_possible_builds()])
-        #form.fields['build_no_1'].choices = [(build_no, build_no) for build_no in all_build_numbers]
-        #form.fields['build_no_2'].choices = [(build_no, build_no) for build_no in all_build_numbers]
 
 
     form = {
@@ -427,6 +402,67 @@ def compare(request):
                   }
         )
 
+
+def get_test_results_for_job(build_name, lava_server, jobs=[]):
+    all_build_numbers = get_possible_builds(build_name)
+    checklist_results = {}
+    for build_no in all_build_numbers:
+        (failed_jobs, total_test_res) = get_test_results_for_build(build_name, build_no, server, job_name_list=jobs)
+        if len(total_test_res) > 0:
+            for job_name in jobs:
+                checklist_for_one_job = checklist_results.get(job_name)
+                if checklist_for_one_job is None:
+                    checklist_for_one_job = {}
+                    checklist_results[job_name] = checklist_for_one_job
+
+                for testcase, testcase_result in total_test_res.get(job_name).get("results").items():
+                    if checklist_for_one_job.get(testcase):
+                        builds_res = checklist_for_one_job[testcase]["builds_res"]
+                        builds_res.update({ build_no: testcase_result})
+                    else:
+                        builds_res = {build_no: testcase_result}
+                        checklist_for_one_job[testcase] = { "name": testcase,
+                                                            "builds_res": builds_res,
+                                                            "job_name": job_name,
+                                                          }
+
+    checklist_results.items().sort()
+    for job_name, checklist_for_one_job in checklist_results.items():
+        checklist_for_one_job.items().sort()
+    return (all_build_numbers, checklist_results)
+
+def checklist(request):
+    checklist_results = {}
+    all_build_numbers= []
+    #form = CompareForm(request)
+    if request.method == 'POST':
+        build_name = request.POST.get("build_name", "android-lcr-reference-hikey-o")
+        job_name = request.POST.get("job_name", "basic")
+        (all_build_numbers, checklist_results) = get_test_results_for_job(build_name, server, jobs=[job_name])
+    else:
+        build_name = request.GET.get("build_name", "android-lcr-reference-hikey-o")
+        job_name = request.GET.get("job_name", "basic")
+
+    jobs_to_be_checked = get_possible_job_names(build_name=build_name)
+
+    form = {
+                 "build_name": build_name,
+                 "job_name": job_name,
+                 "possible_jobs": jobs_to_be_checked,
+           }
+
+    build_info = {
+                    "build_name": build_name,
+                 }
+    return render(request, 'checklist.html',
+                  {
+                   "build_info": build_info,
+                   'lava_server_job_prefix': lava_server_job_prefix,
+                   'form': form,
+                   'checklist_results': checklist_results,
+                   'all_build_numbers': all_build_numbers,
+                  }
+        )
 
 if __name__ == "__main__":
     (jobs_failed, total_tests_res) = get_test_results_for_build("android-lcr-reference-hikey-o", "11", server)
