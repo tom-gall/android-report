@@ -1,0 +1,86 @@
+<div align="center">
+Builds Info
+
+<div> TODO:
+<ul>
+<table>
+<tr>
+<td align="left">
+<li>Trigger ci builds manually or according schedule</li>
+<li>Test any change on local manifest or via patchset script</li>
+<li>Trend Chart for builds</li>
+<li>List jobs result status for one build</li>
+</td>
+</tr>
+</div>
+<table border=2>
+<tr>
+<tr/>
+<tr>
+    <th align="left">Build Names</th>
+    {% for build_name, build_info in builds.items %}
+    <td>{{ build_info.build_name }} </td>
+    {% endfor %}
+<tr/>
+<tr>
+    <th align="left">Android Version</th>
+    {% for build_name, build_info in builds.items %}
+    <td>{{ build_info.android_version }} </td>
+    {% endfor %}
+<tr/>
+<tr>
+    <th align="left">Kernel Version</th>
+    {% for build_name, build_info in builds.items %}
+    <td>{{ build_info.kernel_version }} </td>
+    {% endfor %}
+<tr/>
+<tr>
+    <th align="left">CI Link</th>
+    {% for build_name, build_info in builds.items %}
+    <td><a href="{{ build_info.ci_link }}">{{ build_info.build_name }}</a> </td>
+    {% endfor %}
+<tr/>
+<tr>
+    <th align="left">Android Build Config</th>
+    {% for build_name, build_info in builds.items %}
+    <td><a href="{{ build_info.android_build_config_link }}"> {{ build_info.build_name }} </a> </td>
+    {% endfor %}
+<tr/>
+<tr>
+    <th align="left">Snapshot URL</th>
+    {% for build_name, build_info in builds.items %}
+    <td><a href="{{ build_info.snapshot_url }}">{{ build_info.build_name }} </a> </td>
+    {% endfor %}
+<tr/>
+<tr>
+    <th align="left">Job Status</th>
+    {% for build_name, build_info in builds.items %}
+    <td><a href="/report/jobs/?build_name={{ build_info.build_name }}"> Jobs Status </a></td>
+    {% endfor %}
+</tr>
+<tr>
+    <th align="left">Checklist</th>
+    {% for build_name, build_info in builds.items %}
+    <td><a href="/report/checklist/?build_name={{ build_info.build_name }}"> CheckList </a></td>
+    {% endfor %}
+</tr>
+<tr>
+    <th align="left">Result Compare</th>
+    {% for build_name, build_info in builds.items %}
+    <td><a href="/report/compare/?build_name={{ build_info.build_name }}"> Result Compare </a></td>
+    {% endfor %}
+</tr>
+<tr>
+    <th align="left">Job Submission</th>
+    {% for build_name, build_info in builds.items %}
+    <td><a href="/report/submit-jobs/?build_name={{ build_info.build_name }}"> Job Submission </a></td>
+    {% endfor %}
+</tr>
+<tr>
+    <th align="left">Trigger Build</th>
+    {% for build_name, build_info in builds.items %}
+    <td><a href="/report/submit-jobs/?build_name={{ build_info.build_name }}"> Job Submission </a></td>
+    {% endfor %}
+</tr>
+</table>
+</div>

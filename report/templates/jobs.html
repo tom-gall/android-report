@@ -1,21 +1,13 @@
 <div align="center">
 <title>Results for build: {{ build_info.build_name }}-{{ build_info.build_no }} </title>
 <h1>Results for build: {{ build_info.build_name }}-{{ build_info.build_no }} </h1>
-
-<li>Trigger ci builds manually or according schedule</li>
-<li>Submit jobs for build</li>
-<li>Test any change on local manifest or via patchset script</li>
-<li>Checklist for build</li>
-<li>Trend Chart for builds</li>
-<li>List jobs result status for one build</li>
-<li>Compare test results between 2 builds</li>
 <table>
 <tr>
 {% for build_no in build_info.build_numbers %}
     {% ifequal build_no build_info.build_no %}
         <td>{{ build_no }} </td>
     {% else %}
-        <td><a href="/report/?build_name={{ build_info.build_name}}&&build_no={{ build_no }}">{{ build_no}} </a></td>
+        <td><a href="/report/jobs/?build_name={{ build_info.build_name}}&&build_no={{ build_no }}">{{ build_no}} </a></td>
     {% endifequal %}
 {% endfor %}
 
@@ -69,7 +61,7 @@
         {% endfor %}
     </td>
     <td>
-        <button name="resubmit_latest" onclick="this.disabled=true; window.location='/report/resubmit-job/?job_id={% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}'">
+        <button name="resubmit_latest" onclick="this.disabled=true; window.location='/report/resubmit-job/?build_name={{ build_info.build_name }}&&job_id={% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}'">
             Resubmit {% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}
         </button>
     </td>
@@ -102,7 +94,7 @@
         {% endwith %}
     </td>
     <td>
-        <button name="resubmit_latest" onclick="this.disabled=true; window.location='/report/resubmit-job/?job_id={% with job_result.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}'">
+        <button name="resubmit_latest" onclick="this.disabled=true; window.location='/report/resubmit-job/?build_name={{ build_info.build_name }}&&job_id={% with job_result.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}'">
             Resubmit {% with job_result.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}
         </button>
     </td>
