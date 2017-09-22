@@ -61,11 +61,23 @@
         {% endfor %}
     </td>
     <td>
-        <button name="resubmit_latest" onclick="this.disabled=true; window.location='/report/resubmit-job/?build_name={{ build_info.build_name }}&&job_id={% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}'">
-            Resubmit {% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}
-        </button>
+        {% with job.id_status_list|first as first_id_status %}
+            {% if first_id_status.1 == 'Submitted' or  first_id_status.1 == 'Running' %}
+            <button name="resubmit_latest" disabled="true" onclick="this.disabled=true; window.location='/report/resubmit-job/?build_name={{ build_info.build_name }}&&job_id={% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}'">
+                Resubmit {% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}
+            </button>
+            {% else %}
+            <button name="resubmit_latest" onclick="this.disabled=true; window.location='/report/resubmit-job/?build_name={{ build_info.build_name }}&&job_id={% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}'">
+                Resubmit {% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}
+            </button>
+
+            {% endif %}
+        {% endwith %}
     </td>
-    <td>--</td>
+    <td>
+        <a href="https://bugs.linaro.org/enter_bug.cgi?product=Linaro%20Android">Report Android Bug</a><br/>
+        <a href="https://bugs.linaro.org/enter_bug.cgi?product=LAVA%20Framework">Report LAVA Bug</a><br/>
+    </td>
 </tr>
 {% endfor %}
 </table>
@@ -98,7 +110,10 @@
             Resubmit {% with job_result.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}
         </button>
     </td>
-    <td>--</td>
+    <td>
+        <a href="https://bugs.linaro.org/enter_bug.cgi?product=Linaro%20Android">Report Android Bug</a><br/>
+        <a href="https://bugs.linaro.org/enter_bug.cgi?product=LAVA%20Framework">Report LAVA Bug</a><br/>
+    </td>
 </tr>
 {% endfor %}
 </table>

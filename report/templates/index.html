@@ -79,7 +79,7 @@ Builds Info
 <tr>
     <th align="left">Trigger Build</th>
     {% for build_name, build_info in builds.items %}
-    <td><a href="/report/submit-jobs/?build_name={{ build_info.build_name }}"> Job Submission </a></td>
+    <td><a href="{{ build_info.ci_link }}">{{ build_info.build_name }}</a> </td>
     {% endfor %}
 </tr>
 </table>
