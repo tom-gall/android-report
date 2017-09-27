@@ -38,7 +38,7 @@ names_ignore = ["test-attachment",
                 "tradefed-test-run", "check-adb-connectivity",
                 "3D-mean","Overall_Score-mean", "Memory_Bandwidth_Add_Multi_Core-mean", "Platform-mean", "Memory_Bandwidth-mean", "Memory_Bandwidth_Copy_Single_Core-mean", "Memory_Latency_64M_range-mean", "Memory_Bandwidth_Scale_Single_Core-mean", "Memory_Bandwidth_Copy_Multi_Core-mean", "Storage-mean", "Memory_Bandwidth_Triad_Single_Core-mean", "CoreMark-PRO_Base-mean", "Memory_Bandwidth_Add_Single_Core-mean", "CoreMark-PRO_Peak-mean", "Memory_Bandwidth_Scale_Multi_Core-mean", "Memory_Latency-mean", "Memory_Bandwidth_Triad_Multi_Core-mean",
                 "BOOTTIME_LOGCAT_ALL_COLLECT", "BOOTTIME_LOGCAT_EVENTS_COLLECT", "SERVICE_STARTED_ONCE", "BOOTTIME_ANALYZE", "BOOTTIME_DMESG_COLLECT",
-                "start_bootchart", "enabled_bootchart",
+                "start_bootchart", "enabled_bootchart", "stop_bootchart", "rm_start_file", "generate-bootchart-graphic",
                ]
 
 job_status_dict = {0: "Submitted",
@@ -50,9 +50,9 @@ job_status_dict = {0: "Submitted",
 
 
 user = "yongqin.liu"
-token = {'staging': 'ty1dprzx7wysqrqmzuytccufwbyyl9xthwowgim0p0z5hm00t6mzwebyp4dgagmyg2f1kag9ln0s9dh212s3wdaxhasm0df7bqnumrwz1m5mbmf4xg780xgeo9x1348k',
-         'production': 'n2ab47pbfbu4um0sw5r3zd22q1zdorj7nlnj3qaaaqwdfigahkn6j1kp0ze49jjir84cud7dq4kezhms0jrwy14k1m609e8q50kxmgn9je3zlum0yrlr0njxc87bpss9',
-         'lkft': 'gdr5ww4npc7y7fby703hcz1b62bxrbpdt2ug1169wce02r2y2jiz96dy83n5xsm96uhnidxxotxj92uefy4degk3bwgiqgz1gq09h02yjipuon6wacfmkxnoocx4mdwg'
+token = {'staging': '',
+         'production': '',
+         'lkft': ''
     }
 
 

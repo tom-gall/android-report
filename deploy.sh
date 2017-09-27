@@ -4,6 +4,8 @@ if [ -d "${work_root}" ]; then
     work_root=${work_root}
 elif [ -d /sata250/django_instances ]; then
     work_root="/sata250/django_instances"
+elif [ -d /SATA3/django_instances ]; then
+    work_root="/SATA3/django_instances"
 elif [ -d /home/yongqin.liu/django_instance ]; then
     work_root="/home/yongqin.liu/django_instance"
 else
