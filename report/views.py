@@ -87,9 +87,9 @@ build_configs = {
                                                     'template_dir': "hikey-v2",
                                                    },
                   'android-lcr-reference-x15-o': {
-                                                    'lava_server': lava_server_production,
+                                                    'lava_server': lava_server_staging,
                                                     'img_ext': ".img",
-                                                    'template_dir': "x15",
+                                                    'template_dir': "x15-v2",
                                                    },
                 }
 
