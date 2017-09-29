@@ -37,7 +37,7 @@ names_ignore = ["test-attachment",
                 "test-skipped", "regression_4003_XTS", "regression_4003_NO_XTS", "subtests-fail-rate",
                 "tradefed-test-run", "check-adb-connectivity",
                 "3D-mean","Overall_Score-mean", "Memory_Bandwidth_Add_Multi_Core-mean", "Platform-mean", "Memory_Bandwidth-mean", "Memory_Bandwidth_Copy_Single_Core-mean", "Memory_Latency_64M_range-mean", "Memory_Bandwidth_Scale_Single_Core-mean", "Memory_Bandwidth_Copy_Multi_Core-mean", "Storage-mean", "Memory_Bandwidth_Triad_Single_Core-mean", "CoreMark-PRO_Base-mean", "Memory_Bandwidth_Add_Single_Core-mean", "CoreMark-PRO_Peak-mean", "Memory_Bandwidth_Scale_Multi_Core-mean", "Memory_Latency-mean", "Memory_Bandwidth_Triad_Multi_Core-mean",
-                "BOOTTIME_LOGCAT_ALL_COLLECT", "BOOTTIME_LOGCAT_EVENTS_COLLECT", "SERVICE_STARTED_ONCE", "BOOTTIME_ANALYZE", "BOOTTIME_DMESG_COLLECT",
+                "BOOTTIME_LOGCAT_ALL_COLLECT", "BOOTTIME_LOGCAT_EVENTS_COLLECT", "SERVICE_STARTED_ONCE", "BOOTTIME_ANALYZE", "BOOTTIME_DMESG_COLLECT", 'BOOTANIM_TIME', 'FS_MOUNT_DURATION', 'FS_MOUNT_TIME', 'KERNEL_BOOT_TIME', 'TOTAL_BOOT_TIME', 'ANDROID_SERVICE_START_TIME', 'ANDROID_BOOT_TIME', 'ANDROID_UI_SHOWN', 'SURFACEFLINGER_BOOT_TIME', 'INIT_TO_SURFACEFLINGER_START_TIME',
                 "start_bootchart", "enabled_bootchart", "stop_bootchart", "rm_start_file", "generate-bootchart-graphic",
                ]
 
@@ -49,10 +49,11 @@ job_status_dict = {0: "Submitted",
                   }
 
 
+job_priority_list = ['high', 'medium', 'low']
 user = "yongqin.liu"
-token = {'staging': '',
-         'production': '',
-         'lkft': ''
+token = {'staging': 'ty1dprzx7wysqrqmzuytccufwbyyl9xthwowgim0p0z5hm00t6mzwebyp4dgagmyg2f1kag9ln0s9dh212s3wdaxhasm0df7bqnumrwz1m5mbmf4xg780xgeo9x1348k',
+         'production': 'n2ab47pbfbu4um0sw5r3zd22q1zdorj7nlnj3qaaaqwdfigahkn6j1kp0ze49jjir84cud7dq4kezhms0jrwy14k1m609e8q50kxmgn9je3zlum0yrlr0njxc87bpss9',
+         'lkft': 'gdr5ww4npc7y7fby703hcz1b62bxrbpdt2ug1169wce02r2y2jiz96dy83n5xsm96uhnidxxotxj92uefy4degk3bwgiqgz1gq09h02yjipuon6wacfmkxnoocx4mdwg'
     }
 
 
@@ -529,6 +530,7 @@ class JobSubmissionForm(forms.Form):
                                               ("production", "production"),
                                               ("lkft", "lkft"),
                                              ))
+    job_priority = forms.ChoiceField(label='Priority', choices=zip(job_priority_list, job_priority_list))
     jobs = forms.MultipleChoiceField(widget=forms.CheckboxSelectMultiple)
 
 
@@ -550,6 +552,7 @@ def submit_lava_jobs(request):
             build_name = cd['build_name']
             build_no = cd['build_no']
             jobs = cd['jobs']
+            job_priority = cd['job_priority']
             lava_instance = cd['lava_instance']
             lava_server = build_configs[build_name]['lava_server']
 
@@ -571,7 +574,8 @@ def submit_lava_jobs(request):
                                      .replace("%%ANDROID_BOOT%%", "%s/boot%s" % (download_url, img_ext))\
                                      .replace("%%ANDROID_SYSTEM%%", "%s/system%s" % (download_url, img_ext))\
                                      .replace("%%ANDROID_DATA%%", "%s/userdata%s" % (download_url, img_ext))\
-                                     .replace("%%ANDROID_CACHE%%", "%s/cache%s" % (download_url, img_ext))
+                                     .replace("%%ANDROID_CACHE%%", "%s/cache%s" % (download_url, img_ext))\
+                                     .replace("priority: medium", "priority: %s" % job_priority)
                 try:
                     job_id = lava_server.scheduler.submit_job(job_definition)
                     submit_result.append({
@@ -612,6 +616,7 @@ def submit_lava_jobs(request):
         defaut_build_no = request.POST.get("build_no", defaut_build_no)
         form_initial = {"build_name": build_name,
                         "build_no": defaut_build_no,
+                        "job_priority": 'medium',
                        }
         form = JobSubmissionForm(initial=form_initial)
         form.fields["build_name"].choices = zip(build_names, build_names)
