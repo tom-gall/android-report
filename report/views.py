@@ -14,6 +14,7 @@ import yaml
 from lava_tool.authtoken import AuthenticatingServerProxy, KeyringAuthBackend
 
 # Create your views here.
+from models import TestCase, JobCache
 
 android_snapshot_url_base = "https://snapshots.linaro.org/android"
 ci_job_url_base = 'https://ci.linaro.org/job'
@@ -182,20 +183,35 @@ def jobs_dict_to_sorted_tuple(dict_jobs={}):
     jobs_tuple = []
     for job_name, job_details in dict_jobs.items():
         id_list = job_details.get("id_list")
+        status_list = job_details.get("status_list")
+        zip_id_status_list = zip(id_list, status_list)
+        zip_id_status_list.sort(reverse=True)
+        id_list, status_list = zip(*zip_id_status_list)
         status_string_list = []
-        for status in job_details.get("status_list"):
+        for status in status_list:
             status_string_list.append(job_status_dict[status])
         jobs_tuple.append({"name": job_name,
                            "id_list": id_list,
-                           "status_list": job_details.get("status_list"),
+                           "status_list": status_list,
                            "status_string_list": status_string_list,
                            "id_status_list": zip(id_list, status_string_list)})
     jobs_tuple.sort(key=get_job_name)
     return jobs_tuple
 
 
-def get_yaml_result(job_id, lava_server):
+def get_yaml_result(job_id):
     tests_res = {}
+    for test_case in TestCase.objects.filter(job_id=job_id):
+        tests_res[test_case.name] = {"name": test_case.name,
+                                     "result": test_case.result,
+                                     "measurement": test_case.measurement,
+                                     "unit": test_case.unit,
+                                     "suite": test_case.suite,
+                                     "job_id": job_id,
+                                    }
+    return tests_res
+
+def cache_job_result_to_db(job_id, lava_server):
     try:
         res = lava_server.results.get_testjob_results_yaml(job_id)
         for test in yaml.load(res):
@@ -208,14 +224,14 @@ def get_yaml_result(job_id, lava_server):
                 continue
             if test.get("measurement") and test.get("measurement") == "None":
                 test["measurement"] = None
-            tests_res[test.get("name")] = { "name": test.get("name"),
-                                            "result": test.get("result"),
-                                            "measurement": test.get("measurement"),
-                                            "unit": test.get("unit"),
-                                            "job_id": job_id,
-                                          }
+            TestCase.objects.create(name=test.get("name"),
+                                    result=test.get("result"),
+                                    measurement=test.get("measurement"),
+                                    unit=test.get("unit"),
+                                    suite=test.get("suite"),
+                                    job_id=job_id)
 
-        return tests_res
+        JobCache.objects.create(job_id=job_id, cached=True)
 
     except xmlrpclib.Fault as e:
         raise e
@@ -223,20 +239,37 @@ def get_yaml_result(job_id, lava_server):
         raise
 
 def resubmit_job(request):
-    job_id = request.GET.get("job_id", "")
-    build_name = request.GET.get("build_name", "")
-    if not job_id:
+    job_ids = request.POST.getlist("job_ids")
+    if len(job_ids) == 0:
+        job_id = request.GET.get("job_id", "")
+        build_name = request.GET.get("build_name", "")
+        if not job_id:
+            return render(request, 'job-resubmit.html',
+                          {
+                            'errors': True,
+                          })
+        job_ids = [job_id]
+    else:
+        build_name = request.POST.get("build_name", None)
+
+    if len(job_ids) == 0:
         return render(request, 'job-resubmit.html',
-                  {
-                   'errors': True,
-                  }
-        )
+                      {
+                        'errors': True,
+                      })
 
     lava_server = build_configs[build_name]['lava_server']
-    new_job_id = lava_server.scheduler.jobs.resubmit(job_id)
+
+    new_job_ids = []
+    for job_id in job_ids:
+        new_job_id = lava_server.scheduler.jobs.resubmit(job_id)
+        if new_job_id:
+            new_job_ids.append((job_id, new_job_id))
+        else:
+            new_job_ids.append((job_id, "--"))
     return render(request, 'job-resubmit.html',
                   {
-                   'job_id': new_job_id,
+                   'new_job_ids': new_job_ids,
                    'lava_server_job_prefix': lava_server_job_prefix["staging"],
                   }
         )
@@ -249,6 +282,14 @@ def get_default_build_no(all_build_numbers=[], defaut_build_no=None):
     else:
         return 0
 
+
+def is_job_cached(job_id):
+    try:
+        JobCache.objects.get(job_id=job_id)
+    except JobCache.DoesNotExist:
+        return False
+
+    return True
 
 def get_test_results_for_build(build_name, build_no, job_name_list=[]):
     jobs_failed = []
@@ -263,13 +304,17 @@ def get_test_results_for_build(build_name, build_no, job_name_list=[]):
         for job_id, job_status in id_status_list:
             if job_status != job_status_dict[2]:
                 continue
-            tests_res = get_yaml_result(job_id, lava_server)
+            if not is_job_cached(job_id):
+                cache_job_result_to_db(job_id, lava_server)
+
+            tests_res = get_yaml_result(job_id=job_id)
             if len(tests_res) != 0:
                 # use the last to replace the first
                 # might be better to change to use the better one
                 # compare the 2 results
                 job_total_res.update(tests_res)
                 result_job_id_status = (job_id, job_status)
+                break
 
         if len(job_total_res) == 0:
             jobs_failed.append(job)
@@ -283,6 +328,17 @@ def get_test_results_for_build(build_name, build_no, job_name_list=[]):
 
     return (jobs_failed, total_tests_res)
 
+def get_build_config_value(build_config_url, key="MANIFEST_BRANCH"):
+    response = urllib2.urlopen(build_config_url)
+    html = response.read()
+
+    pat = re.compile('%s=(?P<value>android-.+)' % key)
+    all_builds = pat.findall(html)
+    if len(all_builds) > 0:
+        return all_builds[0]
+    else:
+        return None
+
 def jobs(request):
     build_name = request.GET.get("build_name", DEFAULT_BUILD_NAME)
 
@@ -292,16 +348,17 @@ def jobs(request):
     (jobs_failed, total_tests_res) = get_test_results_for_build(build_name, build_no)
 
     build_config_url = "%s/%s" % (android_build_config_url_base, build_name.replace("android-", ""))
-
+    build_android_tag = get_build_config_value(build_config_url, key="MANIFEST_BRANCH")
     build_info = {
                     "build_name": build_name,
                     "build_no": build_no,
                     "ci_url_base": ci_job_url_base,
                     "snapshot_url_base": android_snapshot_url_base,
-                    "android_tag": "android-8.0.0_r4",
+                    "android_tag": build_android_tag,
                     "build_config_url": build_config_url,
                     "build_numbers": get_possible_builds(build_name),
                  }
+
     return render(request, 'jobs.html',
                   {
                    'jobs_failed': jobs_failed,
@@ -631,12 +688,14 @@ def submit_lava_jobs(request):
 def index(request):
     builds = {}
     for build_name in build_names:
+        build_config_url = "%s/%s" % (android_build_config_url_base, build_name.replace("android-", ""))
+        build_android_tag = get_build_config_value(build_config_url, key="MANIFEST_BRANCH")
         builds[build_name] = {
                                 "build_name": build_name,
-                                "android_version": "android-8.0.0_r4",
+                                "android_version": build_android_tag,
                                 "kernel_version": "4.9",
                                 "ci_link": "%s/%s" % (ci_job_url_base, build_name),
-                                "android_build_config_link": "%s/%s" % (android_build_config_url_base, build_name.replace("android-", "")),
+                                "android_build_config_link": build_config_url,
                                 "snapshot_url": '%s/%s/' % (android_snapshot_url_base, build_name),
                                 "job_status": "--",
                              }
@@ -648,10 +707,16 @@ def index(request):
                   })
 
 if __name__ == "__main__":
-    build_name = "android-lcr-reference-x15-o"
-    job_template = get_possible_job_names(build_name=build_name)
-    print str(job_template)
+#    get_yaml_result("191778")
+    build_name = "android-lcr-reference-hikey-o"
+    build_no = '20'
+#    job_template = get_possible_job_names(build_name=build_name)
+#    print str(job_template)
 #    (all_build_numbers, checklist_results) = get_test_results_for_job(build_name, server, jobs=[])
 #    for job_name, job_result in checklist_results.items():    for test_name, test_result in job_result.items():
 #    print str(checklist_results)
 
+    lava_server = build_configs[build_name]['lava_server']
+
+    jobs = jobs_dict_to_sorted_tuple(get_jobs(build_name, build_no, lava_server, job_name_list=[]))
+    print str(jobs)

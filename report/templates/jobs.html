@@ -45,6 +45,7 @@
 {% with jobs_failed|length as number_of_failed %}
 <h2>Failed Jobs list/Total Jobs: {{ number_of_failed }}/{{ jobs_result|length|add:number_of_failed }}</h2>
 {% endwith %}
+<form action="/report/resubmit-job/" method="post">
 <table border="2">
 <tr>
     <th>Job Name</th>
@@ -66,10 +67,12 @@
             <button name="resubmit_latest" disabled="true" onclick="this.disabled=true; window.location='/report/resubmit-job/?build_name={{ build_info.build_name }}&&job_id={% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}'">
                 Resubmit {% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}
             </button>
+            <input type="checkbox" name="job_ids" value="{% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}" selected="false" disabled="false"/>
             {% else %}
             <button name="resubmit_latest" onclick="this.disabled=true; window.location='/report/resubmit-job/?build_name={{ build_info.build_name }}&&job_id={% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}'">
                 Resubmit {% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}
             </button>
+            <input type="checkbox" name="job_ids" value="{% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}" checked="true"/>
 
             {% endif %}
         {% endwith %}
@@ -81,6 +84,10 @@
 </tr>
 {% endfor %}
 </table>
+{% csrf_token %} 
+<input type="hidden" name="build_name" value="{{ build_info.build_name }}"/>
+<input type="submit" value="Resubmit All Possible Failed Jobs"/>
+</form>
 <h2>Results List from lava jobs</h2>
 <table border="2">
 <tr>
