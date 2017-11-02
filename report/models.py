@@ -11,6 +11,7 @@ class TestCase(models.Model):
     unit = models.CharField(max_length=128, null=True)
     suite = models.CharField(max_length=16)
     job_id = models.CharField(max_length=16)
+    lava_nick = models.CharField(max_length=64)
 
     def __unicode__(self):
         if self.measurement:
@@ -20,7 +21,9 @@ class TestCase(models.Model):
 
 
 class JobCache(models.Model):
+    lava_nick = models.CharField(max_length=16)
     job_id = models.CharField(max_length=16)
     cached = models.BooleanField(default=False)
+
     def __str__(self):
-        return "%s %s" % (self.job_id, self.cached)
+        return "%s_%s %s" % (self.lava_nick, self.job_id, self.cached)

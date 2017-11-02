@@ -9,4 +9,5 @@ urlpatterns = [
     url(r'^compare/.*$', views.compare, name='compare'),
     url(r'^checklist/.*$', views.checklist, name='checklist'),
     url(r'^submit-jobs/.*$', views.submit_lava_jobs, name='submit_jobs'),
+    url(r'^report/.*$', views.test_report, name='test_report'),
 ]

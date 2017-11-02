@@ -27,15 +27,13 @@ pat_ignore = re.compile(".*("
                         "|-max"
                         "|-min"
                         "|-itr\d+"
-                        "|regression_\d+"
-                        "|arm64-v8a.+_executed"
-                        "|arm64-v8a.+_failed"
-                        "|armeabi-v7a.+_executed"
-                        "|armeabi-v7a.+_failed"
                         ")$")
 
+                        #"|regression_\d+"
+
 names_ignore = ["test-attachment",
-                "test-skipped", "regression_4003_XTS", "regression_4003_NO_XTS", "subtests-fail-rate",
+                "test-skipped",
+                "subtests-fail-rate", 'test-cases-fail-rate', # "regression_4003_XTS", "regression_4003_NO_XTS",
                 "tradefed-test-run", "check-adb-connectivity",
                 "3D-mean","Overall_Score-mean", "Memory_Bandwidth_Add_Multi_Core-mean", "Platform-mean", "Memory_Bandwidth-mean", "Memory_Bandwidth_Copy_Single_Core-mean", "Memory_Latency_64M_range-mean", "Memory_Bandwidth_Scale_Single_Core-mean", "Memory_Bandwidth_Copy_Multi_Core-mean", "Storage-mean", "Memory_Bandwidth_Triad_Single_Core-mean", "CoreMark-PRO_Base-mean", "Memory_Bandwidth_Add_Single_Core-mean", "CoreMark-PRO_Peak-mean", "Memory_Bandwidth_Scale_Multi_Core-mean", "Memory_Latency-mean", "Memory_Bandwidth_Triad_Multi_Core-mean",
                 "BOOTTIME_LOGCAT_ALL_COLLECT", "BOOTTIME_LOGCAT_EVENTS_COLLECT", "SERVICE_STARTED_ONCE", "BOOTTIME_ANALYZE", "BOOTTIME_DMESG_COLLECT", 'BOOTANIM_TIME', 'FS_MOUNT_DURATION', 'FS_MOUNT_TIME', 'KERNEL_BOOT_TIME', 'TOTAL_BOOT_TIME', 'ANDROID_SERVICE_START_TIME', 'ANDROID_BOOT_TIME', 'ANDROID_UI_SHOWN', 'SURFACEFLINGER_BOOT_TIME', 'INIT_TO_SURFACEFLINGER_START_TIME',
@@ -58,37 +56,45 @@ token = {'staging': 'ty1dprzx7wysqrqmzuytccufwbyyl9xthwowgim0p0z5hm00t6mzwebyp4d
     }
 
 
-lava_server_domain = {
-                'staging': "staging.validation.linaro.org",
-                'production': "validation.linaro.org",
-                'lkft': "lkft.validation.linaro.org",
-              }
+class LavaInstance(object):
+    def __init__(self, nick=None, domain=None, user=None, token=None):
+        self.nick = nick
+        self.domain = domain
+        self.user = user
+        self.token = token
+        self.url = "https://%s:%s@%s/RPC2/" % (user, token, domain)
+        self.job_url_prefix = "https://%s/scheduler/job" % domain
+        self.server = AuthenticatingServerProxy(self.url, auth_backend=KeyringAuthBackend())
 
-lava_server_url = {
-                'staging': "https://%s:%s@%s/RPC2/" % (user, token['staging'], lava_server_domain['staging']),
-                'production': "https://%s:%s@%s/RPC2/" % (user, token['production'], lava_server_domain['production']),
-                'lkft': "https://%s:%s@%s/RPC2/" % (user, token['lkft'], lava_server_domain['lkft']),
-              }
+NICK_LAVA_STAGING = 'staging'
+NICK_LAVA_PRODUCTION = 'production'
+NICK_LAVA_LKFT = 'lkft'
+LAVAS = { NICK_LAVA_STAGING: LavaInstance(nick=NICK_LAVA_STAGING,
+                                         domain="staging.validation.linaro.org",
+                                         user=user,
+                                         token=token[NICK_LAVA_STAGING]
+                                        ),
+         NICK_LAVA_PRODUCTION: LavaInstance(nick=NICK_LAVA_PRODUCTION,
+                                            domain="validation.linaro.org",
+                                            user=user,
+                                            token=token[NICK_LAVA_PRODUCTION]
+                                           ),
+         NICK_LAVA_LKFT: LavaInstance(nick=NICK_LAVA_LKFT,
+                                            domain="lkft.validation.linaro.org",
+                                            user=user,
+                                            token=token[NICK_LAVA_LKFT]
+                                           ),
+       }
 
-lava_server_job_prefix = {
-                'staging': "https://%s/scheduler/job" % lava_server_domain['staging'],
-                'production': "https://%s/scheduler/job" % lava_server_domain['production'],
-                'lkft': "https://%s/scheduler/job" % lava_server_domain['lkft'],
-              }
-
-lava_server_production = AuthenticatingServerProxy(lava_server_url['production'], auth_backend=KeyringAuthBackend())
-lava_server_lkft = AuthenticatingServerProxy(lava_server_url['lkft'], auth_backend=KeyringAuthBackend())
-lava_server_staging = AuthenticatingServerProxy(lava_server_url['staging'], auth_backend=KeyringAuthBackend())
-server = lava_server_staging
 
 build_configs = {
                   'android-lcr-reference-hikey-o': {
-                                                    'lava_server': lava_server_staging,
+                                                    'lava_server': LAVAS[NICK_LAVA_STAGING],
                                                     'img_ext': ".img.xz",
                                                     'template_dir': "hikey-v2",
                                                    },
                   'android-lcr-reference-x15-o': {
-                                                    'lava_server': lava_server_staging,
+                                                    'lava_server': LAVAS[NICK_LAVA_STAGING],
                                                     'img_ext': ".img",
                                                     'template_dir': "x15-v2",
                                                    },
@@ -142,13 +148,13 @@ def get_possible_job_names(build_name=DEFAULT_BUILD_NAME):
     return job_name_template_name_hash
 
 
-def get_jobs(build_name, build_no, lava_server, job_name_list=[]):
+def get_jobs(build_name, build_no, lava, job_name_list=[]):
     jobs_to_be_checked = get_possible_job_names(build_name=build_name).keys()
     if job_name_list is None or len(job_name_list) == 0 or len(job_name_list) > 1:
         search_condition = "description__icontains__%s-%s" % (build_name, build_no)
     elif len(job_name_list) == 1:
         search_condition = "description__icontains__%s-%s-%s" % (build_name, build_no, job_name_list[0])
-    jobs_from_lava = lava_server.results.make_custom_query("testjob", search_condition)
+    jobs_from_lava = lava.server.results.make_custom_query("testjob", search_condition)
     jobs = { }
     for job in jobs_from_lava:
         job_id = job.get("id")
@@ -211,9 +217,9 @@ def get_yaml_result(job_id):
                                     }
     return tests_res
 
-def cache_job_result_to_db(job_id, lava_server):
+def cache_job_result_to_db(job_id, lava):
     try:
-        res = lava_server.results.get_testjob_results_yaml(job_id)
+        res = lava.server.results.get_testjob_results_yaml(job_id)
         for test in yaml.load(res):
             if test.get("suite") == "lava":
                 continue
@@ -229,9 +235,10 @@ def cache_job_result_to_db(job_id, lava_server):
                                     measurement=test.get("measurement"),
                                     unit=test.get("unit"),
                                     suite=test.get("suite"),
+                                    lava_nick=lava.nick,
                                     job_id=job_id)
 
-        JobCache.objects.create(job_id=job_id, cached=True)
+        JobCache.objects.create(lava_nick=lava.nick, job_id=job_id, cached=True)
 
     except xmlrpclib.Fault as e:
         raise e
@@ -258,11 +265,11 @@ def resubmit_job(request):
                         'errors': True,
                       })
 
-    lava_server = build_configs[build_name]['lava_server']
+    lava = build_configs[build_name]['lava_server']
 
     new_job_ids = []
     for job_id in job_ids:
-        new_job_id = lava_server.scheduler.jobs.resubmit(job_id)
+        new_job_id = lava.server.scheduler.jobs.resubmit(job_id)
         if new_job_id:
             new_job_ids.append((job_id, new_job_id))
         else:
@@ -270,7 +277,7 @@ def resubmit_job(request):
     return render(request, 'job-resubmit.html',
                   {
                    'new_job_ids': new_job_ids,
-                   'lava_server_job_prefix': lava_server_job_prefix["staging"],
+                   'lava_server_job_prefix': lava.job_url_prefix,
                   }
         )
 
@@ -283,9 +290,9 @@ def get_default_build_no(all_build_numbers=[], defaut_build_no=None):
         return 0
 
 
-def is_job_cached(job_id):
+def is_job_cached(job_id, lava):
     try:
-        JobCache.objects.get(job_id=job_id)
+        JobCache.objects.get(job_id=job_id, lava_nick=lava.nick)
     except JobCache.DoesNotExist:
         return False
 
@@ -294,9 +301,9 @@ def is_job_cached(job_id):
 def get_test_results_for_build(build_name, build_no, job_name_list=[]):
     jobs_failed = []
     total_tests_res = {}
-    lava_server = build_configs[build_name]['lava_server']
+    lava = build_configs[build_name]['lava_server']
 
-    jobs = jobs_dict_to_sorted_tuple(get_jobs(build_name, build_no, lava_server, job_name_list=job_name_list))
+    jobs = jobs_dict_to_sorted_tuple(get_jobs(build_name, build_no, lava, job_name_list=job_name_list))
     for job in jobs:
         id_status_list = job.get("id_status_list")
         job_total_res = {}
@@ -304,8 +311,8 @@ def get_test_results_for_build(build_name, build_no, job_name_list=[]):
         for job_id, job_status in id_status_list:
             if job_status != job_status_dict[2]:
                 continue
-            if not is_job_cached(job_id):
-                cache_job_result_to_db(job_id, lava_server)
+            if not is_job_cached(job_id, lava):
+                cache_job_result_to_db(job_id, lava)
 
             tests_res = get_yaml_result(job_id=job_id)
             if len(tests_res) != 0:
@@ -363,7 +370,7 @@ def jobs(request):
                   {
                    'jobs_failed': jobs_failed,
                    'jobs_result': sorted(total_tests_res.items()),
-                   'lava_server_job_prefix': lava_server_job_prefix['staging'],
+                   'lava_server_job_prefix': build_configs[build_name]['lava_server'].job_url_prefix,
                    'build_info': build_info,
                   }
         )
@@ -504,14 +511,14 @@ def compare(request):
     return render(request, 'result-comparison.html',
                   {
                    "build_info": build_info,
-                   'lava_server_job_prefix': lava_server_job_prefix['staging'],
+                   'lava_server_job_prefix': build_configs[build_name]['lava_server'].job_url_prefix,
                    'form': form,
                    'compare_results': compare_results,
                   }
         )
 
 
-def get_test_results_for_job(build_name, lava_server, jobs=[]):
+def get_test_results_for_job(build_name, lava, jobs=[]):
     all_build_numbers = get_possible_builds(build_name)
     checklist_results = {}
     for build_no in all_build_numbers:
@@ -546,8 +553,7 @@ def checklist(request):
     if request.method == 'POST':
         build_name = request.POST.get("build_name", DEFAULT_BUILD_NAME)
         job_name = request.POST.get("job_name", "basic")
-        lava_server = build_configs[build_name]['lava_server']
-        (all_build_numbers, checklist_results) = get_test_results_for_job(build_name, lava_server, jobs=[job_name])
+        (all_build_numbers, checklist_results) = get_test_results_for_job(build_name, lava, jobs=[job_name])
         #(all_build_numbers, checklist_results) = get_test_results_for_job(build_name, lava_server, jobs=[])
     else:
         build_name = request.GET.get("build_name", DEFAULT_BUILD_NAME)
@@ -569,7 +575,7 @@ def checklist(request):
     return render(request, 'checklist.html',
                   {
                    "build_info": build_info,
-                   'lava_server_job_prefix': lava_server_job_prefix['staging'],
+                   'lava_server_job_prefix': build_configs[build_name]['lava_server'].job_url_prefix,
                    'form': form,
                    'checklist_results': checklist_results,
                    'all_build_numbers': all_build_numbers,
@@ -581,7 +587,7 @@ def checklist(request):
 class JobSubmissionForm(forms.Form):
     build_name = forms.ChoiceField(label='Build Name')
     build_no = forms.ChoiceField(label='Build No.')
-    lava_instance= forms.ChoiceField(label='LAVA Instance',
+    lava_nick= forms.ChoiceField(label='LAVA Instance',
                                      choices=(
                                               ("staging", "staging"),
                                               ("production", "production"),
@@ -610,8 +616,9 @@ def submit_lava_jobs(request):
             build_no = cd['build_no']
             jobs = cd['jobs']
             job_priority = cd['job_priority']
-            lava_instance = cd['lava_instance']
-            lava_server = build_configs[build_name]['lava_server']
+            lava_nick = cd['lava_nick']
+            ##lava = build_configs[build_name]['lava_server']
+            lava = LAVAS[lava_nick]
 
             submit_result = []
             for job_name in jobs:
@@ -634,12 +641,12 @@ def submit_lava_jobs(request):
                                      .replace("%%ANDROID_CACHE%%", "%s/cache%s" % (download_url, img_ext))\
                                      .replace("priority: medium", "priority: %s" % job_priority)
                 try:
-                    job_id = lava_server.scheduler.submit_job(job_definition)
+                    job_id = lava.server.scheduler.submit_job(job_definition)
                     submit_result.append({
                                            "job_name": job_name,
                                            "template": template,
                                            "template_url": url,
-                                           "lava_server_job_prefix": lava_server_job_prefix[lava_instance],
+                                           "lava_server_job_prefix": lava.job_url_prefix,
                                            "job_id": job_id,
                                          })
                 except xmlrpclib.Fault as e:
@@ -647,7 +654,7 @@ def submit_lava_jobs(request):
                                            "job_name": job_name,
                                            "template": template,
                                            "template_url": url,
-                                           "lava_server_job_prefix": lava_server_job_prefix[lava_instance],
+                                           "lava_server_job_prefix": lava.job_url_prefix,
                                            "job_id": None,
                                            "error": str(e),
                                           })
@@ -705,6 +712,153 @@ def index(request):
                   {
                     "builds": builds,
                   })
+def test_report(request):
+
+    cts = { 'cts-focused1-v7a': {'cts-focused1-v7a': None},
+            'cts-focused1-v8a': {'cts-focused1-v8a': None },
+            'cts-focused2-v7a': {'cts-focused2-v7a': None},
+            'cts-focused2-v8a': {'cts-focused2-v8a': None},
+            'cts-media-v7a': {'cts-media-v7a': None},
+            'cts-media-v8a': {'cts-media-v8a': None},
+            'cts-media2-v7a': {'cts-media2-v7a': None},
+            'cts-media2-v8a': {'cts-media2-v8a': None},
+            'cts-opengl-v7a': {'cts-opengl-v7a': None},
+            'cts-opengl-v8a': {'cts-opengl-v8a': None},
+            'cts-part1-v7a': {'cts-part1-v7a': None},
+            'cts-part1-v8a': {'cts-part1-v8a': None},
+            'cts-part2-v7a': {'cts-part2-v7a': None},
+            'cts-part2-v8a': {'cts-part2-v8a': None},
+            'cts-part3-v7a': {'cts-part3-v7a': None},
+            'cts-part3-v8a': {'cts-part3-v8a': None},
+            'cts-part4-v7a': {'cts-part4-v7a': None},
+            'cts-part4-v8a': {'cts-part4-v8a': None},
+            'cts-part5-v7a': {'cts-part5-v7a': None},
+            'cts-part5-v8a': {'cts-part5-v8a': None},
+          }
+
+    vts = { 'vts-hal': { 'vts-test': None },
+            'vts-kernel-kselftest': { 'vts-test': None },
+            'vts-kernel-ltp': { 'vts-test': None },
+            'vts-kernel-part1': { 'vts-test': None },
+            'vts-library': { 'vts-test': None },
+            'vts-performance': { 'vts-test': None },
+    }
+
+    build_name = request.GET.get("build_name", DEFAULT_BUILD_NAME)
+
+    all_build_numbers = get_possible_builds(build_name)
+    build_no = request.GET.get("build_no", get_default_build_no(all_build_numbers))
+
+    (jobs_failed, total_tests_res) = get_test_results_for_build(build_name, build_no)
+
+    lava_nick = build_configs[build_name]['lava_server'].nick
+    basic_optee_weekly = { # job_name: ['test_suite', ],
+                            "basic": [ "meminfo", 'meminfo-first', 'meminfo-second', "busybox", "ping", "linaro-android-kernel-tests", "tjbench"],
+                            "optee": [ "optee-xtest"],
+                            "weekly": [ 'media-codecs', 'piglit-gles2', 'piglit-gles3', 'piglit-glslparser', 'piglit-shader-runner', 'stringbench', 'libc-bench'],
+                         }
+    basic_optee_weekly_res = []
+    for job_name in sorted(basic_optee_weekly.keys()):
+        job_res = total_tests_res.get(job_name)
+        if job_res is None:
+            job_id = None
+        else:    
+            job_id = job_res['result_job_id_status'][0]
+        for test_suite in basic_optee_weekly[job_name]:
+            if job_id is None:
+                number_pass = 0
+                number_fail = 0
+                number_skip = 0
+            else:
+                number_pass = len(TestCase.objects.filter(job_id=job_id, lava_nick=lava_nick, suite__endswith='_%s' % test_suite, result='pass'))
+                number_fail = len(TestCase.objects.filter(job_id=job_id, lava_nick=lava_nick, suite__endswith='_%s' % test_suite, result='fail'))
+                number_skip = len(TestCase.objects.filter(job_id=job_id, lava_nick=lava_nick, suite__endswith='_%s' % test_suite, result='skip'))
+
+            number_total = number_pass + number_fail + number_skip
+            basic_optee_weekly_res.append({'job_name': job_name,
+                                           'job_id': job_id,
+                                           'test_suite': test_suite,
+                                           'number_pass': number_pass,
+                                           'number_fail': number_fail,
+                                           'number_skip': number_skip,
+                                           'number_total': number_total,
+                                          })
+
+    benchmarks = {  # job_name: {'test_suite':['test_case',]},
+                    "boottime": {
+                                  'boottime-analyze': ['KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg' ],
+                                  'boottime-first-analyze': ['KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg' ],
+                                  'boottime-second-analyze': ['KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg' ],
+                                },
+                    "basic": {
+                                "meminfo-first": [ 'MemTotal', 'MemFree', 'MemAvailable'],
+                                "meminfo": [ 'MemTotal', 'MemFree', 'MemAvailable'],
+                                "meminfo-second": [ 'MemTotal', 'MemFree', 'MemAvailable'],
+                             },
+
+                    #'andebenchpro2015': {'andebenchpro2015':[] },
+                    'antutu6': { 'antutu6': ['antutu6-sum-mean'] },
+                    #'applications': {},
+                    'benchmarkpi': {'benchmarkpi': ['benchmarkpi-mean',]},
+                    'caffeinemark': {'caffeinemark': ['Caffeinemark-Collect-score-mean', 'Caffeinemark-Float-score-mean', 'Caffeinemark-Loop-score-mean',
+                                          'Caffeinemark-Method-score-mean', 'Caffeinemark-score-mean', 'Caffeinemark-Sieve-score-mean', 'Caffeinemark-String-score-mean']},
+                    'cf-bench': {'cf-bench': ['cfbench-Overall-Score-mean', 'cfbench-Java-Score-mean', 'cfbench-Native-Score-mean']},
+                    'gearses2eclair': {'gearses2eclair': ['gearses2eclair',]},
+                    'geekbench3': {'geekbench3': ['geekbench-multi-core-mean', 'geekbench-single-core-mean']},
+                    #'glbenchmark-2.5.1': {'': ['',]},
+                    'javawhetstone': {'javawhetstone': ['javawhetstone-MWIPS-mean', 'javawhetstone-N1-float-mean', 'javawhetstone-N2-float-mean', 'javawhetstone-N3-if-mean', 'javawhetstone-N4-fixpt-mean',
+                                           'javawhetstone-N5-cos-mean', 'javawhetstone-N6-float-mean', 'javawhetstone-N7-equal-mean', 'javawhetstone-N8-exp-mean',]},
+                    'jbench': {'jbench': ['jbench-mean',]},
+                    'linpack': {'linpack': ['Linpack-MFLOPSMultiScore-mean', 'Linpack-TimeSingleScore-mean', 'Linpack-MFLOPSSingleScore-mean', 'Linpack-TimeMultiScore-mean']},
+                    'quadrantpro': {'quadrantpro': ['quadrandpro-benchmark-memory-mean', 'quadrandpro-benchmark-mean', 'quadrandpro-benchmark-g2d-mean', 'quadrandpro-benchmark-io-mean',
+                                         'quadrandpro-benchmark-cpu-mean', 'quadrandpro-benchmark-g3d-mean',]},
+                    'rl-sqlite': {'rl-sqlite': ['RL-sqlite-Overall-mean',]},
+                    'scimark': {'scimark': ['scimark-FFT-1024-mean', 'scimark-LU-100x100-mean', 'scimark-SOR-100x100-mean', 'scimark-Monte-Carlo-mean', 'scimark-Composite-Score-mean',]},
+                    'vellamo3': {'vellamo3': ['vellamo3-Browser-total-mean', 'vellamo3-Metal-total-mean', 'vellamo3-Multi-total-mean', 'vellamo3-total-score-mean',]},
+                 }
+    benchmarks_res = []
+    for job_name in sorted(benchmarks.keys()):
+        job_res = total_tests_res.get(job_name)
+        if job_res is None:
+            job_id = None
+        else:
+            job_id = job_res['result_job_id_status'][0]
+        for test_suite in sorted(benchmarks[job_name].keys()):
+            test_cases = benchmarks[job_name][test_suite]
+            for test_case in test_cases:
+                if job_id is None:
+                    unit = '--'
+                    measurement = '--'
+                else:
+                    try:
+                        test_case_res = TestCase.objects.get(job_id=job_id, lava_nick=lava_nick, suite__endswith='_%s' % test_suite, name=test_case)
+                        unit = test_case_res.unit
+                        measurement = test_case_res.measurement
+                    except TestCase.DoesNotExist:
+                        unit = '--'
+                        measurement = '--'
+
+                benchmarks_res.append({'job_name': job_name,
+                                       'job_id': job_id,
+                                       'test_case': test_case,
+                                       'test_suite': test_suite,
+                                       'unit': unit,
+                                       'measurement': measurement,
+                                      })
+    build_info = {
+                    'build_name': build_name,
+                    'build_no': build_no,
+                    'build_numbers': all_build_numbers,
+                 }
+
+    return render(request, 'test_report.html',
+                  {
+                   'lava_server_job_prefix': build_configs[build_name]['lava_server'].job_url_prefix,
+                   'build_info': build_info,
+                   'basic_optee_weekly_res': basic_optee_weekly_res,
+                   'benchmarks_res': benchmarks_res,
+                  }
+        )
 
 if __name__ == "__main__":
 #    get_yaml_result("191778")

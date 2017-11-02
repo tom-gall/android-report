@@ -1,0 +1,109 @@
+<h1>Test Report for Build {{ build_info.build_name}}-{{build_info.build_no}}</h1>
+<table>
+<tr>
+{% for build_no in build_info.build_numbers %}
+    {% ifequal build_no build_info.build_no %}
+        <td>{{ build_no }} </td>
+    {% else %}
+        <td><a href="/report/test_report/?build_name={{ build_info.build_name}}&&build_no={{ build_no }}">{{ build_no}} </a></td>
+    {% endifequal %}
+{% endfor %}
+
+</tr>
+</table>
+<hr/>
+<h2>Basic-Boottime-OPTEE-Weekly</h2>
+{% if basic_optee_weekly_res %}
+<table border="2">
+<tr>
+    <th>Job Name</th>
+    <th>Test Name</th>
+    <th>Pass</th>
+    <th>Fail</th>
+    <th>Skip</th>
+    <th>Total</th>
+</tr>
+{% for test_info in basic_optee_weekly_res %}
+<tr>
+    {% ifequal test_info.job_id '--' %}
+    <td> {{ test_info.job_name }}</td>
+    {% else %}
+    <td> <a href="{{ lava_server_job_prefix }}/{{ test_info.job_id }}">{{ test_info.job_name }}</a></td>
+    {% endifequal %}
+    <td> {{ test_info.test_suite }}</td>
+    <td> {{ test_info.number_pass }}</td>
+    {% ifequal test_info.number_fail 0 %}
+    <td> {{ test_info.number_fail }}</td>
+    {% else %}
+    <td style="background-color:red" > {{ test_info.number_fail }}</td>
+    {% endifequal %}
+    <td> {{ test_info.number_skip }}</td>
+    <td> {{ test_info.number_total }}</td>
+</tr>
+{% endfor %}
+</table>
+{% else %}
+No result for basic test, or optee test, or weekly test jobs
+{% endif %}
+<hr/>
+
+
+<h2>Benchmarks</h2>
+{% if basic_optee_weekly_res %}
+<table border="2">
+<tr>
+    <th>Benchmarks</th>
+    <th>Test Suite</th>
+    <th>Test Cases</th>
+    <th>Unit</th>
+    <th>Measurement</th>
+</tr>
+{% for test_info in benchmarks_res %}
+<tr>
+    {% ifequal test_info.job_id '--' %}
+    <td> {{ test_info.job_name }}</td>
+    {% else %}
+    <td> <a href="{{ lava_server_job_prefix }}/{{ test_info.job_id }}">{{ test_info.job_name }}</a></td>
+    {% endifequal %}
+    <td> {{ test_info.test_suite }}</td>
+    <td> {{ test_info.test_case }}</td>
+    <td> {{ test_info.unit }}</td>
+    <td> {{ test_info.measurement }}</td>
+</tr>
+{% endfor %}
+</table>
+{% else %}
+No result for basic test, or optee test, or weekly test jobs
+{% endif %}
+<hr/>
+
+
+<h2>CTS</h2>
+<table border="2">
+<tr>
+    <th>Plan</th>
+    <th>Module</th>
+    <th>v7a-pass</th>
+    <th>v7a-fail</th>
+    <th>v7a-skip</th>
+    <th>v7a-not-executed</th>
+    <th>v8a-pass</th>
+    <th>v8a-fail</th>
+    <th>v8a-skip</th>
+    <th>v8a-not-executed</th>
+    <th>Total</th>
+    <th>PassRate</th>
+</tr>
+
+</table>
+<h2>VTS</h2>
+<table border="2">
+<tr>
+    <th>Plan</th>
+    <th>Pass</th>
+    <th>Fail</th>
+    <th>Total</th>
+    <th>Pass Rate</th>
+    <th>Failed Test Cases</th>
+</tr>
+</table>

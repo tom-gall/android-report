@@ -44,3 +44,20 @@ python -m django --version
 cd ${work_root} && git clone https://git.linaro.org/people/yongqin.liu/public/lcr-report.git
 cd ${instance_dir} && python manage.py runserver 0.0.0.0:8000
 echo "Please update the LAVA_USER_TOKEN and LAVA_USER in report/views.py"
+
+# python manage.py createsuperuser
+# By running makemigrations, you’re telling Django that you’ve made some changes to your models (in this case,
+# you’ve made new ones) and that you’d like the changes to be stored as a migration.
+# python manage.py makemigrations report
+
+# The migrate command looks at the INSTALLED_APPS setting and creates any necessary database tables according to the database settings
+# in your mysite/settings.py file and the database migrations shipped with the app (we’ll cover those later)
+# Need to run after makemigrations so that the tables for report could be created
+# python manage.py migrate
+
+# There’s a command that will run the migrations for you and manage your database schema automatically - that’s called migrate,
+# and we’ll come to it in a moment - but first, let’s see what SQL that migration would run.
+# The sqlmigrate command takes migration names and returns their SQL:
+# Only shows the sql script, not creation
+# python manage.py sqlmigrate report 0002
+
