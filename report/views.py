@@ -14,7 +14,7 @@ import yaml
 from lava_tool.authtoken import AuthenticatingServerProxy, KeyringAuthBackend
 
 # Create your views here.
-from models import TestCase, JobCache
+from models import TestCase, JobCache, BaseResults
 
 android_snapshot_url_base = "https://snapshots.linaro.org/android"
 ci_job_url_base = 'https://ci.linaro.org/job'
@@ -346,6 +346,17 @@ def get_build_config_value(build_config_url, key="MANIFEST_BRANCH"):
     else:
         return None
 
+def get_commit_from_pinned_manifest(snapshot_url, path):
+    response = urllib2.urlopen(snapshot_url)
+    html = response.read()
+
+    # <project groups="device,ti" name="android/kernel.git" path="kernel/ti/x15" remote="git-ti-com" revision="1f7e74a78f44783eeab13c9f39f9fda6ded0a593" upstream="p-ti-android-linux-4.4.y"/>
+    pat = re.compile('path="%s" remote=".+" revision="(?P<commit_id>[\da-z]+)" ' % path)
+    matches = pat.findall(html)
+    if len(matches) > 0:
+        return matches[0]
+    else:
+        return None
 def jobs(request):
     build_name = request.GET.get("build_name", DEFAULT_BUILD_NAME)
 
@@ -713,38 +724,13 @@ def index(request):
                     "builds": builds,
                   })
 def test_report(request):
-
-    cts = { 'cts-focused1-v7a': {'cts-focused1-v7a': None},
-            'cts-focused1-v8a': {'cts-focused1-v8a': None },
-            'cts-focused2-v7a': {'cts-focused2-v7a': None},
-            'cts-focused2-v8a': {'cts-focused2-v8a': None},
-            'cts-media-v7a': {'cts-media-v7a': None},
-            'cts-media-v8a': {'cts-media-v8a': None},
-            'cts-media2-v7a': {'cts-media2-v7a': None},
-            'cts-media2-v8a': {'cts-media2-v8a': None},
-            'cts-opengl-v7a': {'cts-opengl-v7a': None},
-            'cts-opengl-v8a': {'cts-opengl-v8a': None},
-            'cts-part1-v7a': {'cts-part1-v7a': None},
-            'cts-part1-v8a': {'cts-part1-v8a': None},
-            'cts-part2-v7a': {'cts-part2-v7a': None},
-            'cts-part2-v8a': {'cts-part2-v8a': None},
-            'cts-part3-v7a': {'cts-part3-v7a': None},
-            'cts-part3-v8a': {'cts-part3-v8a': None},
-            'cts-part4-v7a': {'cts-part4-v7a': None},
-            'cts-part4-v8a': {'cts-part4-v8a': None},
-            'cts-part5-v7a': {'cts-part5-v7a': None},
-            'cts-part5-v8a': {'cts-part5-v8a': None},
-          }
-
-    vts = { 'vts-hal': { 'vts-test': None },
-            'vts-kernel-kselftest': { 'vts-test': None },
-            'vts-kernel-ltp': { 'vts-test': None },
-            'vts-kernel-part1': { 'vts-test': None },
-            'vts-library': { 'vts-test': None },
-            'vts-performance': { 'vts-test': None },
-    }
-
     build_name = request.GET.get("build_name", DEFAULT_BUILD_NAME)
+
+    base_build_name = build_name
+    # 0 for old version, might be input manually into db
+    #base_build_no = 'nogat-mlcr-17.05'
+    base_build_no = 'N-M-1705'
+    #base_lava_nick = NICK_LAVA_STAGING
 
     all_build_numbers = get_possible_builds(build_name)
     build_no = request.GET.get("build_no", get_default_build_no(all_build_numbers))
@@ -752,17 +738,24 @@ def test_report(request):
     (jobs_failed, total_tests_res) = get_test_results_for_build(build_name, build_no)
 
     lava_nick = build_configs[build_name]['lava_server'].nick
-    basic_optee_weekly = { # job_name: ['test_suite', ],
-                            "basic": [ "meminfo", 'meminfo-first', 'meminfo-second', "busybox", "ping", "linaro-android-kernel-tests", "tjbench"],
-                            "optee": [ "optee-xtest"],
+    basic_weekly = { # job_name: ['test_suite', ],
+                            #"basic": [ "meminfo", 'meminfo-first', 'meminfo-second', "busybox", "ping", "linaro-android-kernel-tests", "tjbench"],
+                            "basic": [ 'meminfo-first', 'meminfo-second', "busybox", "ping", "linaro-android-kernel-tests", "tjbench"],
                             "weekly": [ 'media-codecs', 'piglit-gles2', 'piglit-gles3', 'piglit-glslparser', 'piglit-shader-runner', 'stringbench', 'libc-bench'],
                          }
+
+    optee = { # job_name: ['test_suite', ],
+              "optee": [ "optee-xtest"],
+            }
+    basic_optee_weekly = basic_weekly.copy()
+    if build_name.find("hikey") >= 0:
+        basic_optee_weekly.update(optee)
     basic_optee_weekly_res = []
     for job_name in sorted(basic_optee_weekly.keys()):
         job_res = total_tests_res.get(job_name)
         if job_res is None:
             job_id = None
-        else:    
+        else:
             job_id = job_res['result_job_id_status'][0]
         for test_suite in basic_optee_weekly[job_name]:
             if job_id is None:
@@ -774,7 +767,15 @@ def test_report(request):
                 number_fail = len(TestCase.objects.filter(job_id=job_id, lava_nick=lava_nick, suite__endswith='_%s' % test_suite, result='fail'))
                 number_skip = len(TestCase.objects.filter(job_id=job_id, lava_nick=lava_nick, suite__endswith='_%s' % test_suite, result='skip'))
 
+            try:
+                base = BaseResults.objects.get(build_name=base_build_name, build_no=base_build_no, plan_suite=test_suite, module_testcase=test_suite)
+            except BaseResults.DoesNotExist:
+                base = None
+
             number_total = number_pass + number_fail + number_skip
+            number_passrate = 0
+            if  number_total != 0:
+                number_passrate = float(number_pass * 100 / number_total)
             basic_optee_weekly_res.append({'job_name': job_name,
                                            'job_id': job_id,
                                            'test_suite': test_suite,
@@ -782,17 +783,19 @@ def test_report(request):
                                            'number_fail': number_fail,
                                            'number_skip': number_skip,
                                            'number_total': number_total,
+                                           'number_passrate': number_passrate,
+                                           'base': base,
                                           })
 
     benchmarks = {  # job_name: {'test_suite':['test_case',]},
                     "boottime": {
-                                  'boottime-analyze': ['KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg' ],
+                                  #'boottime-analyze': ['KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg' ],
                                   'boottime-first-analyze': ['KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg' ],
                                   'boottime-second-analyze': ['KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg' ],
                                 },
                     "basic": {
                                 "meminfo-first": [ 'MemTotal', 'MemFree', 'MemAvailable'],
-                                "meminfo": [ 'MemTotal', 'MemFree', 'MemAvailable'],
+                                #"meminfo": [ 'MemTotal', 'MemFree', 'MemAvailable'],
                                 "meminfo-second": [ 'MemTotal', 'MemFree', 'MemAvailable'],
                              },
 
@@ -809,13 +812,18 @@ def test_report(request):
                     'javawhetstone': {'javawhetstone': ['javawhetstone-MWIPS-mean', 'javawhetstone-N1-float-mean', 'javawhetstone-N2-float-mean', 'javawhetstone-N3-if-mean', 'javawhetstone-N4-fixpt-mean',
                                            'javawhetstone-N5-cos-mean', 'javawhetstone-N6-float-mean', 'javawhetstone-N7-equal-mean', 'javawhetstone-N8-exp-mean',]},
                     'jbench': {'jbench': ['jbench-mean',]},
-                    'linpack': {'linpack': ['Linpack-MFLOPSMultiScore-mean', 'Linpack-TimeSingleScore-mean', 'Linpack-MFLOPSSingleScore-mean', 'Linpack-TimeMultiScore-mean']},
+                    'linpack': {'linpack': ['Linpack-MFLOPSSingleScore-mean', 'Linpack-MFLOPSMultiScore-mean', 'Linpack-TimeSingleScore-mean', 'Linpack-TimeMultiScore-mean']},
                     'quadrantpro': {'quadrantpro': ['quadrandpro-benchmark-memory-mean', 'quadrandpro-benchmark-mean', 'quadrandpro-benchmark-g2d-mean', 'quadrandpro-benchmark-io-mean',
                                          'quadrandpro-benchmark-cpu-mean', 'quadrandpro-benchmark-g3d-mean',]},
                     'rl-sqlite': {'rl-sqlite': ['RL-sqlite-Overall-mean',]},
                     'scimark': {'scimark': ['scimark-FFT-1024-mean', 'scimark-LU-100x100-mean', 'scimark-SOR-100x100-mean', 'scimark-Monte-Carlo-mean', 'scimark-Composite-Score-mean',]},
                     'vellamo3': {'vellamo3': ['vellamo3-Browser-total-mean', 'vellamo3-Metal-total-mean', 'vellamo3-Multi-total-mean', 'vellamo3-total-score-mean',]},
                  }
+    less_is_better_measurement = [
+                                  'KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg',
+                                  'benchmarkpi-mean',
+                                  'Linpack-TimeSingleScore-mean', 'Linpack-TimeMultiScore-mean', 'RL-sqlite-Overall-mean'
+                                 ]
     benchmarks_res = []
     for job_name in sorted(benchmarks.keys()):
         job_res = total_tests_res.get(job_name)
@@ -838,25 +846,242 @@ def test_report(request):
                         unit = '--'
                         measurement = '--'
 
+                try:
+                    base = BaseResults.objects.get(build_name=base_build_name, build_no=base_build_no, plan_suite=test_suite, module_testcase=test_case)
+                except BaseResults.DoesNotExist:
+                    base = None
+
+                if measurement == '--':
+                    difference = -100
+                elif base is None:
+                    difference = 100
+                else:
+                    difference = (measurement - base.measurement ) * 100 / base.measurement
+                    if test_case in less_is_better_measurement:
+                        difference = difference * -1
+
                 benchmarks_res.append({'job_name': job_name,
                                        'job_id': job_id,
                                        'test_case': test_case,
                                        'test_suite': test_suite,
                                        'unit': unit,
                                        'measurement': measurement,
+                                       'base': base,
+                                       'difference': difference,
                                       })
+
+
+    #########################################################
+    ########### result for vts ##############################
+    #########################################################
+    # test_suite is "vts-test"
+    vts = [
+            'vts-hal',
+            'vts-kernel-kselftest',
+            'vts-kernel-ltp',
+            'vts-kernel-part1',
+            'vts-library',
+            'vts-performance',
+          ]
+    vts_res = []
+    summary = {
+                'pass': 0,
+                'fail': 0,
+                'total': 0,
+               }
+    for job_name in vts:
+        job_res = total_tests_res.get(job_name)
+        if job_res is None:
+            job_id = None
+            number_pass = 0
+            number_fail = 0
+            number_total = 0
+            failed_testcases = []
+        else:
+            job_id = job_res['result_job_id_status'][0]
+            number_pass = len(TestCase.objects.filter(job_id=job_id, lava_nick=lava_nick, suite__endswith='_vts-test', result='pass'))
+            failed_testcases = TestCase.objects.filter(job_id=job_id, lava_nick=lava_nick, suite__endswith='_vts-test', result='fail')
+            number_fail = len(failed_testcases)
+            number_total = number_pass + number_fail
+
+        if number_total == 0:
+            number_passrate = 0.00
+        else:
+            number_passrate = float(number_pass * 100 / number_total)
+
+        try:
+            base = BaseResults.objects.get(build_name=base_build_name, build_no=base_build_no, plan_suite=job_name, module_testcase=job_name)
+        except BaseResults.DoesNotExist:
+            base = None
+        vts_res.append({'job_name': job_name,
+                        'job_id': job_id,
+                        'number_pass': number_pass,
+                        'number_fail': number_fail,
+                        'number_total': number_total,
+                        'number_passrate': number_passrate,
+                        'failed_testcases': failed_testcases,
+                        'base': base,
+                       })
+        summary['pass'] = summary['pass'] + number_pass
+        summary['fail'] = summary['fail'] + number_fail
+        summary['total'] = summary['total'] + number_total
+
+    pass_rate = 0
+    if summary['total'] != 0:
+        pass_rate = float(summary['pass'] * 100 / summary['total'])
+    vts_res.append({'job_name': "Summary",
+                    'job_id': '--',
+                    'number_pass': summary['pass'],
+                    'number_fail': summary['fail'],
+                    'number_total': summary['total'],
+                    'number_passrate': pass_rate,
+                    'failed_testcases': [],
+                   })
+    #########################################################
+    ########### result for cts ##############################
+    #########################################################
+    # test_suite is the same as job name
+    cts_v7a = [ 'cts-focused1-v7a',
+                'cts-focused2-v7a',
+                'cts-media-v7a',
+                'cts-media2-v7a',
+                'cts-opengl-v7a',
+                'cts-part1-v7a',
+                'cts-part2-v7a',
+                'cts-part3-v7a',
+                'cts-part4-v7a',
+                'cts-part5-v7a',
+              ]
+    cts_v8a = [ 'cts-focused1-v8a',
+                'cts-focused2-v8a',
+                'cts-media-v8a',
+                'cts-media2-v8a',
+                'cts-opengl-v8a',
+                'cts-part1-v8a',
+                'cts-part2-v8a',
+                'cts-part3-v8a',
+                'cts-part4-v8a',
+                'cts-part5-v8a',
+              ]
+    cts = cts_v7a + []
+    if build_name.find("hikey") >= 0:
+        cts = cts_v7a + cts_v8a
+    cts_res = []
+    summary = {
+                'pass': 0,
+                'fail': 0,
+                'total': 0,
+               }
+    for job_name in sorted(cts):
+        job_res = total_tests_res.get(job_name)
+        if job_res is None:
+            cts_res.append({'job_name': job_name,
+                            'job_id': '--',
+                            'module_name': '--',
+                            'number_pass': 0,
+                            'number_fail': 0,
+                            'number_total': 0,
+                            'number_passrate': 0,
+                           })
+        else:
+            job_id = job_res['result_job_id_status'][0]
+            modules_res = TestCase.objects.filter(job_id=job_id, lava_nick=lava_nick, suite__endswith='_%s' % job_name)
+            cts_one_job_hash = {}
+            for module  in modules_res:
+                temp_hash = {}
+                number = int(module.measurement)
+                module_name = None
+                if module.name.endswith('_executed'):
+                    module_name = module.name.replace('_executed', '')
+                    temp_hash['total'] = number
+                elif module.name.endswith('_passed'):
+                    module_name = module.name.replace('_passed', '')
+                    temp_hash['pass'] = number
+                elif module.name.endswith('_failed'):
+                    module_name = module.name.replace('_failed', '')
+                    temp_hash['fail'] = number
+                else:
+                    # there should be no such case
+                    pass
+
+                # modules should not be None here
+                if cts_one_job_hash.get(module_name) is None:
+                    cts_one_job_hash[module_name] = temp_hash
+                else:
+                    cts_one_job_hash[module_name].update(temp_hash)
+
+            for module_name in sorted(cts_one_job_hash.keys()):
+                module_res = cts_one_job_hash[module_name]
+                number_pass = module_res.get('pass')
+                number_fail = module_res.get('fail')
+                number_total = module_res.get('total')
+                if number_total == 0:
+                    number_passrate = 0
+                else:
+                    number_passrate = float(number_pass * 100 / number_total )
+                try:
+                    base = BaseResults.objects.get(build_name=base_build_name, build_no=base_build_no, plan_suite=job_name, module_testcase=module_name)
+                except BaseResults.DoesNotExist:
+                    base = None
+                cts_res.append({'job_name': job_name,
+                                'job_id': job_id,
+                                'module_name': module_name,
+                                'number_pass': number_pass,
+                                'number_fail': number_fail,
+                                'number_total': number_total,
+                                'number_passrate': number_passrate,
+                                'base': base,
+                               })
+                summary['pass'] = summary['pass'] + number_pass
+                summary['fail'] = summary['fail'] + number_fail
+                summary['total'] = summary['total'] + number_total
+
+
+    pass_rate = 0
+    if  summary['total'] != 0:
+        pass_rate = float(summary['pass'] * 100 / summary['total'])
+    cts_res.append({'job_name': "Summary",
+                    'job_id': '--',
+                    'module_name': 'Total',
+                    'number_pass': summary['pass'],
+                    'number_fail': summary['fail'],
+                    'number_total': summary['total'],
+                    'number_passrate': pass_rate,
+                   })
+    ##############################################################
+
+    snapshot_url = '%s/%s/%s' % (android_snapshot_url_base, build_name, build_no)
+    pinned_manifest_url = '%s/pinned-manifest.xml' % snapshot_url
+    if build_name.find('x15') >= 0:
+        kernel_commit = get_commit_from_pinned_manifest(pinned_manifest_url, 'kernel/ti/x15')
+        kernel_url = 'http://git.ti.com/android/kernel/commit/%s' % kernel_commit
+        kernel_version = '4.4.91'
+    else:
+        kernel_url = '--'
+        kernel_version = '--'
+    build_config_url = "%s/%s" % (android_build_config_url_base, build_name.replace("android-", ""))
+    build_android_tag = get_build_config_value(build_config_url, key="MANIFEST_BRANCH")
     build_info = {
                     'build_name': build_name,
                     'build_no': build_no,
                     'build_numbers': all_build_numbers,
+                    'build_config_url': build_config_url,
+                    'build_config_name': build_name.replace("android-", ""),
+                    'android_version': build_android_tag,
+                    'kernel_version': kernel_version,
+                    'kernel_url': kernel_url,
+                    'ci_link': '%s/%s/%s' % (ci_job_url_base, build_name, build_no),
+                    'snapshot_url': snapshot_url,
+                    'base_build_no': base_build_no,
                  }
-
     return render(request, 'test_report.html',
                   {
                    'lava_server_job_prefix': build_configs[build_name]['lava_server'].job_url_prefix,
                    'build_info': build_info,
                    'basic_optee_weekly_res': basic_optee_weekly_res,
                    'benchmarks_res': benchmarks_res,
+                   'vts_res': vts_res,
+                   'cts_res': cts_res,
                   }
         )
 

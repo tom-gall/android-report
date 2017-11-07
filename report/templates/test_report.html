@@ -1,3 +1,5 @@
+<title>Test Report for Build {{ build_info.build_name}}-{{build_info.build_no}}</title>
+<div align="center">
 <h1>Test Report for Build {{ build_info.build_name}}-{{build_info.build_no}}</h1>
 <table>
 <tr>
@@ -5,23 +7,60 @@
     {% ifequal build_no build_info.build_no %}
         <td>{{ build_no }} </td>
     {% else %}
-        <td><a href="/report/test_report/?build_name={{ build_info.build_name}}&&build_no={{ build_no }}">{{ build_no}} </a></td>
+        <td><a href="/report/test-report/?build_name={{ build_info.build_name}}&&build_no={{ build_no }}">{{ build_no}} </a></td>
     {% endifequal %}
 {% endfor %}
 
 </tr>
 </table>
 <hr/>
-<h2>Basic-Boottime-OPTEE-Weekly</h2>
+<h2>Build Summary</h2>
+<table border=2>
+    <tr>
+        <th align="left">Build Name </th>
+        <td>{{ build_info.build_name}} </td>
+    <tr/>
+    <tr>
+        <th align="left">Build Number </th>
+        <td>{{ build_info.build_no}} </td>
+    <tr/>
+    <tr>
+        <th align="left">Build Config </th>
+        <td><a href="{{ build_info.build_config_url }}">{{ build_info.build_config_name }} </a></td>
+    <tr/>
+    <tr>
+        <th align="left">Android Version </th>
+        <td>{{ build_info.android_version }}</td>
+    <tr/>
+    <tr>
+        <th align="left">Kernel Version </th>
+        {% ifequal build_info.kernel_url '--' %}
+        <td>{{ build_info.kernel_version }}</td>
+        {% else %}
+        <td> <a href="{{ build_info.kernel_url }}">{{ build_info.kernel_version }}</a></td>
+        {% endifequal %}
+    <tr/>
+</table>
+<hr/>
+<h2>Basic Weekly</h2>
 {% if basic_optee_weekly_res %}
 <table border="2">
 <tr>
-    <th>Job Name</th>
-    <th>Test Name</th>
+    <th rowspan=2>Job Name</th>
+    <th rowspan=2>Test Name</th>
+    <th colspan=3>Base({{ build_info.base_build_no }})</th>
+    <th colspan=5>Current Build</th>
+    <th rowspan=2 >Bugs</th>
+</tr>
+<tr>
+    <th>Pass</th>
+    <th>Fail</th>
+    <th>Total</th>
     <th>Pass</th>
     <th>Fail</th>
     <th>Skip</th>
     <th>Total</th>
+    <th>PassRate</th>
 </tr>
 {% for test_info in basic_optee_weekly_res %}
 <tr>
@@ -30,15 +69,34 @@
     {% else %}
     <td> <a href="{{ lava_server_job_prefix }}/{{ test_info.job_id }}">{{ test_info.job_name }}</a></td>
     {% endifequal %}
-    <td> {{ test_info.test_suite }}</td>
-    <td> {{ test_info.number_pass }}</td>
-    {% ifequal test_info.number_fail 0 %}
-    <td> {{ test_info.number_fail }}</td>
+    <td align='left'> {{ test_info.test_suite }}</td>
+    {% with test_info.base as base %}
+    {% if base %}
+    <td align='right'> {{ base.number_pass }}</td>
+    <td align='right'> {{ base.number_fail }}</td>
+    <td align='right'> {{ base.number_total }}</td>
     {% else %}
-    <td style="background-color:red" > {{ test_info.number_fail }}</td>
+    <td align='right'> -- </td>
+    <td align='right'> -- </td>
+    <td align='right'> -- </td>
+    {% endif %}
+    {% endwith %}
+    <td align='right'> {{ test_info.number_pass }}</td>
+    {% ifequal test_info.number_fail 0 %}
+    <td align='right'> {{ test_info.number_fail }}</td>
+    {% else %}
+    <td align='right' style="background-color:red" > {{ test_info.number_fail }}</td>
     {% endifequal %}
-    <td> {{ test_info.number_skip }}</td>
-    <td> {{ test_info.number_total }}</td>
+    <td align='right'> {{ test_info.number_skip }}</td>
+    <td align='right'> {{ test_info.number_total }}</td>
+    {% if test_info.number_passrate == 0 %}
+    <td align='right' style="background-color:red" > {{ test_info.number_passrate|floatformat:2 }}</td>
+    {% elif test_info.number_passrate == 100 %}
+    <td align='right' style="background-color:green" > {{ test_info.number_passrate|floatformat:2 }}</td>
+    {% else  %}
+    <td align='right'  > {{ test_info.number_passrate|floatformat:2 }}</td>
+    {% endif %}
+    <td align='left'></td>
 </tr>
 {% endfor %}
 </table>
@@ -49,14 +107,17 @@ No result for basic test, or optee test, or weekly test jobs
 
 
 <h2>Benchmarks</h2>
-{% if basic_optee_weekly_res %}
+{% if benchmarks_res %}
 <table border="2">
 <tr>
     <th>Benchmarks</th>
     <th>Test Suite</th>
     <th>Test Cases</th>
     <th>Unit</th>
-    <th>Measurement</th>
+    <th>Base({{ build_info.base_build_no }})</th>
+    <th>Current</th>
+    <th>Difference(%)</th>
+    <th>Bugs</th>
 </tr>
 {% for test_info in benchmarks_res %}
 <tr>
@@ -68,42 +129,159 @@ No result for basic test, or optee test, or weekly test jobs
     <td> {{ test_info.test_suite }}</td>
     <td> {{ test_info.test_case }}</td>
     <td> {{ test_info.unit }}</td>
-    <td> {{ test_info.measurement }}</td>
+    {% with test_info.base as base %}
+    {% if base %}
+    <td align='right'> {{ base.measurement }}</td>
+    {% else %}
+    <td align='right'> -- </td>
+    {% endif %}
+    {% endwith %}
+    <td align='right'> {{ test_info.measurement }}</td>
+    {% if test_info.difference >= 50 %}
+    <td align='right' style="background-color:green" > {{ test_info.difference|floatformat:2 }}</td>
+    {% elif test_info.difference <= -50 %}
+    <td align='right' style="background-color:red" > {{ test_info.difference|floatformat:2 }}</td>
+    {% else  %}
+    <td align='right'> {{ test_info.difference |floatformat:2 }}</td>
+    {% endif %}
+    <td align='left'> </td>
 </tr>
 {% endfor %}
 </table>
 {% else %}
-No result for basic test, or optee test, or weekly test jobs
+No result for benchmark test jobs.
 {% endif %}
 <hr/>
 
 
 <h2>CTS</h2>
+{% if cts_res %}
 <table border="2">
 <tr>
-    <th>Plan</th>
-    <th>Module</th>
-    <th>v7a-pass</th>
-    <th>v7a-fail</th>
-    <th>v7a-skip</th>
-    <th>v7a-not-executed</th>
-    <th>v8a-pass</th>
-    <th>v8a-fail</th>
-    <th>v8a-skip</th>
-    <th>v8a-not-executed</th>
-    <th>Total</th>
-    <th>PassRate</th>
+    <th rowspan=2>Plan</th>
+    <th rowspan=2>Module</th>
+    <th colspan=4>Base({{ build_info.base_build_no }})</th>
+    <th colspan=4>Current</th>
+    <th rowspan=2>Bugs</th>
 </tr>
 
-</table>
-<h2>VTS</h2>
-<table border="2">
 <tr>
-    <th>Plan</th>
     <th>Pass</th>
     <th>Fail</th>
     <th>Total</th>
     <th>Pass Rate</th>
-    <th>Failed Test Cases</th>
+    <th>Pass</th>
+    <th>Fail</th>
+    <th>Total</th>
+    <th>Pass Rate</th>
 </tr>
+{% for test_info in cts_res %}
+<tr>
+    {% ifequal test_info.job_id '--' %}
+    <td> {{ test_info.job_name }}</td>
+    {% else %}
+    <td> <a href="{{ lava_server_job_prefix }}/{{ test_info.job_id }}">{{ test_info.job_name }}</a></td>
+    {% endifequal %}
+    <td align='right'> {{ test_info.module_name }}</td>
+    {% with test_info.base as base %}
+    {% if base %}
+    <td align='right'> {{ base.number_pass }}</td>
+    <td align='right'> {{ base.number_fail }}</td>
+    <td align='right'> {{ base.number_total }}</td>
+    <td align='right'> {{ base.number_passrate|floatformat:2 }}</td>
+    {% else %}
+    <td align='right'> -- </td>
+    <td align='right'> -- </td>
+    <td align='right'> -- </td>
+    <td align='right'> -- </td>
+    {% endif %}
+    {% endwith %}
+    <td align='right'> {{ test_info.number_pass }}</td>
+    <td align='right'> {{ test_info.number_fail }}</td>
+    <td align='right'> {{ test_info.number_total }}</td>
+    {% if test_info.number_passrate == 0 %}
+    <td align='right' style="background-color:red" > {{ test_info.number_passrate|floatformat:2 }}</td>
+    {% elif test_info.number_passrate == 100 %}
+    <td align='right' style="background-color:green" > {{ test_info.number_passrate|floatformat:2 }}</td>
+    {% else  %}
+    <td align='right'  > {{ test_info.number_passrate|floatformat:2 }}</td>
+    {% endif %}
+    <td align='left'> </td>
+</tr>
+{% endfor %}
 </table>
+{% else %}
+No result for benchmark test jobs.
+{% endif %}
+<hr/>
+<h2>VTS</h2>
+{% if vts_res %}
+<table border="2">
+<tr>
+    <th rowspan=2>Plan</th>
+    <th colspan=4>Base({{ build_info.base_build_no }})</th>
+    <th colspan=4>Current</th>
+    <th rowspan=2>Current Failed Test Cases</th>
+    <th rowspan=2>Bugs</th>
+</tr>
+<tr>
+    <th>Pass</th>
+    <th>Fail</th>
+    <th>Total</th>
+    <th>Pass Rate</th>
+    <th>Pass</th>
+    <th>Fail</th>
+    <th>Total</th>
+    <th>Pass Rate</th>
+</tr>
+{% for test_info in vts_res %}
+<tr>
+    {% ifequal test_info.job_id '--' %}
+    <td> {{ test_info.job_name }}</td>
+    {% else %}
+    <td> <a href="{{ lava_server_job_prefix }}/{{ test_info.job_id }}">{{ test_info.job_name }}</a></td>
+    {% endifequal %}
+    {% with test_info.base as base %}
+    {% if base %}
+    <td align='right'> {{ base.number_pass }}</td>
+    <td align='right'> {{ base.number_fail }}</td>
+    <td align='right'> {{ base.number_total }}</td>
+    <td align='right'> {{ base.number_passrate|floatformat:2 }}</td>
+    {% else %}
+    <td align='right'> -- </td>
+    <td align='right'> -- </td>
+    <td align='right'> -- </td>
+    <td align='right'> -- </td>
+    {% endif %}
+    {% endwith %}
+    <td align='right'> {{ test_info.number_pass }}</td>
+    <td align='right'> {{ test_info.number_fail }}</td>
+    <td align='right'> {{ test_info.number_total }}</td>
+
+    {% if test_info.number_passrate == 0 %}
+    <td align='right' style="background-color:red" > {{ test_info.number_passrate|floatformat:2 }}</td>
+    {% elif test_info.number_passrate == 100 %}
+    <td align='right' style="background-color:green" > {{ test_info.number_passrate|floatformat:2 }}</td>
+    {% else %}
+    <td align='right'> {{ test_info.number_passrate|floatformat:2 }}</td>
+    {% endif %}
+    {% with test_info.failed_testcases as failed_testcases %}
+        {% ifequal test_info.number_total 0 %}
+            <td> -- </td>
+        {% else %}
+            <td>
+                {% for test_case in failed_testcases %}
+                {{ test_case.name }} <br/>
+                {% endfor %}
+            </td>
+        {% endifequal %}
+    {% endwith%}
+    <td align='left'> </td>
+</tr>
+{% endfor %}
+</table>
+{% else %}
+No result for benchmark test jobs.
+{% endif %}
+<hr/>
+</div>
