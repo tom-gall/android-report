@@ -10,4 +10,5 @@ urlpatterns = [
     url(r'^checklist/.*$', views.checklist, name='checklist'),
     url(r'^submit-jobs/.*$', views.submit_lava_jobs, name='submit_jobs'),
     url(r'^test-report/.*$', views.test_report, name='test_report'),
+    url(r'^add-bug/.*$', views.add_bug, name='add_bug'),
 ]

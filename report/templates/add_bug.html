@@ -1,0 +1,18 @@
+<div align="center">
+<h1>Add bug for build {{ build_info.build_name }}</h1>
+<div>{{ form.errors }}</div>
+<div>
+{% if build_info.message %}
+<font color="green">
+{{ build_info.message }}
+</font>
+{% endif %}
+</div>
+<form action="/report/add-bug/" method="post">
+    {% csrf_token %}
+    <table border="2" aligh='left'>
+    {{ form.as_table }}
+    </table>
+    <input type="submit" id="submit_btn" value="submit" />
+</form>
+</div>

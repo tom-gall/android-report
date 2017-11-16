@@ -7,7 +7,7 @@ from django.db import models
 class TestCase(models.Model):
     name = models.CharField(max_length=128)
     result = models.CharField(max_length=16)
-    measurement = models.DecimalField( max_digits=11, decimal_places=2, null=True)
+    measurement = models.DecimalField( max_digits=20, decimal_places=2, null=True)
     unit = models.CharField(max_length=128, null=True)
     suite = models.CharField(max_length=16)
     job_id = models.CharField(max_length=16)
@@ -29,17 +29,34 @@ class JobCache(models.Model):
     def __str__(self):
         return "%s_%s %s" % (self.lava_nick, self.job_id, self.cached)
 
-#class Bugs(models.Model):
-#    job_name = models.CharField(max_length=16)
-#    job_id = models.CharField(max_length=16)
-#    test_suite = models.CharField(max_length=64)
-#    test_case = models.CharField(max_length=64)
-#    bug_id = models.CharField(max_length=64)
-#    bug_links = models.CharField(max_length=64)
-#    hardware = models.CharField(max_length=64)
-#
-#    def __str__(self):
-#        return "%s_%s %s" % (self.bug_id, self.hardware, self.test_suite)
+
+BUG_STATUS_CHOICES = (
+                      ("unconfirmed", "Unconfirmed"),
+                      ("confirmed", "Confirmed"),
+                      ("inprogress", "InProgress"),
+                      ("resolved", "Resolved"),
+                     )
+
+class Bug(models.Model):
+    build_name = models.CharField(max_length=64)
+    bug_id = models.CharField(max_length=16)
+    link = models.CharField(max_length=128)
+    subject = models.CharField(max_length=256)
+    ## Unconfirmed, Confirmed, InProgress, Resolved
+    status = models.CharField(max_length=64, choices=BUG_STATUS_CHOICES)
+    # for cts, test plan
+    # for vts, test plan, job_name
+    # for basic, test suite
+    # for benchmarks, test suite
+    plan_suite = models.CharField(max_length=64)
+    # for cts, test module
+    # for vts, same as plan
+    # for basic test, same as test suite
+    # for benchmarks, test case
+    module_testcase = models.CharField(max_length=128)
+
+    def __str__(self):
+        return "%s %s %s %s %s" % (self.bug_id, self.plan_suite, self.module_testcase, self.status, self.build_name)
 
 class BaseResults(models.Model):
     build_name = models.CharField(max_length=64)
@@ -70,8 +87,3 @@ class BaseResults(models.Model):
 
     def __str__(self):
         return "%s %d %d %f %s %s-%s" % (self.module_testcase, self.number_pass, self.number_fail, self.measurement, self.unit, self.build_name, self.build_no)
-
-#class Bases(models.Model):
-#    build_name = models.CharField(max_length=64)
-#    base_build_no = models.CharField(max_length=16)
-    #base_lava_nick = models.CharField(max_length=8)

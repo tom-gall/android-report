@@ -5,6 +5,7 @@ from django import forms
 from django.shortcuts import render
 from django.http import HttpResponse
 
+import collections
 import re
 import sys
 import urllib2
@@ -14,7 +15,7 @@ import yaml
 from lava_tool.authtoken import AuthenticatingServerProxy, KeyringAuthBackend
 
 # Create your views here.
-from models import TestCase, JobCache, BaseResults
+from models import TestCase, JobCache, BaseResults, Bug
 
 android_snapshot_url_base = "https://snapshots.linaro.org/android"
 ci_job_url_base = 'https://ci.linaro.org/job'
@@ -89,19 +90,53 @@ LAVAS = { NICK_LAVA_STAGING: LavaInstance(nick=NICK_LAVA_STAGING,
 
 build_configs = {
                   'android-lcr-reference-hikey-o': {
-                                                    'lava_server': LAVAS[NICK_LAVA_STAGING],
+                                                    'lava_server': LAVAS[NICK_LAVA_PRODUCTION],
                                                     'img_ext': ".img.xz",
                                                     'template_dir': "hikey-v2",
+                                                    'bugzilla': {
+                                                            'new_bug_url': 'https://bugs.linaro.org/enter_bug.cgi',
+                                                            'product': 'Linaro Android',
+                                                            'op_sys': 'Android',
+                                                            'bug_severity': 'normal',
+                                                            'component': 'R-LCR-HIKEY',
+                                                            'keywords': 'LCR',
+                                                            'rep_platform': 'HiKey',
+                                                            'short_desc_prefix': "HiKey",
+                                                           },
+                                                   },
+                  'android-lcr-reference-hikey-master': {
+                                                    'lava_server': LAVAS[NICK_LAVA_PRODUCTION],
+                                                    'img_ext': ".img.xz",
+                                                    'template_dir': "hikey-v2",
+                                                    'bugzilla': {
+                                                            'new_bug_url': 'https://bugs.linaro.org/enter_bug.cgi',
+                                                            'product': 'Linaro Android',
+                                                            'op_sys': 'Android',
+                                                            'bug_severity': 'normal',
+                                                            'component': 'AOSP master builds',
+                                                            'rep_platform': 'HiKey',
+                                                            'short_desc_prefix': "HiKey",
+                                                           },
                                                    },
                   'android-lcr-reference-x15-o': {
                                                     'lava_server': LAVAS[NICK_LAVA_STAGING],
                                                     'img_ext': ".img",
                                                     'template_dir': "x15-v2",
+                                                    'bugzilla': {
+                                                            'new_bug_url': 'https://bugs.linaro.org/enter_bug.cgi',
+                                                            'product': 'Linaro Android',
+                                                            'op_sys': 'Android',
+                                                            'bug_severity': 'normal',
+                                                            'component': 'R-LCR-X15',
+                                                            'keywords': 'LCR',
+                                                            'rep_platform': 'BeagleBoard-X15',
+                                                            'short_desc_prefix': 'X15',
+                                                           },
                                                    },
                 }
 
 build_names = build_configs.keys()
-build_names.sort()
+build_names = sorted(build_names)
 
 DEFAULT_BUILD_NAME = "android-lcr-reference-hikey-o"
 def get_possible_builds(build_name=DEFAULT_BUILD_NAME):
@@ -230,6 +265,8 @@ def cache_job_result_to_db(job_id, lava):
                 continue
             if test.get("measurement") and test.get("measurement") == "None":
                 test["measurement"] = None
+            else:
+                test["measurement"] = "{:.2f}".format(float(test.get("measurement")))
             TestCase.objects.create(name=test.get("name"),
                                     result=test.get("result"),
                                     measurement=test.get("measurement"),
@@ -718,7 +755,7 @@ def index(request):
                                 "job_status": "--",
                              }
 
-    builds.items().sort()
+    builds = collections.OrderedDict(sorted(builds.items()))
     return render(request, 'index.html',
                   {
                     "builds": builds,
@@ -772,6 +809,8 @@ def test_report(request):
             except BaseResults.DoesNotExist:
                 base = None
 
+            bugs = Bug.objects.filter(build_name=build_name, plan_suite=test_suite, module_testcase=test_suite)
+
             number_total = number_pass + number_fail + number_skip
             number_passrate = 0
             if  number_total != 0:
@@ -785,6 +824,7 @@ def test_report(request):
                                            'number_total': number_total,
                                            'number_passrate': number_passrate,
                                            'base': base,
+                                           'bugs': bugs,
                                           })
 
     benchmarks = {  # job_name: {'test_suite':['test_case',]},
@@ -808,7 +848,14 @@ def test_report(request):
                     'cf-bench': {'cf-bench': ['cfbench-Overall-Score-mean', 'cfbench-Java-Score-mean', 'cfbench-Native-Score-mean']},
                     'gearses2eclair': {'gearses2eclair': ['gearses2eclair',]},
                     'geekbench3': {'geekbench3': ['geekbench-multi-core-mean', 'geekbench-single-core-mean']},
-                    #'glbenchmark-2.5.1': {'': ['',]},
+                    'glbenchmark25': {'glbenchmark25': ['Fill-rate-C24Z16-mean', 'Fill-rate-C24Z16-Offscreen-mean',
+                                                        'GLBenchmark-2.1-Egypt-Classic-C16Z16-mean', 'GLBenchmark-2.1-Egypt-Classic-C16Z16-Offscreen-mean',
+                                                        'GLBenchmark-2.5-Egypt-HD-C24Z16-Fixed-timestep-mean', 'GLBenchmark-2.5-Egypt-HD-C24Z16-Fixed-timestep-Offscreen-mean',
+                                                        'GLBenchmark-2.5-Egypt-HD-C24Z16-mean', 'GLBenchmark-2.5-Egypt-HD-C24Z16-Offscreen-mean',
+                                                        'Triangle-throughput-Textured-C24Z16-Fragment-lit-mean', 'Triangle-throughput-Textured-C24Z16-Offscreen-Fragment-lit-mean',
+                                                        'Triangle-throughput-Textured-C24Z16-mean', 'Triangle-throughput-Textured-C24Z16-Offscreen-mean',
+                                                        'Triangle-throughput-Textured-C24Z16-Vertex-lit-mean', 'Triangle-throughput-Textured-C24Z16-Offscreen-Vertex-lit-mean',
+                                                       ],},
                     'javawhetstone': {'javawhetstone': ['javawhetstone-MWIPS-mean', 'javawhetstone-N1-float-mean', 'javawhetstone-N2-float-mean', 'javawhetstone-N3-if-mean', 'javawhetstone-N4-fixpt-mean',
                                            'javawhetstone-N5-cos-mean', 'javawhetstone-N6-float-mean', 'javawhetstone-N7-equal-mean', 'javawhetstone-N8-exp-mean',]},
                     'jbench': {'jbench': ['jbench-mean',]},
@@ -851,6 +898,8 @@ def test_report(request):
                 except BaseResults.DoesNotExist:
                     base = None
 
+                bugs = Bug.objects.filter(build_name=build_name, plan_suite=test_suite, module_testcase=test_case)
+
                 if measurement == '--':
                     difference = -100
                 elif base is None:
@@ -867,6 +916,7 @@ def test_report(request):
                                        'unit': unit,
                                        'measurement': measurement,
                                        'base': base,
+                                       'bugs': bugs,
                                        'difference': difference,
                                       })
 
@@ -913,6 +963,9 @@ def test_report(request):
             base = BaseResults.objects.get(build_name=base_build_name, build_no=base_build_no, plan_suite=job_name, module_testcase=job_name)
         except BaseResults.DoesNotExist:
             base = None
+
+        bugs = Bug.objects.filter(build_name=build_name, plan_suite=job_name, module_testcase=job_name)
+
         vts_res.append({'job_name': job_name,
                         'job_id': job_id,
                         'number_pass': number_pass,
@@ -921,6 +974,7 @@ def test_report(request):
                         'number_passrate': number_passrate,
                         'failed_testcases': failed_testcases,
                         'base': base,
+                        'bugs': bugs,
                        })
         summary['pass'] = summary['pass'] + number_pass
         summary['fail'] = summary['fail'] + number_fail
@@ -976,7 +1030,7 @@ def test_report(request):
         job_res = total_tests_res.get(job_name)
         if job_res is None:
             cts_res.append({'job_name': job_name,
-                            'job_id': '--',
+                            'job_id': None,
                             'module_name': '--',
                             'number_pass': 0,
                             'number_fail': 0,
@@ -1019,10 +1073,13 @@ def test_report(request):
                     number_passrate = 0
                 else:
                     number_passrate = float(number_pass * 100 / number_total )
+
                 try:
                     base = BaseResults.objects.get(build_name=base_build_name, build_no=base_build_no, plan_suite=job_name, module_testcase=module_name)
                 except BaseResults.DoesNotExist:
                     base = None
+
+                bugs = Bug.objects.filter(build_name=build_name, plan_suite=job_name, module_testcase=module_name)
                 cts_res.append({'job_name': job_name,
                                 'job_id': job_id,
                                 'module_name': module_name,
@@ -1031,6 +1088,7 @@ def test_report(request):
                                 'number_total': number_total,
                                 'number_passrate': number_passrate,
                                 'base': base,
+                                'bugs': bugs,
                                })
                 summary['pass'] = summary['pass'] + number_pass
                 summary['fail'] = summary['fail'] + number_fail
@@ -1041,7 +1099,7 @@ def test_report(request):
     if  summary['total'] != 0:
         pass_rate = float(summary['pass'] * 100 / summary['total'])
     cts_res.append({'job_name': "Summary",
-                    'job_id': '--',
+                    'job_id': None,
                     'module_name': 'Total',
                     'number_pass': summary['pass'],
                     'number_fail': summary['fail'],
@@ -1049,7 +1107,8 @@ def test_report(request):
                     'number_passrate': pass_rate,
                    })
     ##############################################################
-
+    build_bugs = Bug.objects.filter(build_name=build_name, )
+    ##############################################################
     snapshot_url = '%s/%s/%s' % (android_snapshot_url_base, build_name, build_no)
     pinned_manifest_url = '%s/pinned-manifest.xml' % snapshot_url
     if build_name.find('x15') >= 0:
@@ -1061,6 +1120,16 @@ def test_report(request):
         kernel_version = '--'
     build_config_url = "%s/%s" % (android_build_config_url_base, build_name.replace("android-", ""))
     build_android_tag = get_build_config_value(build_config_url, key="MANIFEST_BRANCH")
+    build_bugzilla = build_configs[build_name]['bugzilla']
+    build_new_bug_url_prefix = '%s?product=%s&op_sys=%s&bug_severity=%s&component=%s&keywords=%s&rep_platform=%s&short_desc=%s: ' % ( build_bugzilla['new_bug_url'],
+                                                                                                                                      build_bugzilla['product'],
+                                                                                                                                      build_bugzilla['op_sys'],
+                                                                                                                                      build_bugzilla['bug_severity'],
+                                                                                                                                      build_bugzilla['component'],
+                                                                                                                                      build_bugzilla['keywords'],
+                                                                                                                                      build_bugzilla['rep_platform'],
+                                                                                                                                      build_bugzilla['short_desc_prefix'],
+                                                                                                                                     )
     build_info = {
                     'build_name': build_name,
                     'build_no': build_no,
@@ -1073,7 +1142,10 @@ def test_report(request):
                     'ci_link': '%s/%s/%s' % (ci_job_url_base, build_name, build_no),
                     'snapshot_url': snapshot_url,
                     'base_build_no': base_build_no,
+                    'new_bug_url_prefix': build_new_bug_url_prefix,
                  }
+
+
     return render(request, 'test_report.html',
                   {
                    'lava_server_job_prefix': build_configs[build_name]['lava_server'].job_url_prefix,
@@ -1082,8 +1154,45 @@ def test_report(request):
                    'benchmarks_res': benchmarks_res,
                    'vts_res': vts_res,
                    'cts_res': cts_res,
+                   'build_bugs': build_bugs,
                   }
         )
+
+class BugForm(forms.ModelForm):
+    class Meta:
+        model = Bug
+        fields = ['build_name', 'bug_id', 'link', 'subject', 'status', 'plan_suite', 'module_testcase']
+
+def add_bug(request):
+    if request.method == 'POST':
+        build_name = request.POST.get("build_name")
+        form = BugForm(request.POST)
+        form.save()
+
+        build_info = {
+                      'build_name': build_name,
+                      'message': 'Added bug successfully',
+                     }
+    else: # GET
+        build_name = request.GET.get("build_name", DEFAULT_BUILD_NAME)
+        plan_suite = request.GET.get("plan_suite", '')
+        module_testcase = request.GET.get("module_testcase", '')
+        form_initial = {"build_name": build_name,
+                        "plan_suite": plan_suite,
+                        "status": 'unconfirmed',
+                        "module_testcase": module_testcase,
+                       }
+        form = BugForm(initial=form_initial)
+
+        build_info = {
+                      'build_name': build_name,
+                     }
+
+    return render(request, 'add_bug.html',
+                      {
+                        "form": form,
+                        "build_info": build_info,
+                      })
 
 if __name__ == "__main__":
 #    get_yaml_result("191778")
