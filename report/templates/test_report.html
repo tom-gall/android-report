@@ -40,6 +40,22 @@
         <td> <a href="{{ build_info.kernel_url }}">{{ build_info.kernel_version }}</a></td>
         {% endifequal %}
     <tr/>
+    <tr>
+        <th align="left">Toolchain</th>
+        <td align="left">{{ build_info.toolchain_info}}</td>
+    <tr/>
+    <tr>
+        <th align="left">Firmware Info</th>
+        {% ifequal build_info.firmware_url '--' %}
+        <td>{{ build_info.firmware_version }}</td>
+        {% else %}
+        <td> <a href="{{ build_info.firmware_url }}">{{ build_info.firmware_version }}</a></td>
+        {% endifequal %}
+    <tr/>
+    <tr>
+        <th align="left">Images</th>
+        <td align="left"><a href="{{ build_info.images_url }}">{{ build_info.images_url }}</a></td>
+    <tr/>
 </table>
 <hr/>
 <h2>Basic Weekly</h2>
@@ -341,8 +357,8 @@ No result for benchmark test jobs.
         {% endwith%}
     </td>
     <td align='left'>
-        <a target='_blank' href="/report/add-bug/?build_name={{ build_info.build_name }}&plan_suite={{ test_info.job_name }}&&module_testcase={{ test_info.job_name }}">Add Bug</a><br/>
         {% ifequal test_info.number_passrate 0 %}
+        <a target='_blank' href="/report/add-bug/?build_name={{ build_info.build_name }}&plan_suite={{ test_info.job_name }}&&module_testcase={{ test_info.job_name }}">Add Bug</a><br/>
         <a target='_blank' href="{{ build_info.new_bug_url_prefix }}{{ test_info.job_name }}">Report Android Bug</a>&nbsp;
         <!--
         <a target='_blank' href="https://bugs.linaro.org/enter_bug.cgi?product=LAVA%20Framework">Report LAVA Bug</a>&nbsp;
@@ -363,6 +379,7 @@ No result for benchmark test jobs.
 <tr>
     <th>Index</th>
     <th>Bug Id</th>
+    <th>Plan/TestSuite</th>
     <th>Module/TestCase</th>
     <th>Subject</th>
     <th>Status</th>
@@ -372,11 +389,8 @@ No result for benchmark test jobs.
 <tr>
     <td>{{ forloop.counter }}</a></td>
     <td><a href="{{ bug.link }}">{{ bug.bug_id }}</a></td>
-    {% ifequal bug.module_testcase '--' %}
-        <td>{{ bug.module_testcase }}</a></td>
-    {% else %}
-        <td>{{ bug.plan_suite }}</a></td>
-    {% endifequal %}
+    <td>{{ bug.plan_suite }}</a></td>
+    <td>{{ bug.module_testcase }}</a></td>
     <td>{{ bug.subject }}</a></td>
     <td>{{ bug.status }}</a></td>
     <td> -- </a></td>

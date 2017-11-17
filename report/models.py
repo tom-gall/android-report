@@ -87,3 +87,19 @@ class BaseResults(models.Model):
 
     def __str__(self):
         return "%s %d %d %f %s %s-%s" % (self.module_testcase, self.number_pass, self.number_fail, self.measurement, self.unit, self.build_name, self.build_no)
+
+
+class BuildSummary(models.Model):
+    build_name = models.CharField(max_length=64)
+    build_no = models.CharField(max_length=8)
+    build_config  = models.CharField(max_length=64)
+    build_commit  = models.CharField(max_length=64)
+    android_version = models.CharField(max_length=32)
+    kernel_version = models.CharField(max_length=16)
+    kernel_url = models.CharField(max_length=256)
+    firmware_url = models.CharField(max_length=256)
+    firmware_version = models.CharField(max_length=64)
+    toolchain_info = models.CharField(max_length=256)
+    images_url = models.CharField(max_length=256)
+    def __str__(self):
+        return "%s %s %s %s" % (self.build_name, self.build_no, self.android_version, self.kernel_version)

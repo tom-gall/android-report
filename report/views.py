@@ -15,7 +15,7 @@ import yaml
 from lava_tool.authtoken import AuthenticatingServerProxy, KeyringAuthBackend
 
 # Create your views here.
-from models import TestCase, JobCache, BaseResults, Bug
+from models import TestCase, JobCache, BaseResults, Bug, BuildSummary
 
 android_snapshot_url_base = "https://snapshots.linaro.org/android"
 ci_job_url_base = 'https://ci.linaro.org/job'
@@ -93,6 +93,10 @@ build_configs = {
                                                     'lava_server': LAVAS[NICK_LAVA_PRODUCTION],
                                                     'img_ext': ".img.xz",
                                                     'template_dir': "hikey-v2",
+                                                    'base_build': {
+                                                                    'build_name':'android-lcr-reference-hikey-o',
+                                                                    'build_no': 'N-M-1705',
+                                                                  },
                                                     'bugzilla': {
                                                             'new_bug_url': 'https://bugs.linaro.org/enter_bug.cgi',
                                                             'product': 'Linaro Android',
@@ -108,12 +112,17 @@ build_configs = {
                                                     'lava_server': LAVAS[NICK_LAVA_PRODUCTION],
                                                     'img_ext': ".img.xz",
                                                     'template_dir': "hikey-v2",
+                                                    'base_build': {
+                                                                    'build_name':'android-lcr-reference-hikey-o',
+                                                                    'build_no': 'N-M-1705',
+                                                                  },
                                                     'bugzilla': {
                                                             'new_bug_url': 'https://bugs.linaro.org/enter_bug.cgi',
                                                             'product': 'Linaro Android',
                                                             'op_sys': 'Android',
                                                             'bug_severity': 'normal',
                                                             'component': 'AOSP master builds',
+                                                            'keywords': '',
                                                             'rep_platform': 'HiKey',
                                                             'short_desc_prefix': "HiKey",
                                                            },
@@ -122,6 +131,10 @@ build_configs = {
                                                     'lava_server': LAVAS[NICK_LAVA_STAGING],
                                                     'img_ext': ".img",
                                                     'template_dir': "x15-v2",
+                                                    'base_build': {
+                                                                    'build_name':'android-lcr-reference-x15-o',
+                                                                    'build_no': 'N-M-1705',
+                                                                  },
                                                     'bugzilla': {
                                                             'new_bug_url': 'https://bugs.linaro.org/enter_bug.cgi',
                                                             'product': 'Linaro Android',
@@ -760,13 +773,16 @@ def index(request):
                   {
                     "builds": builds,
                   })
+
+
 def test_report(request):
     build_name = request.GET.get("build_name", DEFAULT_BUILD_NAME)
 
-    base_build_name = build_name
+    base_build_name = build_configs[build_name]['base_build']['build_name']
+    base_build_no = build_configs[build_name]['base_build']['build_no']
     # 0 for old version, might be input manually into db
     #base_build_no = 'nogat-mlcr-17.05'
-    base_build_no = 'N-M-1705'
+    #base_build_no = 'N-M-1705'
     #base_lava_nick = NICK_LAVA_STAGING
 
     all_build_numbers = get_possible_builds(build_name)
@@ -827,7 +843,7 @@ def test_report(request):
                                            'bugs': bugs,
                                           })
 
-    benchmarks = {  # job_name: {'test_suite':['test_case',]},
+    benchmarks_common = {  # job_name: {'test_suite':['test_case',]},
                     "boottime": {
                                   #'boottime-analyze': ['KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg' ],
                                   'boottime-first-analyze': ['KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg' ],
@@ -848,14 +864,6 @@ def test_report(request):
                     'cf-bench': {'cf-bench': ['cfbench-Overall-Score-mean', 'cfbench-Java-Score-mean', 'cfbench-Native-Score-mean']},
                     'gearses2eclair': {'gearses2eclair': ['gearses2eclair',]},
                     'geekbench3': {'geekbench3': ['geekbench-multi-core-mean', 'geekbench-single-core-mean']},
-                    'glbenchmark25': {'glbenchmark25': ['Fill-rate-C24Z16-mean', 'Fill-rate-C24Z16-Offscreen-mean',
-                                                        'GLBenchmark-2.1-Egypt-Classic-C16Z16-mean', 'GLBenchmark-2.1-Egypt-Classic-C16Z16-Offscreen-mean',
-                                                        'GLBenchmark-2.5-Egypt-HD-C24Z16-Fixed-timestep-mean', 'GLBenchmark-2.5-Egypt-HD-C24Z16-Fixed-timestep-Offscreen-mean',
-                                                        'GLBenchmark-2.5-Egypt-HD-C24Z16-mean', 'GLBenchmark-2.5-Egypt-HD-C24Z16-Offscreen-mean',
-                                                        'Triangle-throughput-Textured-C24Z16-Fragment-lit-mean', 'Triangle-throughput-Textured-C24Z16-Offscreen-Fragment-lit-mean',
-                                                        'Triangle-throughput-Textured-C24Z16-mean', 'Triangle-throughput-Textured-C24Z16-Offscreen-mean',
-                                                        'Triangle-throughput-Textured-C24Z16-Vertex-lit-mean', 'Triangle-throughput-Textured-C24Z16-Offscreen-Vertex-lit-mean',
-                                                       ],},
                     'javawhetstone': {'javawhetstone': ['javawhetstone-MWIPS-mean', 'javawhetstone-N1-float-mean', 'javawhetstone-N2-float-mean', 'javawhetstone-N3-if-mean', 'javawhetstone-N4-fixpt-mean',
                                            'javawhetstone-N5-cos-mean', 'javawhetstone-N6-float-mean', 'javawhetstone-N7-equal-mean', 'javawhetstone-N8-exp-mean',]},
                     'jbench': {'jbench': ['jbench-mean',]},
@@ -871,6 +879,21 @@ def test_report(request):
                                   'benchmarkpi-mean',
                                   'Linpack-TimeSingleScore-mean', 'Linpack-TimeMultiScore-mean', 'RL-sqlite-Overall-mean'
                                  ]
+
+    glbenchmark25 = {
+                    'glbenchmark25': {'glbenchmark25': ['Fill-rate-C24Z16-mean', 'Fill-rate-C24Z16-Offscreen-mean',
+                                                        'GLBenchmark-2.1-Egypt-Classic-C16Z16-mean', 'GLBenchmark-2.1-Egypt-Classic-C16Z16-Offscreen-mean',
+                                                        'GLBenchmark-2.5-Egypt-HD-C24Z16-Fixed-timestep-mean', 'GLBenchmark-2.5-Egypt-HD-C24Z16-Fixed-timestep-Offscreen-mean',
+                                                        'GLBenchmark-2.5-Egypt-HD-C24Z16-mean', 'GLBenchmark-2.5-Egypt-HD-C24Z16-Offscreen-mean',
+                                                        'Triangle-throughput-Textured-C24Z16-Fragment-lit-mean', 'Triangle-throughput-Textured-C24Z16-Offscreen-Fragment-lit-mean',
+                                                        'Triangle-throughput-Textured-C24Z16-mean', 'Triangle-throughput-Textured-C24Z16-Offscreen-mean',
+                                                        'Triangle-throughput-Textured-C24Z16-Vertex-lit-mean', 'Triangle-throughput-Textured-C24Z16-Offscreen-Vertex-lit-mean',
+                                                       ],},
+                  }
+    benchmarks = benchmarks_common.copy()
+    if build_name.find("x15") >= 0:
+        benchmarks.update(glbenchmark25)
+
     benchmarks_res = []
     for job_name in sorted(benchmarks.keys()):
         job_res = total_tests_res.get(job_name)
@@ -1109,17 +1132,34 @@ def test_report(request):
     ##############################################################
     build_bugs = Bug.objects.filter(build_name=build_name, )
     ##############################################################
-    snapshot_url = '%s/%s/%s' % (android_snapshot_url_base, build_name, build_no)
-    pinned_manifest_url = '%s/pinned-manifest.xml' % snapshot_url
-    if build_name.find('x15') >= 0:
-        kernel_commit = get_commit_from_pinned_manifest(pinned_manifest_url, 'kernel/ti/x15')
-        kernel_url = 'http://git.ti.com/android/kernel/commit/%s' % kernel_commit
-        kernel_version = '4.4.91'
-    else:
-        kernel_url = '--'
-        kernel_version = '--'
-    build_config_url = "%s/%s" % (android_build_config_url_base, build_name.replace("android-", ""))
-    build_android_tag = get_build_config_value(build_config_url, key="MANIFEST_BRANCH")
+    try:
+        build_summary = BuildSummary.objects.get(build_name=build_name, build_no=build_no)
+        build_config_url = "%s/%s?id=%s" % (android_build_config_url_base, build_summary.build_config, build_summary.build_commit)
+        kernel_version = build_summary.kernel_version
+        kernel_url = build_summary.kernel_url
+        build_android_tag = build_summary.android_version
+        firmware_url = build_summary.firmware_url
+        firmware_version = build_summary.firmware_version
+        images_url = build_summary.images_url
+        toolchain_info = build_summary.toolchain_info
+    except BuildSummary.DoesNotExist:
+        images_url = '%s/%s/%s' % (android_snapshot_url_base, build_name, build_no)
+        pinned_manifest_url = '%s/pinned-manifest.xml' % images_url
+        if build_name.find('x15') >= 0:
+            kernel_commit = get_commit_from_pinned_manifest(pinned_manifest_url, 'kernel/ti/x15')
+            kernel_url = 'http://git.ti.com/android/kernel/commit/%s' % kernel_commit
+            kernel_version = '4.4.91'
+        else:
+            kernel_url = '--'
+            kernel_version = '4.9.60'
+
+        build_config_url = "%s/%s" % (android_build_config_url_base, build_name.replace("android-", ""))
+        build_android_tag = get_build_config_value(build_config_url, key="MANIFEST_BRANCH")
+        toolchain_info = '--'
+        firmware_version = '--'
+        firmware_url = '--'
+
+    ## bugzilla related information
     build_bugzilla = build_configs[build_name]['bugzilla']
     build_new_bug_url_prefix = '%s?product=%s&op_sys=%s&bug_severity=%s&component=%s&keywords=%s&rep_platform=%s&short_desc=%s: ' % ( build_bugzilla['new_bug_url'],
                                                                                                                                       build_bugzilla['product'],
@@ -1130,6 +1170,7 @@ def test_report(request):
                                                                                                                                       build_bugzilla['rep_platform'],
                                                                                                                                       build_bugzilla['short_desc_prefix'],
                                                                                                                                      )
+
     build_info = {
                     'build_name': build_name,
                     'build_no': build_no,
@@ -1140,11 +1181,13 @@ def test_report(request):
                     'kernel_version': kernel_version,
                     'kernel_url': kernel_url,
                     'ci_link': '%s/%s/%s' % (ci_job_url_base, build_name, build_no),
-                    'snapshot_url': snapshot_url,
                     'base_build_no': base_build_no,
                     'new_bug_url_prefix': build_new_bug_url_prefix,
+                    'firmware_url': firmware_url,
+                    'firmware_version': firmware_version,
+                    'toolchain_info': toolchain_info,
+                    'images_url': images_url,
                  }
-
 
     return render(request, 'test_report.html',
                   {
