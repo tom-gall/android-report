@@ -21,10 +21,13 @@ class TestCase(models.Model):
 
 
 class JobCache(models.Model):
+#    build_name = models.CharField(max_length=64)
+#    build_no = models.CharField(max_length=8)
     lava_nick = models.CharField(max_length=16)
     job_id = models.CharField(max_length=16)
     #job_name = models.CharField(max_length=64)
     cached = models.BooleanField(default=False)
+    #duration
 
     def __str__(self):
         return "%s_%s %s" % (self.lava_nick, self.job_id, self.cached)
@@ -80,10 +83,15 @@ class BaseResults(models.Model):
     number_fail = models.IntegerField(default=0)
     number_total = models.IntegerField(default=0)
     # for basic, caculate as well, but not used
-    number_passrate = models.DecimalField( max_digits=11, decimal_places=2, null=True)
+    number_passrate = models.DecimalField( max_digits=11, decimal_places=2, default=100)
 
     unit = models.CharField(max_length=16, default='points')
-    measurement = models.DecimalField(max_digits=11, decimal_places=2, null=True, default=0)
+    measurement = models.DecimalField(max_digits=20, decimal_places=2, null=True, default=0)
+
+
+    lava_nick = models.CharField(max_length=16, default='')
+    job_id = models.CharField(max_length=16, default='')
+    job_name = models.CharField(max_length=64, default='' )
 
     def __str__(self):
         return "%s %d %d %f %s %s-%s" % (self.module_testcase, self.number_pass, self.number_fail, self.measurement, self.unit, self.build_name, self.build_no)
@@ -103,3 +111,11 @@ class BuildSummary(models.Model):
     images_url = models.CharField(max_length=256)
     def __str__(self):
         return "%s %s %s %s" % (self.build_name, self.build_no, self.android_version, self.kernel_version)
+
+class LAVAUser(models.Model):
+    lava_nick = models.CharField(max_length=64)
+    user_name = models.CharField(max_length=32)
+    token = models.CharField(max_length=128)
+
+    def __str__(self):
+        return "%s %s" % (self.lava_nick, self.user_name)

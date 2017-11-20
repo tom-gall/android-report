@@ -56,6 +56,20 @@
         <th align="left">Images</th>
         <td align="left"><a href="{{ build_info.images_url }}">{{ build_info.images_url }}</a></td>
     <tr/>
+    <tr>
+        <th align="left">Cached In Base</th>
+        <td align="left">
+        {% if build_info.cached_in_base %}
+            <button name="cache_to_base" onclick="this.disabled=true; window.location='/report/test-report/?build_name={{ build_info.build_name }}&build_no={{ build_info.build_no }}&cache_to_base=false'">
+                Remove From Base
+            </button>
+        {% else %}
+            <button name="cache_to_base" onclick="this.disabled=true; window.location='/report/test-report/?build_name={{ build_info.build_name }}&build_no={{ build_info.build_no }}&cache_to_base=true'">
+                Cache Into Base
+            </button>
+        {% endif %}
+        </td>
+    <tr/>
 </table>
 <hr/>
 <h2>Basic Weekly</h2>
@@ -250,8 +264,14 @@ No result for benchmark test jobs.
     <td align='right'> -- </td>
     <td align='right'> -- </td>
     {% endif %}
-    {% endwith %}
+    {% if test_info.number_pass|add:0 > base.number_pass|add:0 %}
+    <td align='right' style="background-color:green" > {{ test_info.number_pass }}</td>
+    {% elif test_info.number_pass|add:0 < base.number_pass|add:0  %}
+    <td align='right' style="background-color:yellow" > {{ test_info.number_pass }}</td>
+    {% else  %}
     <td align='right'> {{ test_info.number_pass }}</td>
+    {% endif %}
+    {% endwith %}
     <td align='right'> {{ test_info.number_fail }}</td>
     <td align='right'> {{ test_info.number_total }}</td>
     {% if test_info.number_passrate == 0 %}

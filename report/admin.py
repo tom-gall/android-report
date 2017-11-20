@@ -8,7 +8,7 @@ from .models import TestCase
 from .models import JobCache
 from .models import BaseResults
 from .models import Bug
-from .models import BuildSummary
+from .models import BuildSummary, LAVAUser
 
 class TestCaseAdmin(admin.ModelAdmin):
     list_display = ('name', 'result', 'measurement', 'unit', 'suite', 'job_id')
@@ -20,3 +20,4 @@ admin.site.register(JobCache)
 admin.site.register(BaseResults)
 admin.site.register(Bug)
 admin.site.register(BuildSummary)
+admin.site.register(LAVAUser)
