@@ -1,5 +1,11 @@
+{% extends '_layouts/base.html' %}
+
+{% block title %} Add bug for build {{ build_info.build_name }} {% endblock %}
+
+{% block headline %}<h1>Add bug for build {{ build_info.build_name }}</h1>{% endblock %}
+
+{% block content %}
 <div align="center">
-<h1>Add bug for build {{ build_info.build_name }}</h1>
 <div>{{ form.errors }}</div>
 <div>
 {% if build_info.message %}
@@ -16,3 +22,4 @@
     <input type="submit" id="submit_btn" value="submit" />
 </form>
 </div>
+{% endblock %}

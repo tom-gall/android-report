@@ -1,6 +1,12 @@
-<title>Test Report for Build {{ build_info.build_name}}-{{build_info.build_no}}</title>
-<div align="center">
-<h1>Test Report for Build {{ build_info.build_name}}-{{build_info.build_no}}</h1>
+{% extends '_layouts/base.html' %}
+
+{% block title %} Test Report for Build {{ build_info.build_name}}-{{build_info.build_no}}  {% endblock %}
+
+{% block headline %}<h1>Test Report for Build {{ build_info.build_name}}-{{build_info.build_no}}</h1>{% endblock %}
+
+{% block content %}
+
+<div align="left">
 <table>
 <tr>
 {% for build_no in build_info.build_numbers %}
@@ -393,7 +399,7 @@ No result for benchmark test jobs.
 {% endif %}
 <hr/>
 
-<h2>Bug Status:<h2>
+<h2>Bug Status:</h2>
 {% if build_bugs %}
 <table border=2>
 <tr>
@@ -422,3 +428,4 @@ Excelent build, no open bugs on it at the moment.
 {% endif %}
 
 </div>
+{% endblock %}

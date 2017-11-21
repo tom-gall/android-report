@@ -1,4 +1,11 @@
-<div align="center">
+{% extends '_layouts/base.html' %}
+
+{% block title %} Result Compare {% endblock %}
+
+{% block headline %}<h1>Result Compare</h1>{% endblock %}
+
+{% block content %}
+<div align="left">
 <form action="/report/compare/" method="post">
     {% csrf_token %} 
     <label>{{ build_info.build_name }}</label>
@@ -53,3 +60,4 @@
 </table>
 </div>
 {% endif %}
+{% endblock %}

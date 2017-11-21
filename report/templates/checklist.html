@@ -1,3 +1,10 @@
+{% extends '_layouts/base.html' %}
+
+{% block title %} CheckList Display {% endblock %}
+
+{% block headline %}<h1>CheckList Display</h1>{% endblock %}
+
+{% block content %}
 <div align="center">
 <form action="/report/checklist/" method="post">
     {% csrf_token %} 
@@ -53,3 +60,4 @@
 </table>
 </div>
 {% endif %}
+{% endblock %}

@@ -1,3 +1,10 @@
+{% extends '_layouts/base.html' %}
+
+{% block title %} Job Submission {% endblock %}
+
+{% block headline %}<h1>Job Submission</h1>{% endblock %}
+
+{% block content %}
 <div align="center">
 {% if not from.errors and submit_result %}
 <div>Jobs submission status</div>
@@ -32,3 +39,4 @@
 </form>
 {% endif %}
 </div>
+{% endblock %}

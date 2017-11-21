@@ -16,7 +16,12 @@ class TestCaseAdmin(admin.ModelAdmin):
     list_filter = ('name', 'suite')
 
 admin.site.register(TestCase, TestCaseAdmin)
-admin.site.register(JobCache)
+
+class JobCacheAdmin(admin.ModelAdmin):
+    list_display = ('job_id', 'job_name', 'lava_nick', 'status', 'duration', 'build_name', 'build_no')
+    search_fields = ('job_id', 'job_name', 'build_name', 'build_no')
+
+admin.site.register(JobCache, JobCacheAdmin)
 admin.site.register(BaseResults)
 admin.site.register(Bug)
 admin.site.register(BuildSummary)

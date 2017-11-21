@@ -1,0 +1,64 @@
+<!DOCTYPE>
+<html>
+<head>
+    <title>{% block title %}LCR Report Management System{% endblock title %}</title>
+    <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
+    <style>
+        body {
+            padding-bottom: 20px;
+            padding-top: 70px;
+        }
+        .messages {
+            list-style: none;
+        }
+        .headline {
+            padding-top: 1px;
+            padding-bottom: 8px;
+            margin-bottom: 3px;
+            font-size: 50px;
+        }
+        h2 {
+            background-color: darkgrey;
+        }
+
+        th {
+            background-color: whitesmoke;
+        }
+    </style>
+    {% block css %}{% endblock css %}
+</head>
+<body>
+    <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+        <div class="container">
+            <div class="navbar-header">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="#">LCR Report Management System</a>
+            </div>
+            <div class="navbar-collapse collapse" align='right'>
+                {% if not user.is_authenticated %}
+                <a href="{% url 'signup' %}" class="btn btn-default navbar-btn">Register</a>
+                <a href="{% url 'login' %}" class="btn btn-default navbar-btn">Login</a>
+                {% else %}
+                <span class="icon-bar" style="color:#fff">Welcome <strong>{% firstof user.get_short_name user.get_username %}</strong>&nbsp;</span>
+                <a href="/account/password_change" class="btn btn-default navbar-btn">Change Password</a>
+                <a href="{% url 'logout' %}" class="btn btn-default navbar-btn">Logout</a>
+                {% endif %}
+            </div><!--/.navbar-collapse -->
+        </div>
+    </div>
+    <div class="headline">
+        <div class="container" style="background-color:darkgray;">{% block headline %}{% endblock headline %}</div>
+    </div>
+    <div class="container">
+        {% block content %}{% endblock content %}
+   </div>
+   <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+   {% block js %}{% endblock js %}
+</body>
+</html>
+

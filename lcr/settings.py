@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'report',
+    'crispy_forms',
 ]
 
 MIDDLEWARE = [
@@ -156,3 +157,7 @@ LOGGING = {
         },
     }
 }
+
+#DATA_UPLOAD_MAX_NUMBER_FIELDS = 100000
+
+CRISPY_TEMPLATE_PACK = 'bootstrap3'

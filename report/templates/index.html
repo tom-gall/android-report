@@ -1,7 +1,12 @@
-<div align="center">
-Builds Info
+{% extends '_layouts/base.html' %}
 
-<div> TODO:
+{% block title %} Builds Information  {% endblock %}
+
+{% block headline %}<h1>Builds Information</h1>{% endblock %}
+
+{% block content %}
+<div>
+<h2>TODO:</h2>
 <ul>
 <table>
 <tr>
@@ -18,7 +23,9 @@ Builds Info
 <li>Login implementation</li>
 </td>
 </tr>
+</table>
 </div>
+<h2>Builds Information</h2>
 <table border=2>
 <tr>
 <tr/>
@@ -95,4 +102,4 @@ Builds Info
     {% endfor %}
 </tr>
 </table>
-</div>
+{% endblock %}

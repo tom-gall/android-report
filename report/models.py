@@ -20,17 +20,26 @@ class TestCase(models.Model):
             return "%s %s" % (self.name, self.result)
 
 
+JOB_STATUS_CHOICE = (
+                     (0, "Submitted"),
+                     (1, "Running"),
+                     (2, "Complete"),
+                     (3, "Incomplete"),
+                     (4, "Canceled"),
+                    )
+
 class JobCache(models.Model):
-#    build_name = models.CharField(max_length=64)
-#    build_no = models.CharField(max_length=8)
+    build_name = models.CharField(max_length=64)
+    build_no = models.CharField(max_length=8)
     lava_nick = models.CharField(max_length=16)
     job_id = models.CharField(max_length=16)
-    #job_name = models.CharField(max_length=64)
+    job_name = models.CharField(max_length=64)
+    status = models.IntegerField(choices=JOB_STATUS_CHOICE)
+    duration = models.FloatField()
     cached = models.BooleanField(default=False)
-    #duration
 
     def __str__(self):
-        return "%s_%s %s" % (self.lava_nick, self.job_id, self.cached)
+        return "%s_%s %s %s#%s %s %.2f" % (self.lava_nick, self.job_id, self.job_name, self.build_name, self.build_no, self.status, self.duration/3600)
 
 
 BUG_STATUS_CHOICES = (

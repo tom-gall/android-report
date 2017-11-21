@@ -1,6 +1,12 @@
-<div align="center">
-<title>Results for build: {{ build_info.build_name }}-{{ build_info.build_no }} </title>
-<h1>Results for build: {{ build_info.build_name }}-{{ build_info.build_no }} </h1>
+{% extends '_layouts/base.html' %}
+
+{% block title %} Results for build: {{ build_info.build_name }}-{{ build_info.build_no }} {% endblock %}
+
+{% block headline %}<h1>Results for build: {{ build_info.build_name }}-{{ build_info.build_no }}</h1>{% endblock %}
+
+{% block content %}
+
+<div align="left">
 <table>
 <tr>
 {% for build_no in build_info.build_numbers %}
@@ -125,3 +131,4 @@
 {% endfor %}
 </table>
 </div>
+{% endblock %}

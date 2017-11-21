@@ -4,8 +4,10 @@ from __future__ import unicode_literals
 from django import forms
 from django.shortcuts import render
 from django.http import HttpResponse
+from django.contrib.auth.decorators import login_required
 
 import collections
+import datetime
 import re
 import sys
 import urllib2
@@ -48,6 +50,11 @@ job_status_dict = {0: "Submitted",
                    3: "Incomplete",
                    4: "Canceled",
                   }
+
+
+job_status_string_int = dict((v,k) for k,v in job_status_dict.iteritems())
+
+
 
 job_priority_list = ['high', 'medium', 'low']
 
@@ -129,7 +136,8 @@ build_configs = {
                                                     'template_dir': "x15-v2",
                                                     'base_build': {
                                                                     'build_name':'android-lcr-reference-x15-o',
-                                                                    'build_no': 'N-M-1705',
+                                                                    #'build_no': 'N-M-1705',
+                                                                    'build_no': '19',
                                                                   },
                                                     'bugzilla': {
                                                             'new_bug_url': 'https://bugs.linaro.org/enter_bug.cgi',
@@ -193,75 +201,94 @@ def get_possible_job_names(build_name=DEFAULT_BUILD_NAME):
 
 
 def get_jobs(build_name, build_no, lava, job_name_list=[]):
-    jobs_to_be_checked = get_possible_job_names(build_name=build_name).keys()
-    if job_name_list is None or len(job_name_list) == 0 or len(job_name_list) > 1:
-        search_condition = "description__icontains__%s-%s" % (build_name, build_no)
-    elif len(job_name_list) == 1:
-        search_condition = "description__icontains__%s-%s-%s" % (build_name, build_no, job_name_list[0])
-    jobs_from_lava = lava.server.results.make_custom_query("testjob", search_condition)
-    jobs = { }
-    for job in jobs_from_lava:
-        job_id = job.get("id")
-        job_description = job.get("description")
-        job_status = job.get("status")
-        if job_name_list is None or len(job_name_list) == 0 or len(job_name_list) > 1:
-            local_job_name = job_description.replace("%s-%s-" % (build_name, build_no), "")
+    ## TODO: have the same build tested on 2 different lava instances, and saved as base
+    count_in_base = BaseResults.objects.filter(build_name=build_name, build_no=build_no).count()
+    if count_in_base > 0:
+        cached_in_base = True
+    else:
+        cached_in_base = False
 
-            if local_job_name not in jobs_to_be_checked:
-                continue
-            if len(job_name_list) > 1 and local_job_name not in job_name_list:
-                continue
+    if not cached_in_base:
+        jobs_to_be_checked = get_possible_job_names(build_name=build_name).keys()
+        if job_name_list is None or len(job_name_list) == 0 or len(job_name_list) > 1:
+            search_condition = "description__icontains__%s-%s" % (build_name, build_no)
+        elif len(job_name_list) == 1:
+            search_condition = "description__icontains__%s-%s-%s" % (build_name, build_no, job_name_list[0])
+        jobs_raw = lava.server.results.make_custom_query("testjob", search_condition)
+    else:
+        jobs_raw = JobCache.objects.filter(build_name=build_name, build_no=build_no, lava_nick=lava.nick)
+        ## TODO include the lava_nick information in the result?
+        #jobs_raw = JobCache.objects.filter(build_name=build_name, build_no=build_no)
+
+    jobs = { }
+    for job in jobs_raw:
+        if not cached_in_base:
+            job_id = job.get("id")
+            job_status = job.get("status")
+            if job['start_time'] is None or job['end_time'] is None:
+                job_duration = 0
+            else:
+                job_start_time = datetime.datetime.strptime(str(job['start_time']), '%Y%m%dT%H:%M:%S')
+                job_end_time =  datetime.datetime.strptime(str(job['end_time']), '%Y%m%dT%H:%M:%S')
+                job_duration = (job_end_time - job_start_time).seconds
+
+            job_description = job.get("description")
+            if job_name_list is None or len(job_name_list) == 0 or len(job_name_list) > 1:
+                local_job_name = job_description.replace("%s-%s-" % (build_name, build_no), "")
+
+                if local_job_name not in jobs_to_be_checked:
+                    continue
+                if len(job_name_list) > 1 and local_job_name not in job_name_list:
+                    continue
+            else:
+                local_job_name = job_name_list[0]
+
+            if is_job_cached(job_id, lava):
+                JobCache.objects.filter(lava_nick=lava.nick, job_id=job_id).update(
+                                        build_name=build_name, build_no=build_no,
+                                        lava_nick=lava.nick, job_id=job_id, job_name=local_job_name, status=job_status,
+                                        duration=job_duration, cached=False)
+            else:
+                JobCache.objects.create(
+                                        build_name=build_name, build_no=build_no,
+                                        lava_nick=lava.nick, job_id=job_id, job_name=local_job_name, status=job_status,
+                                        duration=job_duration, cached=False)
+
         else:
-            local_job_name = job_name_list[0]
+            job_id = job.job_id
+            job_status = job.status
+            local_job_name = job.job_name
+            job_duration = job.duration
 
         job_exist = jobs.get(local_job_name)
         if job_exist is not None:
-            job_exist.get("id_list").append(job_id)
-            job_exist.get("status_list").append(job_status)
+            job_exist.get("id_status_list").append((job_id, job_status_dict[job_status]))
         else:
             jobs[local_job_name] = {
-                                "id_list": [job_id],
-                                "status_list": [job_status],
+                                'name': local_job_name,
+                                "id_status_list": [(job_id, job_status_dict[job_status])],
                              }
-
     return jobs
+
 
 def get_job_name(job_dict):
     return  job_dict.get("name")
 
-def jobs_dict_to_sorted_tuple(dict_jobs={}):
-    jobs_tuple = []
-    for job_name, job_details in dict_jobs.items():
-        id_list = job_details.get("id_list")
-        status_list = job_details.get("status_list")
-        zip_id_status_list = zip(id_list, status_list)
-        zip_id_status_list.sort(reverse=True)
-        id_list, status_list = zip(*zip_id_status_list)
-        status_string_list = []
-        for status in status_list:
-            status_string_list.append(job_status_dict[status])
-        jobs_tuple.append({"name": job_name,
-                           "id_list": id_list,
-                           "status_list": status_list,
-                           "status_string_list": status_string_list,
-                           "id_status_list": zip(id_list, status_string_list)})
-    jobs_tuple.sort(key=get_job_name)
-    return jobs_tuple
 
-
-def get_yaml_result(job_id):
+def get_yaml_result(job_id, lava):
     tests_res = {}
-    for test_case in TestCase.objects.filter(job_id=job_id):
+    for test_case in TestCase.objects.filter(job_id=job_id, lava_nick=lava.nick):
         tests_res[test_case.name] = {"name": test_case.name,
                                      "result": test_case.result,
                                      "measurement": test_case.measurement,
                                      "unit": test_case.unit,
                                      "suite": test_case.suite,
                                      "job_id": job_id,
+                                     "lava_nick": lava.nick,
                                     }
     return tests_res
 
-def cache_job_result_to_db(job_id, lava):
+def cache_job_result_to_db(job_id, lava, job_status):
     try:
         res = lava.server.results.get_testjob_results_yaml(job_id)
         for test in yaml.load(res):
@@ -284,13 +311,15 @@ def cache_job_result_to_db(job_id, lava):
                                     lava_nick=lava.nick,
                                     job_id=job_id)
 
-        JobCache.objects.create(lava_nick=lava.nick, job_id=job_id, cached=True)
+        JobCache.objects.filter(lava_nick=lava.nick, job_id=job_id).update(cached=True,
+                                                                           status=job_status_string_int[job_status])
 
     except xmlrpclib.Fault as e:
         raise e
     except:
         raise
 
+@login_required
 def resubmit_job(request):
     job_ids = request.POST.getlist("job_ids")
     if len(job_ids) == 0:
@@ -338,7 +367,7 @@ def get_default_build_no(all_build_numbers=[], defaut_build_no=None):
 
 def is_job_cached(job_id, lava):
     try:
-        JobCache.objects.get(job_id=job_id, lava_nick=lava.nick)
+        JobCache.objects.get(job_id=job_id, lava_nick=lava.nick, cached=True)
     except JobCache.DoesNotExist:
         return False
 
@@ -349,18 +378,19 @@ def get_test_results_for_build(build_name, build_no, job_name_list=[]):
     total_tests_res = {}
     lava = build_configs[build_name]['lava_server']
 
-    jobs = jobs_dict_to_sorted_tuple(get_jobs(build_name, build_no, lava, job_name_list=job_name_list))
-    for job in jobs:
-        id_status_list = job.get("id_status_list")
+    jobs = get_jobs(build_name, build_no, lava, job_name_list=job_name_list)
+    for job_name, job_details in jobs.items():
+        id_status_list = job_details.get("id_status_list")
+        id_status_list.sort(reverse=True)
         job_total_res = {}
         result_job_id_status = None
         for job_id, job_status in id_status_list:
             if job_status != job_status_dict[2]:
                 continue
             if not is_job_cached(job_id, lava):
-                cache_job_result_to_db(job_id, lava)
+                cache_job_result_to_db(job_id, lava, job_status)
 
-            tests_res = get_yaml_result(job_id=job_id)
+            tests_res = get_yaml_result(job_id=job_id, lava=lava)
             if len(tests_res) != 0:
                 # use the last to replace the first
                 # might be better to change to use the better one
@@ -370,11 +400,11 @@ def get_test_results_for_build(build_name, build_no, job_name_list=[]):
                 break
 
         if len(job_total_res) == 0:
-            jobs_failed.append(job)
+            jobs_failed.append(job_details)
         else:
-            total_tests_res[job.get("name")] = {
-                                     "job_name": job.get("name"),
-                                     "id_status_list": job.get("id_status_list"),
+            total_tests_res[job_name] = {
+                                     "job_name": job_name,
+                                     "id_status_list": id_status_list,
                                      "result_job_id_status": result_job_id_status,
                                      "build_no": build_no,
                                      "results": job_total_res}
@@ -403,6 +433,9 @@ def get_commit_from_pinned_manifest(snapshot_url, path):
         return matches[0]
     else:
         return None
+
+
+@login_required
 def jobs(request):
     build_name = request.GET.get("build_name", DEFAULT_BUILD_NAME)
 
@@ -538,6 +571,7 @@ def compare_results_func(tests_result_1, tests_result_2):
     return sorted(compare_results.items())
 
 
+@login_required
 def compare(request):
     compare_results = {}
     if request.method == 'POST':
@@ -603,6 +637,7 @@ def get_test_results_for_job(build_name, lava, jobs=[]):
         checklist_for_one_job.items().sort()
     return (all_build_numbers, checklist_results)
 
+@login_required
 def checklist(request):
     checklist_results = {}
     all_build_numbers= []
@@ -654,6 +689,7 @@ class JobSubmissionForm(forms.Form):
     jobs = forms.MultipleChoiceField(widget=forms.CheckboxSelectMultiple)
 
 
+@login_required
 def submit_lava_jobs(request):
     if request.method == 'POST':
         build_name = request.POST.get("build_name")
@@ -749,6 +785,7 @@ def submit_lava_jobs(request):
                         "form": form,
                       })
 
+@login_required
 def index(request):
     builds = {}
     for build_name in build_names:
@@ -865,6 +902,7 @@ cts_v8a = [ 'cts-focused1-v8a',
             'cts-part5-v8a',
           ]
 
+@login_required
 def test_report(request):
     build_name = request.GET.get("build_name", DEFAULT_BUILD_NAME)
     all_build_numbers = get_possible_builds(build_name)
@@ -1258,6 +1296,8 @@ class BugForm(forms.ModelForm):
         model = Bug
         fields = ['build_name', 'bug_id', 'link', 'subject', 'status', 'plan_suite', 'module_testcase']
 
+
+@login_required
 def add_bug(request):
     if request.method == 'POST':
         build_name = request.POST.get("build_name")
@@ -1289,8 +1329,8 @@ def add_bug(request):
                         "build_info": build_info,
                       })
 
+
 if __name__ == "__main__":
-#    get_yaml_result("191778")
     build_name = "android-lcr-reference-hikey-o"
     build_no = '20'
 #    job_template = get_possible_job_names(build_name=build_name)
@@ -1301,5 +1341,5 @@ if __name__ == "__main__":
 
     lava_server = build_configs[build_name]['lava_server']
 
-    jobs = jobs_dict_to_sorted_tuple(get_jobs(build_name, build_no, lava_server, job_name_list=[]))
+    jobs = get_jobs(build_name, build_no, lava_server, job_name_list=[])
     print str(jobs)
