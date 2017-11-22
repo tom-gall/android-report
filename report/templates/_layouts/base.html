@@ -37,7 +37,7 @@
                     <span class="icon-bar"></span>
                     <span class="icon-bar"></span>
                 </button>
-                <a class="navbar-brand" href="#">LCR Report Management System</a>
+                <a class="navbar-brand" href="{% url 'home' %}">LCR Report Management System</a>
             </div>
             <div class="navbar-collapse collapse" align='right'>
                 {% if not user.is_authenticated %}
@@ -45,11 +45,20 @@
                 <a href="{% url 'login' %}" class="btn btn-default navbar-btn">Login</a>
                 {% else %}
                 <span class="icon-bar" style="color:#fff">Welcome <strong>{% firstof user.get_short_name user.get_username %}</strong>&nbsp;</span>
-                <a href="/account/password_change" class="btn btn-default navbar-btn">Change Password</a>
+                <a href="{% url 'change_password' %}" class="btn btn-default navbar-btn">Change Password</a>
                 <a href="{% url 'logout' %}" class="btn btn-default navbar-btn">Logout</a>
                 {% endif %}
             </div><!--/.navbar-collapse -->
         </div>
+    </div>
+    <div>
+    {% if messages %}
+    <ul class="messages">
+        {% for message in messages %}
+        <li{% if message.tags %} class="alert alert-{{ message.tags }}"{% endif %}>{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
     </div>
     <div class="headline">
         <div class="container" style="background-color:darkgray;">{% block headline %}{% endblock headline %}</div>

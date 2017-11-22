@@ -1,3 +1,10 @@
+{% extends '_layouts/base.html' %}
+
+{% block title %} Jobs resubmitted {% endblock %}
+
+{% block headline %}<h1>Jobs resubmitted</h1>{% endblock %}
+
+{% block content %}
 <div align="center">
 {% if errors %}
 <title>Job resubmitted failed </title>
@@ -17,3 +24,4 @@ Back to check the <a href="/report/jobs/">lava result report</a>
 Back to check the <a href="/report/jobs/">lava result report</a>
 {% endif %}
 </div>
+{% endblock %}

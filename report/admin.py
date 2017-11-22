@@ -8,7 +8,10 @@ from .models import TestCase
 from .models import JobCache
 from .models import BaseResults
 from .models import Bug
-from .models import BuildSummary, LAVAUser
+from .models import BuildSummary, LAVAUser, BuildBugzilla, BuildConfig, LAVA
+from django.contrib.auth.models import Permission
+
+admin.site.register(Permission)
 
 class TestCaseAdmin(admin.ModelAdmin):
     list_display = ('name', 'result', 'measurement', 'unit', 'suite', 'job_id')
@@ -26,3 +29,6 @@ admin.site.register(BaseResults)
 admin.site.register(Bug)
 admin.site.register(BuildSummary)
 admin.site.register(LAVAUser)
+admin.site.register(BuildBugzilla)
+admin.site.register(BuildConfig)
+admin.site.register(LAVA)

@@ -1,0 +1,15 @@
+{% extends '_layouts/base.html' %}
+
+{% block title %} Permission Denied {% endblock %}
+
+{% block headline %}<h1>Permission Denied</h1>{% endblock %}
+
+{% block content %}
+<div class="alert alert-block alert-danger">
+<ul>
+<li>You do not have permission to view this page. Please log in with account which has the permission.</li>
+</ul>
+</div>
+<hr/>
+<a href="{% url 'login' %}" class="btn btn-default navbar-btn">Login With Another Account</a>
+{% endblock %}

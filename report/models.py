@@ -118,13 +118,52 @@ class BuildSummary(models.Model):
     firmware_version = models.CharField(max_length=64)
     toolchain_info = models.CharField(max_length=256)
     images_url = models.CharField(max_length=256)
+
     def __str__(self):
         return "%s %s %s %s" % (self.build_name, self.build_no, self.android_version, self.kernel_version)
 
-class LAVAUser(models.Model):
-    lava_nick = models.CharField(max_length=64)
-    user_name = models.CharField(max_length=32)
-    token = models.CharField(max_length=128)
+
+class BuildBugzilla(models.Model):
+    build_name = models.CharField(max_length=64)
+    new_bug_url = models.URLField()
+    product = models.CharField(max_length=64)
+    op_sys = models.CharField(max_length=32)
+    bug_severity = models.CharField(max_length=32)
+    component = models.CharField(max_length=64)
+    keywords = models.CharField(max_length=16, default='', null=True, blank=True)
+    rep_platform = models.CharField(max_length=16)
+    short_desc_prefix = models.CharField(max_length=16, default='', blank=True)
 
     def __str__(self):
-        return "%s %s" % (self.lava_nick, self.user_name)
+        return "%s %s %s" % (self.build_name, self.product, self.component)
+
+
+class LAVA(models.Model):
+    nick = models.CharField(max_length=64)
+    domain = models.CharField(max_length=64)
+
+    def __str__(self):
+        return "%s %s" % (self.nick, self.domain)
+
+
+class LAVAUser(models.Model):
+    user_name = models.CharField(max_length=32)
+    token = models.CharField(max_length=128)
+    lava = models.ForeignKey(LAVA, null=True)
+
+    def __str__(self):
+        return "%s %s" % (self.lava, self.user_name)
+
+
+class BuildConfig(models.Model):
+    build_name = models.CharField(max_length=64)
+    img_ext = models.CharField(max_length=16)
+    base_build_name = models.CharField(max_length=64)
+    base_build_no = models.CharField(max_length=8)
+    template_dir = models.CharField(max_length=8, blank=True, default='')
+
+    bugzilla = models.ForeignKey(BuildBugzilla)
+    lava = models.ForeignKey(LAVA, null=True)
+
+    def __str__(self):
+        return "%s %s %s" % (self.build_name, self.base_build_name, self.base_build_no)

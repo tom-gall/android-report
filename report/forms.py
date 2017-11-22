@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.forms import PasswordChangeForm as AuthPasswordChangeForm
 from django.contrib.auth.models import User
 
 from crispy_forms.helper import FormHelper
@@ -42,5 +43,19 @@ class LoginForm(AuthenticationForm):
             'password',
             ButtonHolder(
                 Submit('login', 'Login', css_class='btn-primary')
+            )
+        )
+
+class PasswordChangeForm(AuthPasswordChangeForm):
+    def __init__(self, *args, **kwargs):
+        super(PasswordChangeForm, self).__init__(*args, **kwargs)
+
+        self.helper = FormHelper()
+        self.helper.layout = Layout(
+            'old_password',
+            'new_password1',
+            'new_password2',
+            ButtonHolder(
+                Submit('passwd_change', 'Change Password', css_class='btn-primary')
             )
         )

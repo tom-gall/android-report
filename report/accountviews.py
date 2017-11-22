@@ -8,18 +8,25 @@ from __future__ import absolute_import
 from django.views import generic
 from django.utils.http import is_safe_url
 
+from django.contrib import messages
+from django.contrib.auth import authenticate, login, logout, REDIRECT_FIELD_NAME, update_session_auth_hash
 from django.contrib.auth.models import User
-from django.contrib.auth import authenticate, login, logout, REDIRECT_FIELD_NAME
+from django.contrib.auth.decorators import login_required
 from django.core.urlresolvers import reverse_lazy
+from django.shortcuts import render, redirect
 
 from .forms import RegistrationForm
 from .forms import LoginForm
+from .forms import PasswordChangeForm
 
-class SignUpView(generic.CreateView):
+class SignUpView(
+                 generic.CreateView):
+
     form_class = RegistrationForm
     model = User
     template_name = 'accounts/signup.html'
     success_url = reverse_lazy('home')
+    form_valid_message = "Sign Up finished successfully, please log in with you username and password."
 
 
 class LoginView(generic.FormView):
@@ -27,6 +34,7 @@ class LoginView(generic.FormView):
     success_url = reverse_lazy('home')
     template_name = 'accounts/login.html'
     redirect_field_name = REDIRECT_FIELD_NAME
+    form_valid_message = 'Logged in successfully.'
 
     def form_valid(self, form):
         username = form.cleaned_data['username']
@@ -53,3 +61,27 @@ class LogOutView(generic.RedirectView):
     def get(self, request, *args, **kwargs):
         logout(request)
         return super(LogOutView, self).get(request, *args, **kwargs)
+
+
+@login_required
+def change_password(request):
+    if request.method == 'POST':
+        form = PasswordChangeForm(request.user, request.POST)
+        if form.is_valid():
+            user = form.save()
+            update_session_auth_hash(request, user)  # Important!
+            messages.success(request, 'Your password was successfully updated!')
+            return redirect('change_password')
+        else:
+            messages.error(request, 'Please correct the error below.')
+    else:
+        form = PasswordChangeForm(request.user)
+        return render(request, 'accounts/change_password.html', {
+                'form': form
+                    })
+
+class NoPermissionView(generic.TemplateView):
+    template_name = 'accounts/no_permission.html'
+
+    def get(self, request, *args, **kwargs):
+        return super(NoPermissionView, self).get(request, *args, **kwargs)

@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 from django import forms
 from django.shortcuts import render
 from django.http import HttpResponse
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 
 import collections
 import datetime
@@ -18,7 +18,7 @@ import logging
 from lava_tool.authtoken import AuthenticatingServerProxy, KeyringAuthBackend
 
 # Create your views here.
-from models import TestCase, JobCache, BaseResults, Bug, BuildSummary, LAVAUser
+from models import TestCase, JobCache, BaseResults, Bug, BuildSummary, LAVA, LAVAUser, BuildBugzilla, BuildConfig
 
 android_snapshot_url_base = "https://snapshots.linaro.org/android"
 ci_job_url_base = 'https://ci.linaro.org/job'
@@ -51,106 +51,39 @@ job_status_dict = {0: "Submitted",
                    4: "Canceled",
                   }
 
-
 job_status_string_int = dict((v,k) for k,v in job_status_dict.iteritems())
-
-
-
 job_priority_list = ['high', 'medium', 'low']
-
-
-NICK_LAVA_STAGING = 'staging'
-NICK_LAVA_PRODUCTION = 'production'
-NICK_LAVA_LKFT = 'lkft'
-LAVA_NICK_DOMAIN = {
-                    NICK_LAVA_STAGING: 'staging.validation.linaro.org',
-                    NICK_LAVA_PRODUCTION: 'validation.linaro.org',
-                    NICK_LAVA_LKFT: 'lkft.linaro.org',
-                   }
 
 class LavaInstance(object):
     def __init__(self, nick=None, user=None):
         self.nick = nick
-        self.domain = LAVA_NICK_DOMAIN[self.nick]
-        self.user = user
-        self.token = LAVAUser.objects.get(lava_nick=self.nick, user_name=self.user).token
-        self.url = "https://%s:%s@%s/RPC2/" % (self.user, self.token, self.domain)
+        self.lava = LAVA.objects.get(nick=self.nick)
+        self.domain = self.lava.domain
+        self.lava_user = LAVAUser.objects.get(lava=self.lava, user_name=user)
+        self.url = "https://%s:%s@%s/RPC2/" % (self.lava_user.user_name, self.lava_user.token, self.domain)
         self.job_url_prefix = "https://%s/scheduler/job" % self.domain
         self.server = AuthenticatingServerProxy(self.url, auth_backend=KeyringAuthBackend())
 
-DEFAULT_USER = "yongqin.liu"
-LAVAS = { NICK_LAVA_STAGING: LavaInstance(nick=NICK_LAVA_STAGING,
-                                         user=DEFAULT_USER,
-                                        ),
-         NICK_LAVA_PRODUCTION: LavaInstance(nick=NICK_LAVA_PRODUCTION,
-                                            user=DEFAULT_USER,
-                                           ),
-         NICK_LAVA_LKFT: LavaInstance(nick=NICK_LAVA_LKFT,
-                                            user=DEFAULT_USER,
-                                           ),
-       }
 
-build_configs = {
-                  'android-lcr-reference-hikey-o': {
-                                                    'lava_server': LAVAS[NICK_LAVA_PRODUCTION],
-                                                    'img_ext': ".img.xz",
-                                                    'template_dir': "hikey-v2",
-                                                    'base_build': {
-                                                                    'build_name':'android-lcr-reference-hikey-o',
-                                                                    #'build_no': 'N-M-1705',
-                                                                    'build_no': '20',
-                                                                  },
-                                                    'bugzilla': {
-                                                            'new_bug_url': 'https://bugs.linaro.org/enter_bug.cgi',
-                                                            'product': 'Linaro Android',
-                                                            'op_sys': 'Android',
-                                                            'bug_severity': 'normal',
-                                                            'component': 'R-LCR-HIKEY',
-                                                            'keywords': 'LCR',
-                                                            'rep_platform': 'HiKey',
-                                                            'short_desc_prefix': "HiKey",
-                                                           },
-                                                   },
-                  'android-lcr-reference-hikey-master': {
-                                                    'lava_server': LAVAS[NICK_LAVA_PRODUCTION],
-                                                    'img_ext': ".img.xz",
-                                                    'template_dir': "hikey-v2",
-                                                    'base_build': {
-                                                                    'build_name':'android-lcr-reference-hikey-o',
-                                                                    'build_no': '20',
-                                                                  },
-                                                    'bugzilla': {
-                                                            'new_bug_url': 'https://bugs.linaro.org/enter_bug.cgi',
-                                                            'product': 'Linaro Android',
-                                                            'op_sys': 'Android',
-                                                            'bug_severity': 'normal',
-                                                            'component': 'AOSP master builds',
-                                                            'keywords': '',
-                                                            'rep_platform': 'HiKey',
-                                                            'short_desc_prefix': "HiKey",
-                                                           },
-                                                   },
-                  'android-lcr-reference-x15-o': {
-                                                    'lava_server': LAVAS[NICK_LAVA_STAGING],
-                                                    'img_ext': ".img",
-                                                    'template_dir': "x15-v2",
-                                                    'base_build': {
-                                                                    'build_name':'android-lcr-reference-x15-o',
-                                                                    #'build_no': 'N-M-1705',
-                                                                    'build_no': '19',
-                                                                  },
-                                                    'bugzilla': {
-                                                            'new_bug_url': 'https://bugs.linaro.org/enter_bug.cgi',
-                                                            'product': 'Linaro Android',
-                                                            'op_sys': 'Android',
-                                                            'bug_severity': 'normal',
-                                                            'component': 'R-LCR-X15',
-                                                            'keywords': 'LCR',
-                                                            'rep_platform': 'BeagleBoard-X15',
-                                                            'short_desc_prefix': 'X15',
-                                                           },
-                                                   },
-                }
+DEFAULT_USER = "yongqin.liu"
+LAVAS = {}
+for lava in LAVA.objects.all():
+    LAVAS[lava.nick] = LavaInstance(nick=lava.nick, user=DEFAULT_USER)
+
+build_configs = {}
+
+for build in BuildConfig.objects.all():
+    build_config = {
+                    'lava_server': LAVAS[build.lava.nick],
+                    'img_ext': build.img_ext,
+                    'template_dir': build.template_dir,
+                    'base_build': {
+                                    'build_name': build.base_build_name,
+                                    'build_no': build.base_build_no,
+                                   },
+                   }
+    build_configs[build.build_name] = build_config
+
 
 build_names = build_configs.keys()
 build_names = sorted(build_names)
@@ -243,12 +176,13 @@ def get_jobs(build_name, build_no, lava, job_name_list=[]):
             else:
                 local_job_name = job_name_list[0]
 
-            if is_job_cached(job_id, lava):
+            try:
+                JobCache.objects.get(job_id=job_id, lava_nick=lava.nick)
                 JobCache.objects.filter(lava_nick=lava.nick, job_id=job_id).update(
                                         build_name=build_name, build_no=build_no,
                                         lava_nick=lava.nick, job_id=job_id, job_name=local_job_name, status=job_status,
                                         duration=job_duration, cached=False)
-            else:
+            except JobCache.DoesNotExist:
                 JobCache.objects.create(
                                         build_name=build_name, build_no=build_no,
                                         lava_nick=lava.nick, job_id=job_id, job_name=local_job_name, status=job_status,
@@ -303,13 +237,20 @@ def cache_job_result_to_db(job_id, lava, job_status):
                 test["measurement"] = None
             else:
                 test["measurement"] = "{:.2f}".format(float(test.get("measurement")))
-            TestCase.objects.create(name=test.get("name"),
-                                    result=test.get("result"),
-                                    measurement=test.get("measurement"),
-                                    unit=test.get("unit"),
-                                    suite=test.get("suite"),
-                                    lava_nick=lava.nick,
-                                    job_id=job_id)
+            try:
+                # not set again if already cached
+                TestCase.objects.get(name=test.get("name"),
+                                     suite=test.get("suite"),
+                                     lava_nick=lava.nick,
+                                     job_id=job_id)
+            except TestCase.DoesNotExist:
+                TestCase.objects.create(name=test.get("name"),
+                                        result=test.get("result"),
+                                        measurement=test.get("measurement"),
+                                        unit=test.get("unit"),
+                                        suite=test.get("suite"),
+                                        lava_nick=lava.nick,
+                                        job_id=job_id)
 
         JobCache.objects.filter(lava_nick=lava.nick, job_id=job_id).update(cached=True,
                                                                            status=job_status_string_int[job_status])
@@ -436,6 +377,7 @@ def get_commit_from_pinned_manifest(snapshot_url, path):
 
 
 @login_required
+@permission_required('report.can_testcase', login_url='/report/accounts/no_permission/')
 def jobs(request):
     build_name = request.GET.get("build_name", DEFAULT_BUILD_NAME)
 
@@ -572,6 +514,7 @@ def compare_results_func(tests_result_1, tests_result_2):
 
 
 @login_required
+@permission_required('report.can_testcase', login_url='/report/accounts/no_permission/')
 def compare(request):
     compare_results = {}
     if request.method == 'POST':
@@ -638,6 +581,7 @@ def get_test_results_for_job(build_name, lava, jobs=[]):
     return (all_build_numbers, checklist_results)
 
 @login_required
+@permission_required('report.can_testcase', login_url='/report/accounts/no_permission/')
 def checklist(request):
     checklist_results = {}
     all_build_numbers= []
@@ -903,6 +847,7 @@ cts_v8a = [ 'cts-focused1-v8a',
           ]
 
 @login_required
+@permission_required('report.can_testcase', login_url='/report/accounts/no_permission/')
 def test_report(request):
     build_name = request.GET.get("build_name", DEFAULT_BUILD_NAME)
     all_build_numbers = get_possible_builds(build_name)
@@ -1243,15 +1188,15 @@ def test_report(request):
         firmware_url = '--'
 
     ## bugzilla related information
-    build_bugzilla = build_configs[build_name]['bugzilla']
-    build_new_bug_url_prefix = '%s?product=%s&op_sys=%s&bug_severity=%s&component=%s&keywords=%s&rep_platform=%s&short_desc=%s: ' % ( build_bugzilla['new_bug_url'],
-                                                                                                                                      build_bugzilla['product'],
-                                                                                                                                      build_bugzilla['op_sys'],
-                                                                                                                                      build_bugzilla['bug_severity'],
-                                                                                                                                      build_bugzilla['component'],
-                                                                                                                                      build_bugzilla['keywords'],
-                                                                                                                                      build_bugzilla['rep_platform'],
-                                                                                                                                      build_bugzilla['short_desc_prefix'],
+    build_bugzilla = BuildBugzilla.objects.get(build_name=build_name)
+    build_new_bug_url_prefix = '%s?product=%s&op_sys=%s&bug_severity=%s&component=%s&keywords=%s&rep_platform=%s&short_desc=%s: ' % ( build_bugzilla.new_bug_url,
+                                                                                                                                      build_bugzilla.product,
+                                                                                                                                      build_bugzilla.op_sys,
+                                                                                                                                      build_bugzilla.bug_severity,
+                                                                                                                                      build_bugzilla.component,
+                                                                                                                                      build_bugzilla.keywords,
+                                                                                                                                      build_bugzilla.rep_platform,
+                                                                                                                                      build_bugzilla.short_desc_prefix,
                                                                                                                                      )
 
     count_in_base = BaseResults.objects.filter(build_name=build_name, build_no=build_no).count()
