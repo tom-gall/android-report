@@ -15,6 +15,7 @@
     {% else %}
         <td><a href="/report/test-report/?build_name={{ build_info.build_name}}&&build_no={{ build_no }}">{{ build_no}} </a></td>
     {% endifequal %}
+    &nbsp;&nbsp;
 {% endfor %}
 
 </tr>
@@ -78,6 +79,54 @@
     <tr/>
 </table>
 <hr/>
+{% if jobs_failed %}
+<form action="/report/resubmit-job/" method="post">
+<table border="2">
+<tr>
+    <th>Job Name</th>
+    <th>Job Ids</th>
+    <th>Resubmit latest</th>
+    <th>bug link</th>
+</tr>
+{% for job in jobs_failed %}
+<tr>
+    <td>{{ job.name }}</td>
+    <td>
+        {% for id_status in job.id_status_list %}
+        <a href="{{ lava_server_job_prefix }}/{{ id_status.0 }}"> {{ id_status.0 }}</a>: {{ id_status.1 }} <br>
+        {% endfor %}
+    </td>
+    <td>
+        {% with job.id_status_list|first as first_id_status %}
+            {% if first_id_status.1 == 'Submitted' or  first_id_status.1 == 'Running' %}
+            <button name="resubmit_latest" disabled="true" onclick="this.disabled=true; window.location='/report/resubmit-job/?build_name={{ build_info.build_name }}&&job_id={% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}'">
+                Resubmit {% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}
+            </button>
+            <input type="checkbox" name="job_ids" value="{% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}" selected="false" disabled="false"/>
+            {% else %}
+            <button name="resubmit_latest" onclick="this.disabled=true; window.location='/report/resubmit-job/?build_name={{ build_info.build_name }}&&job_id={% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}'">
+                Resubmit {% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}
+            </button>
+            <input type="checkbox" name="job_ids" value="{% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}" checked="true"/>
+
+            {% endif %}
+        {% endwith %}
+    </td>
+    <td>
+        <a href="https://bugs.linaro.org/enter_bug.cgi?product=Linaro%20Android">Report Android Bug</a><br/>
+        <a href="https://bugs.linaro.org/enter_bug.cgi?product=LAVA%20Framework">Report LAVA Bug</a><br/>
+    </td>
+</tr>
+{% endfor %}
+</table>
+{% csrf_token %}
+<input type="hidden" name="build_name" value="{{ build_info.build_name }}"/>
+<input type="submit" value="Resubmit All Possible Failed Jobs"/>
+&nbsp;&nbsp;<a href="/report/submit-jobs/?build_name={{ build_info.build_name }}"> Job Submission </a>
+</form>
+<hr/>
+{% endif %}
+
 <h2>Basic Weekly</h2>
 {% if basic_optee_weekly_res %}
 <table border="2">
@@ -138,7 +187,9 @@
     <td align='left'>
         {% with test_info.bugs as bugs %}
         {% for bug in bugs %}
-        <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
+            {% if not bug.build_no or bug.build_no == build_info.build_no %}
+            <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
+             {% endif %}
         {% endfor%}
         {% endwith%}
     </td>
@@ -204,7 +255,9 @@ No result for basic test, or optee test, or weekly test jobs
     <td align='left'>
         {% with test_info.bugs as bugs %}
         {% for bug in bugs %}
-        <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
+            {% if not bug.build_no or bug.build_no == build_info.build_no %}
+            <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
+            {% endif %}
         {% endfor%}
         {% endwith%}
     </td>
@@ -228,6 +281,7 @@ No result for benchmark test jobs.
 
 <h2>CTS</h2>
 {% if cts_res %}
+Only failures in the focused1 and focused2 test plans, and zero pass rate modules will be focused.
 <table border="2">
 <tr>
     <th rowspan=2>Index</th>
@@ -236,6 +290,7 @@ No result for benchmark test jobs.
     <th colspan=4>Base({{ build_info.base_build_no }})</th>
     <th colspan=4>Current</th>
     <th rowspan=2>Bugs</th>
+    <th rowspan=2>Comments</th>
     <th rowspan=2>Operations</th>
 </tr>
 
@@ -271,9 +326,15 @@ No result for benchmark test jobs.
     <td align='right'> -- </td>
     {% endif %}
     {% if test_info.number_pass|add:0 > base.number_pass|add:0 %}
+    <!--
     <td align='right' style="background-color:green" > {{ test_info.number_pass }}</td>
+    -->
+    <td align='right'> {{ test_info.number_pass }}</td>
     {% elif test_info.number_pass|add:0 < base.number_pass|add:0  %}
+    <!--
     <td align='right' style="background-color:yellow" > {{ test_info.number_pass }}</td>
+    -->
+    <td align='right'> {{ test_info.number_pass }}</td>
     {% else  %}
     <td align='right'> {{ test_info.number_pass }}</td>
     {% endif %}
@@ -290,24 +351,40 @@ No result for benchmark test jobs.
     <td align='left'>
         {% with test_info.bugs as bugs %}
         {% for bug in bugs %}
-        <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
+            {% if not bug.build_no or bug.build_no == build_info.build_no %}
+            <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
+            {% endif %}
         {% endfor%}
         {% endwith%}
     </td>
+    <td>
+        <ul>
+        {% with test_info.comments as comments %}
+        {% for comment in comments %}
+            {% if not comment.build_no or comment.build_no == build_info.build_no %}
+            <li>{{ comment.comment }}</li>
+            {% endif %}
+        {% endfor %}
+        {% endwith %}
+        </ul>
+        {% ifnotequal test_info.number_passrate 100 %}
+        <a target='_blank' href="/report/add-comment/?build_name={{ build_info.build_name }}&build_no={{ build_info.build_no }}&plan_suite={{ test_info.job_name }}&&module_testcase={{ test_info.module_name }}">Add Comment</a><br/>
+        {% endifnotequal %}
+    </td>
     <td align='left'>
-        {% ifequal test_info.number_passrate 0 %}
-        <a target='_blank' href="/report/add-bug/?build_name={{ build_info.build_name }}&plan_suite={{ test_info.job_name }}&&module_testcase={{ test_info.module_name }}">Add Bug</a><br/>
+        {% ifnotequal test_info.number_passrate 100 %}
+        <a target='_blank' href="/report/add-bug/?build_name={{ build_info.build_name }}&build_no={{ build_info.build_no }}&plan_suite={{ test_info.job_name }}&&module_testcase={{ test_info.module_name }}">Add Bug</a><br/>
         <a target='_blank' href="{{ build_info.new_bug_url_prefix }}{{ test_info.module_name }}">Report Android Bug</a>&nbsp;
         <!--
         <a target='_blank' href="https://bugs.linaro.org/enter_bug.cgi?product=LAVA%20Framework">Report LAVA Bug</a>&nbsp;
         -->
-        {% endifequal %}
+        {% endifnotequal %}
     </td>
 </tr>
 {% endfor %}
 </table>
 {% else %}
-No result for benchmark test jobs.
+No result for cts test jobs.
 {% endif %}
 <hr/>
 <h2>VTS</h2>
@@ -378,13 +455,15 @@ No result for benchmark test jobs.
     <td align='left'>
         {% with test_info.bugs as bugs %}
         {% for bug in bugs %}
-        <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
+            {% if not bug.build_no or bug.build_no == build_info.build_no %}
+            <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
+            {% endif %}
         {% endfor%}
         {% endwith%}
     </td>
     <td align='left'>
-        {% ifequal test_info.number_passrate 0 %}
         <a target='_blank' href="/report/add-bug/?build_name={{ build_info.build_name }}&plan_suite={{ test_info.job_name }}&&module_testcase={{ test_info.job_name }}">Add Bug</a><br/>
+        {% ifequal test_info.number_passrate 0 %}
         <a target='_blank' href="{{ build_info.new_bug_url_prefix }}{{ test_info.job_name }}">Report Android Bug</a>&nbsp;
         <!--
         <a target='_blank' href="https://bugs.linaro.org/enter_bug.cgi?product=LAVA%20Framework">Report LAVA Bug</a>&nbsp;
@@ -395,7 +474,7 @@ No result for benchmark test jobs.
 {% endfor %}
 </table>
 {% else %}
-No result for benchmark test jobs.
+No result for vts test jobs.
 {% endif %}
 <hr/>
 
@@ -412,6 +491,7 @@ No result for benchmark test jobs.
     <th>Comments</th>
 </tr>
 {% for bug in build_bugs %}
+{% if not bug.build_no or bug.build_no == build_info.build_no %}
 <tr>
     <td>{{ forloop.counter }}</a></td>
     <td><a href="{{ bug.link }}">{{ bug.bug_id }}</a></td>
@@ -421,6 +501,7 @@ No result for benchmark test jobs.
     <td>{{ bug.status }}</a></td>
     <td> -- </a></td>
 </tr>
+{% endif %}
 {% endfor %}
 </table>
 {% else %}

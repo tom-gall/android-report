@@ -36,6 +36,7 @@ source ${virenv_dir}/bin/activate
 pip install Django
 pip install pyaml
 pip install lava-tool
+pip install django-crispy-forms
 
 # https://docs.djangoproject.com/en/1.11/intro/tutorial01/
 python -m django --version

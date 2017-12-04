@@ -8,7 +8,7 @@ from .models import TestCase
 from .models import JobCache
 from .models import BaseResults
 from .models import Bug
-from .models import BuildSummary, LAVAUser, BuildBugzilla, BuildConfig, LAVA
+from .models import BuildSummary, LAVAUser, BuildBugzilla, BuildConfig, LAVA, Comment
 from django.contrib.auth.models import Permission
 
 admin.site.register(Permission)
@@ -25,10 +25,16 @@ class JobCacheAdmin(admin.ModelAdmin):
     search_fields = ('job_id', 'job_name', 'build_name', 'build_no')
 
 admin.site.register(JobCache, JobCacheAdmin)
+
+class BugAdmin(admin.ModelAdmin):
+    search_fields = ('bug_id', 'build_name', 'plan_suite', 'module_testcase')
+
+admin.site.register(Bug, BugAdmin)
+
 admin.site.register(BaseResults)
-admin.site.register(Bug)
 admin.site.register(BuildSummary)
 admin.site.register(LAVAUser)
 admin.site.register(BuildBugzilla)
 admin.site.register(BuildConfig)
 admin.site.register(LAVA)
+admin.site.register(Comment)

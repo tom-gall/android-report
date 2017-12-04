@@ -18,7 +18,101 @@ import logging
 from lava_tool.authtoken import AuthenticatingServerProxy, KeyringAuthBackend
 
 # Create your views here.
-from models import TestCase, JobCache, BaseResults, Bug, BuildSummary, LAVA, LAVAUser, BuildBugzilla, BuildConfig
+from models import TestCase, JobCache, BaseResults, Bug, BuildSummary, LAVA, LAVAUser, BuildBugzilla, BuildConfig, Comment
+
+basic_weekly = { # job_name: ['test_suite', ],
+                        #"basic": [ "meminfo", 'meminfo-first', 'meminfo-second', "busybox", "ping", "linaro-android-kernel-tests", "tjbench"],
+                        "basic": [ 'meminfo-first', 'meminfo-second', "busybox", "ping", "linaro-android-kernel-tests", "tjbench"],
+                        "weekly": [ 'media-codecs', 'piglit-gles2', 'piglit-gles3', 'piglit-glslparser', 'piglit-shader-runner', 'stringbench', 'libc-bench'],
+                     }
+
+optee = { # job_name: ['test_suite', ],
+          "optee": [ "optee-xtest"],
+        }
+
+benchmarks_common = {  # job_name: {'test_suite':['test_case',]},
+                "boottime": {
+                              #'boottime-analyze': ['KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg' ],
+                              'boottime-first-analyze': ['KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg' ],
+                              'boottime-second-analyze': ['KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg' ],
+                            },
+                "basic": {
+                            "meminfo-first": [ 'MemTotal', 'MemFree', 'MemAvailable'],
+                            #"meminfo": [ 'MemTotal', 'MemFree', 'MemAvailable'],
+                            "meminfo-second": [ 'MemTotal', 'MemFree', 'MemAvailable'],
+                         },
+
+                #'andebenchpro2015': {'andebenchpro2015':[] },
+                'antutu6': { 'antutu6': ['antutu6-sum-mean'] },
+                #'applications': {},
+                'benchmarkpi': {'benchmarkpi': ['benchmarkpi-mean',]},
+                'caffeinemark': {'caffeinemark': ['Caffeinemark-Collect-score-mean', 'Caffeinemark-Float-score-mean', 'Caffeinemark-Loop-score-mean',
+                                      'Caffeinemark-Method-score-mean', 'Caffeinemark-score-mean', 'Caffeinemark-Sieve-score-mean', 'Caffeinemark-String-score-mean']},
+                'cf-bench': {'cf-bench': ['cfbench-Overall-Score-mean', 'cfbench-Java-Score-mean', 'cfbench-Native-Score-mean']},
+                'gearses2eclair': {'gearses2eclair': ['gearses2eclair',]},
+                'geekbench3': {'geekbench3': ['geekbench-multi-core-mean', 'geekbench-single-core-mean']},
+                'javawhetstone': {'javawhetstone': ['javawhetstone-MWIPS-mean', 'javawhetstone-N1-float-mean', 'javawhetstone-N2-float-mean', 'javawhetstone-N3-if-mean', 'javawhetstone-N4-fixpt-mean',
+                                       'javawhetstone-N5-cos-mean', 'javawhetstone-N6-float-mean', 'javawhetstone-N7-equal-mean', 'javawhetstone-N8-exp-mean',]},
+                'jbench': {'jbench': ['jbench-mean',]},
+                'linpack': {'linpack': ['Linpack-MFLOPSSingleScore-mean', 'Linpack-MFLOPSMultiScore-mean', 'Linpack-TimeSingleScore-mean', 'Linpack-TimeMultiScore-mean']},
+                'quadrantpro': {'quadrantpro': ['quadrandpro-benchmark-memory-mean', 'quadrandpro-benchmark-mean', 'quadrandpro-benchmark-g2d-mean', 'quadrandpro-benchmark-io-mean',
+                                     'quadrandpro-benchmark-cpu-mean', 'quadrandpro-benchmark-g3d-mean',]},
+                'rl-sqlite': {'rl-sqlite': ['RL-sqlite-Overall-mean',]},
+                'scimark': {'scimark': ['scimark-FFT-1024-mean', 'scimark-LU-100x100-mean', 'scimark-SOR-100x100-mean', 'scimark-Monte-Carlo-mean', 'scimark-Composite-Score-mean',]},
+                'vellamo3': {'vellamo3': ['vellamo3-Browser-total-mean', 'vellamo3-Metal-total-mean', 'vellamo3-Multi-total-mean', 'vellamo3-total-score-mean',]},
+             }
+less_is_better_measurement = [
+                              'KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg',
+                              'benchmarkpi-mean',
+                              'Linpack-TimeSingleScore-mean', 'Linpack-TimeMultiScore-mean', 'RL-sqlite-Overall-mean'
+                             ]
+
+glbenchmark25 = {
+                'glbenchmark25': {'glbenchmark25': ['Fill-rate-C24Z16-mean', 'Fill-rate-C24Z16-Offscreen-mean',
+                                                    'GLBenchmark-2.1-Egypt-Classic-C16Z16-mean', 'GLBenchmark-2.1-Egypt-Classic-C16Z16-Offscreen-mean',
+                                                    'GLBenchmark-2.5-Egypt-HD-C24Z16-Fixed-timestep-mean', 'GLBenchmark-2.5-Egypt-HD-C24Z16-Fixed-timestep-Offscreen-mean',
+                                                    'GLBenchmark-2.5-Egypt-HD-C24Z16-mean', 'GLBenchmark-2.5-Egypt-HD-C24Z16-Offscreen-mean',
+                                                    'Triangle-throughput-Textured-C24Z16-Fragment-lit-mean', 'Triangle-throughput-Textured-C24Z16-Offscreen-Fragment-lit-mean',
+                                                    'Triangle-throughput-Textured-C24Z16-mean', 'Triangle-throughput-Textured-C24Z16-Offscreen-mean',
+                                                    'Triangle-throughput-Textured-C24Z16-Vertex-lit-mean', 'Triangle-throughput-Textured-C24Z16-Offscreen-Vertex-lit-mean',
+                                                   ],},
+              }
+
+# test_suite is "vts-test"
+vts = [
+        'vts-hal',
+        'vts-kernel-kselftest',
+        'vts-kernel-ltp',
+        'vts-kernel-part1',
+        'vts-library',
+        'vts-performance',
+      ]
+
+# test_suite is the same as job name
+cts_v7a = [ 'cts-focused1-v7a',
+            'cts-focused2-v7a',
+            'cts-media-v7a',
+            'cts-media2-v7a',
+            'cts-opengl-v7a',
+            'cts-part1-v7a',
+            'cts-part2-v7a',
+            'cts-part3-v7a',
+            'cts-part4-v7a',
+            'cts-part5-v7a',
+          ]
+
+# test_suite is the same as job name
+cts_v8a = [ 'cts-focused1-v8a',
+            'cts-focused2-v8a',
+            'cts-media-v8a',
+            'cts-media2-v8a',
+            'cts-opengl-v8a',
+            'cts-part1-v8a',
+            'cts-part2-v8a',
+            'cts-part3-v8a',
+            'cts-part4-v8a',
+            'cts-part5-v8a',
+          ]
 
 android_snapshot_url_base = "https://snapshots.linaro.org/android"
 ci_job_url_base = 'https://ci.linaro.org/job'
@@ -377,7 +471,7 @@ def get_commit_from_pinned_manifest(snapshot_url, path):
 
 
 @login_required
-@permission_required('report.can_testcase', login_url='/report/accounts/no_permission/')
+@permission_required('report.add_testcase', login_url='/report/accounts/no_permission/')
 def jobs(request):
     build_name = request.GET.get("build_name", DEFAULT_BUILD_NAME)
 
@@ -514,7 +608,7 @@ def compare_results_func(tests_result_1, tests_result_2):
 
 
 @login_required
-@permission_required('report.can_testcase', login_url='/report/accounts/no_permission/')
+@permission_required('report.add_testcase', login_url='/report/accounts/no_permission/')
 def compare(request):
     compare_results = {}
     if request.method == 'POST':
@@ -581,7 +675,7 @@ def get_test_results_for_job(build_name, lava, jobs=[]):
     return (all_build_numbers, checklist_results)
 
 @login_required
-@permission_required('report.can_testcase', login_url='/report/accounts/no_permission/')
+@permission_required('report.add_testcase', login_url='/report/accounts/no_permission/')
 def checklist(request):
     checklist_results = {}
     all_build_numbers= []
@@ -751,103 +845,8 @@ def index(request):
                     "builds": builds,
                   })
 
-
-basic_weekly = { # job_name: ['test_suite', ],
-                        #"basic": [ "meminfo", 'meminfo-first', 'meminfo-second', "busybox", "ping", "linaro-android-kernel-tests", "tjbench"],
-                        "basic": [ 'meminfo-first', 'meminfo-second', "busybox", "ping", "linaro-android-kernel-tests", "tjbench"],
-                        "weekly": [ 'media-codecs', 'piglit-gles2', 'piglit-gles3', 'piglit-glslparser', 'piglit-shader-runner', 'stringbench', 'libc-bench'],
-                     }
-
-optee = { # job_name: ['test_suite', ],
-          "optee": [ "optee-xtest"],
-        }
-
-benchmarks_common = {  # job_name: {'test_suite':['test_case',]},
-                "boottime": {
-                              #'boottime-analyze': ['KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg' ],
-                              'boottime-first-analyze': ['KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg' ],
-                              'boottime-second-analyze': ['KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg' ],
-                            },
-                "basic": {
-                            "meminfo-first": [ 'MemTotal', 'MemFree', 'MemAvailable'],
-                            #"meminfo": [ 'MemTotal', 'MemFree', 'MemAvailable'],
-                            "meminfo-second": [ 'MemTotal', 'MemFree', 'MemAvailable'],
-                         },
-
-                #'andebenchpro2015': {'andebenchpro2015':[] },
-                'antutu6': { 'antutu6': ['antutu6-sum-mean'] },
-                #'applications': {},
-                'benchmarkpi': {'benchmarkpi': ['benchmarkpi-mean',]},
-                'caffeinemark': {'caffeinemark': ['Caffeinemark-Collect-score-mean', 'Caffeinemark-Float-score-mean', 'Caffeinemark-Loop-score-mean',
-                                      'Caffeinemark-Method-score-mean', 'Caffeinemark-score-mean', 'Caffeinemark-Sieve-score-mean', 'Caffeinemark-String-score-mean']},
-                'cf-bench': {'cf-bench': ['cfbench-Overall-Score-mean', 'cfbench-Java-Score-mean', 'cfbench-Native-Score-mean']},
-                'gearses2eclair': {'gearses2eclair': ['gearses2eclair',]},
-                'geekbench3': {'geekbench3': ['geekbench-multi-core-mean', 'geekbench-single-core-mean']},
-                'javawhetstone': {'javawhetstone': ['javawhetstone-MWIPS-mean', 'javawhetstone-N1-float-mean', 'javawhetstone-N2-float-mean', 'javawhetstone-N3-if-mean', 'javawhetstone-N4-fixpt-mean',
-                                       'javawhetstone-N5-cos-mean', 'javawhetstone-N6-float-mean', 'javawhetstone-N7-equal-mean', 'javawhetstone-N8-exp-mean',]},
-                'jbench': {'jbench': ['jbench-mean',]},
-                'linpack': {'linpack': ['Linpack-MFLOPSSingleScore-mean', 'Linpack-MFLOPSMultiScore-mean', 'Linpack-TimeSingleScore-mean', 'Linpack-TimeMultiScore-mean']},
-                'quadrantpro': {'quadrantpro': ['quadrandpro-benchmark-memory-mean', 'quadrandpro-benchmark-mean', 'quadrandpro-benchmark-g2d-mean', 'quadrandpro-benchmark-io-mean',
-                                     'quadrandpro-benchmark-cpu-mean', 'quadrandpro-benchmark-g3d-mean',]},
-                'rl-sqlite': {'rl-sqlite': ['RL-sqlite-Overall-mean',]},
-                'scimark': {'scimark': ['scimark-FFT-1024-mean', 'scimark-LU-100x100-mean', 'scimark-SOR-100x100-mean', 'scimark-Monte-Carlo-mean', 'scimark-Composite-Score-mean',]},
-                'vellamo3': {'vellamo3': ['vellamo3-Browser-total-mean', 'vellamo3-Metal-total-mean', 'vellamo3-Multi-total-mean', 'vellamo3-total-score-mean',]},
-             }
-less_is_better_measurement = [
-                              'KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg',
-                              'benchmarkpi-mean',
-                              'Linpack-TimeSingleScore-mean', 'Linpack-TimeMultiScore-mean', 'RL-sqlite-Overall-mean'
-                             ]
-
-glbenchmark25 = {
-                'glbenchmark25': {'glbenchmark25': ['Fill-rate-C24Z16-mean', 'Fill-rate-C24Z16-Offscreen-mean',
-                                                    'GLBenchmark-2.1-Egypt-Classic-C16Z16-mean', 'GLBenchmark-2.1-Egypt-Classic-C16Z16-Offscreen-mean',
-                                                    'GLBenchmark-2.5-Egypt-HD-C24Z16-Fixed-timestep-mean', 'GLBenchmark-2.5-Egypt-HD-C24Z16-Fixed-timestep-Offscreen-mean',
-                                                    'GLBenchmark-2.5-Egypt-HD-C24Z16-mean', 'GLBenchmark-2.5-Egypt-HD-C24Z16-Offscreen-mean',
-                                                    'Triangle-throughput-Textured-C24Z16-Fragment-lit-mean', 'Triangle-throughput-Textured-C24Z16-Offscreen-Fragment-lit-mean',
-                                                    'Triangle-throughput-Textured-C24Z16-mean', 'Triangle-throughput-Textured-C24Z16-Offscreen-mean',
-                                                    'Triangle-throughput-Textured-C24Z16-Vertex-lit-mean', 'Triangle-throughput-Textured-C24Z16-Offscreen-Vertex-lit-mean',
-                                                   ],},
-              }
-
-# test_suite is "vts-test"
-vts = [
-        'vts-hal',
-        'vts-kernel-kselftest',
-        'vts-kernel-ltp',
-        'vts-kernel-part1',
-        'vts-library',
-        'vts-performance',
-      ]
-
-# test_suite is the same as job name
-cts_v7a = [ 'cts-focused1-v7a',
-            'cts-focused2-v7a',
-            'cts-media-v7a',
-            'cts-media2-v7a',
-            'cts-opengl-v7a',
-            'cts-part1-v7a',
-            'cts-part2-v7a',
-            'cts-part3-v7a',
-            'cts-part4-v7a',
-            'cts-part5-v7a',
-          ]
-
-# test_suite is the same as job name
-cts_v8a = [ 'cts-focused1-v8a',
-            'cts-focused2-v8a',
-            'cts-media-v8a',
-            'cts-media2-v8a',
-            'cts-opengl-v8a',
-            'cts-part1-v8a',
-            'cts-part2-v8a',
-            'cts-part3-v8a',
-            'cts-part4-v8a',
-            'cts-part5-v8a',
-          ]
-
 @login_required
-@permission_required('report.can_testcase', login_url='/report/accounts/no_permission/')
+@permission_required('report.add_testcase', login_url='/report/accounts/no_permission/')
 def test_report(request):
     build_name = request.GET.get("build_name", DEFAULT_BUILD_NAME)
     all_build_numbers = get_possible_builds(build_name)
@@ -910,6 +909,7 @@ def test_report(request):
                 base = None
 
             bugs = Bug.objects.filter(build_name=build_name, plan_suite=test_suite, module_testcase=test_suite)
+            comments = Comment.objects.filter(build_name=build_name, plan_suite=test_suite, module_testcase=test_suite)
 
             number_total = number_pass + number_fail + number_skip
             number_passrate = 0
@@ -925,6 +925,7 @@ def test_report(request):
                                            'number_passrate': number_passrate,
                                            'base': base,
                                            'bugs': bugs,
+                                           'comments': comments,
                                           })
 
             if cache_to_base and ( job_id is not None):
@@ -968,6 +969,7 @@ def test_report(request):
                     base = None
 
                 bugs = Bug.objects.filter(build_name=build_name, plan_suite=test_suite, module_testcase=test_case)
+                comments = Comment.objects.filter(build_name=build_name, plan_suite=test_suite, module_testcase=test_case)
 
                 if measurement == '--':
                     difference = -100
@@ -986,6 +988,7 @@ def test_report(request):
                                        'measurement': measurement,
                                        'base': base,
                                        'bugs': bugs,
+                                       'comments': comments,
                                        'difference': difference,
                                       })
                 if cache_to_base and job_id is not None:
@@ -1029,6 +1032,7 @@ def test_report(request):
             base = None
 
         bugs = Bug.objects.filter(build_name=build_name, plan_suite=job_name, module_testcase=job_name)
+        comments = Comment.objects.filter(build_name=build_name, plan_suite=job_name, module_testcase=job_name)
 
         vts_res.append({'job_name': job_name,
                         'job_id': job_id,
@@ -1039,6 +1043,7 @@ def test_report(request):
                         'failed_testcases': failed_testcases,
                         'base': base,
                         'bugs': bugs,
+                        'comments': comments,
                        })
         if cache_to_base and job_id is not None:
             BaseResults.objects.create(build_name=build_name, build_no=build_no, job_name=job_name, job_id=job_id, lava_nick=lava_nick,
@@ -1126,6 +1131,7 @@ def test_report(request):
                     base = None
 
                 bugs = Bug.objects.filter(build_name=build_name, plan_suite=job_name, module_testcase=module_name)
+                comments = Comment.objects.filter(build_name=build_name, plan_suite=job_name, module_testcase=module_name)
                 cts_res.append({'job_name': job_name,
                                 'job_id': job_id,
                                 'module_name': module_name,
@@ -1135,6 +1141,7 @@ def test_report(request):
                                 'number_passrate': number_passrate,
                                 'base': base,
                                 'bugs': bugs,
+                                'comments': comments,
                                })
                 if cache_to_base:
                     BaseResults.objects.create(build_name=build_name, build_no=build_no, job_name=job_name, job_id=job_id, lava_nick=lava_nick,
@@ -1233,31 +1240,36 @@ def test_report(request):
                    'vts_res': vts_res,
                    'cts_res': cts_res,
                    'build_bugs': build_bugs,
+                   'jobs_failed': jobs_failed,
                   }
         )
 
 class BugForm(forms.ModelForm):
     class Meta:
         model = Bug
-        fields = ['build_name', 'bug_id', 'link', 'subject', 'status', 'plan_suite', 'module_testcase']
+        fields = ['build_name', 'build_no', 'bug_id', 'link', 'subject', 'status', 'plan_suite', 'module_testcase']
 
 
 @login_required
 def add_bug(request):
     if request.method == 'POST':
         build_name = request.POST.get("build_name")
+        build_no = request.POST.get("build_no")
         form = BugForm(request.POST)
         form.save()
 
         build_info = {
                       'build_name': build_name,
+                      'build_no': build_no,
                       'message': 'Added bug successfully',
                      }
     else: # GET
         build_name = request.GET.get("build_name", DEFAULT_BUILD_NAME)
+        build_no = request.GET.get("build_no", '')
         plan_suite = request.GET.get("plan_suite", '')
         module_testcase = request.GET.get("module_testcase", '')
         form_initial = {"build_name": build_name,
+                        "build_no": build_no,
                         "plan_suite": plan_suite,
                         "status": 'unconfirmed',
                         "module_testcase": module_testcase,
@@ -1266,9 +1278,54 @@ def add_bug(request):
 
         build_info = {
                       'build_name': build_name,
+                      'build_no': build_no,
                      }
 
     return render(request, 'add_bug.html',
+                      {
+                        "form": form,
+                        "build_info": build_info,
+                      })
+
+
+class CommentForm(forms.ModelForm):
+    class Meta:
+        model = Comment
+        fields = ['build_name', 'build_no', 'plan_suite', 'module_testcase', 'comment']
+
+
+@login_required
+def add_comment(request):
+    if request.method == 'POST':
+        build_name = request.POST.get("build_name")
+        build_no = request.POST.get("build_no")
+        form = CommentForm(request.POST)
+        form.save()
+
+        build_info = {
+                      'build_name': build_name,
+                      'build_no': build_no,
+                      'message': 'Added comment successfully',
+                     }
+    else: # GET
+        build_name = request.GET.get("build_name", DEFAULT_BUILD_NAME)
+        build_no = request.GET.get("build_no", '')
+        plan_suite = request.GET.get("plan_suite", '')
+        module_testcase = request.GET.get("module_testcase", '')
+        form_initial = {"build_name": build_name,
+                        "build_no": build_no,
+                        "plan_suite": plan_suite,
+                        "status": 'unconfirmed',
+                        "module_testcase": module_testcase,
+                       }
+        form = CommentForm(initial=form_initial)
+
+        build_info = {
+                      'build_name': build_name,
+                      'build_no': build_no,
+                     }
+
+    return render(request, 'add_comment.html',
                       {
                         "form": form,
                         "build_info": build_info,

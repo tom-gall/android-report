@@ -42,6 +42,25 @@ class JobCache(models.Model):
         return "%s_%s %s %s#%s %s %.2f" % (self.lava_nick, self.job_id, self.job_name, self.build_name, self.build_no, self.status, self.duration/3600)
 
 
+class Comment(models.Model):
+    build_name = models.CharField(max_length=64)
+    build_no = models.CharField(max_length=8, default='', blank=True)
+    # for cts, test plan
+    # for vts, test plan, job_name
+    # for basic, test suite
+    # for benchmarks, test suite
+    plan_suite = models.CharField(max_length=64)
+    # for cts, test module
+    # for vts, same as plan
+    # for basic test, same as test suite
+    # for benchmarks, test case
+    module_testcase = models.CharField(max_length=128)
+    comment = models.TextField()
+
+    def __str__(self):
+        return "%s %s %s %s %s" % (self.build_name, self.build_no, self.plan_suite, self.module_testcase, self.comment)
+
+
 BUG_STATUS_CHOICES = (
                       ("unconfirmed", "Unconfirmed"),
                       ("confirmed", "Confirmed"),
@@ -51,6 +70,7 @@ BUG_STATUS_CHOICES = (
 
 class Bug(models.Model):
     build_name = models.CharField(max_length=64)
+    build_no = models.CharField(max_length=8, default='', blank=True)
     bug_id = models.CharField(max_length=16)
     link = models.CharField(max_length=128)
     subject = models.CharField(max_length=256)

@@ -1,7 +1,14 @@
 # -*- coding: utf-8 -*-
+# Class Base Views
+# https://docs.djangoproject.com/en/1.11/topics/class-based-views/
+# User authentication in Django
+# https://docs.djangoproject.com/en/1.11/topics/auth/
+# Logging
+# https://docs.djangoproject.com/en/1.11/topics/logging/
 # http://gswd-a-crash-course-pycon-2014.readthedocs.io/en/latest/authviews.html
 # https://simpleisbetterthancomplex.com/tutorial/2017/02/18/how-to-create-user-sign-up-view.html
 # https://docs.djangoproject.com/en/1.11/topics/auth/default/
+# https://developer.mozilla.org/en-US/docs/Learn/Server-side/Django/Authentication
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
