@@ -31,10 +31,16 @@ class BugAdmin(admin.ModelAdmin):
 
 admin.site.register(Bug, BugAdmin)
 
+class CommentAdmin(admin.ModelAdmin):
+    search_fields = ('build_name', 'plan_suite', 'module_testcase', 'comment')
+
+admin.site.register(Comment, CommentAdmin)
+
+
+
 admin.site.register(BaseResults)
 admin.site.register(BuildSummary)
 admin.site.register(LAVAUser)
 admin.site.register(BuildBugzilla)
 admin.site.register(BuildConfig)
 admin.site.register(LAVA)
-admin.site.register(Comment)

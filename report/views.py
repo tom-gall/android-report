@@ -158,6 +158,8 @@ class LavaInstance(object):
         self.job_url_prefix = "https://%s/scheduler/job" % self.domain
         self.server = AuthenticatingServerProxy(self.url, auth_backend=KeyringAuthBackend())
 
+    def __str__(self):
+        return self.url
 
 DEFAULT_USER = "yongqin.liu"
 LAVAS = {}
@@ -480,7 +482,7 @@ def jobs(request):
 
     (jobs_failed, total_tests_res) = get_test_results_for_build(build_name, build_no)
 
-    build_config_url = "%s/%s" % (android_build_config_url_base, build_name.replace("android-", ""))
+    build_config_url = "%s/%s" % (android_build_config_url_base, build_name.replace("android-", "").replace('-premerge-ci', ''))
     build_android_tag = get_build_config_value(build_config_url, key="MANIFEST_BRANCH")
     build_info = {
                     "build_name": build_name,
@@ -719,9 +721,9 @@ class JobSubmissionForm(forms.Form):
     build_no = forms.ChoiceField(label='Build No.')
     lava_nick= forms.ChoiceField(label='LAVA Instance',
                                      choices=(
-                                              ("staging", "staging"),
-                                              ("production", "production"),
                                               ("lkft", "lkft"),
+                                              ("production", "production"),
+                                              ("staging", "staging"),
                                              ))
     job_priority = forms.ChoiceField(label='Priority', choices=zip(job_priority_list, job_priority_list))
     jobs = forms.MultipleChoiceField(widget=forms.CheckboxSelectMultiple)
@@ -772,6 +774,7 @@ def submit_lava_jobs(request):
                                      .replace("%%ANDROID_CACHE%%", "%s/cache%s" % (download_url, img_ext))\
                                      .replace("priority: medium", "priority: %s" % job_priority)
                 try:
+                    logging.info(lava.url)
                     job_id = lava.server.scheduler.submit_job(job_definition)
                     submit_result.append({
                                            "job_name": job_name,
@@ -811,7 +814,8 @@ def submit_lava_jobs(request):
         defaut_build_no = request.POST.get("build_no", defaut_build_no)
         form_initial = {"build_name": build_name,
                         "build_no": defaut_build_no,
-                        "job_priority": 'medium',
+                        "job_priority": 'low',
+                        'lava_nick': 'lkft',
                        }
         form = JobSubmissionForm(initial=form_initial)
         form.fields["build_name"].choices = zip(build_names, build_names)
@@ -827,7 +831,7 @@ def submit_lava_jobs(request):
 def index(request):
     builds = {}
     for build_name in build_names:
-        build_config_url = "%s/%s" % (android_build_config_url_base, build_name.replace("android-", ""))
+        build_config_url = "%s/%s" % (android_build_config_url_base, build_name.replace("android-", "").replace('-premerge-ci', ''))
         build_android_tag = get_build_config_value(build_config_url, key="MANIFEST_BRANCH")
         builds[build_name] = {
                                 "build_name": build_name,
@@ -1188,14 +1192,14 @@ def test_report(request):
             kernel_url = '--'
             kernel_version = '4.9.60'
 
-        build_config_url = "%s/%s" % (android_build_config_url_base, build_name.replace("android-", ""))
+        build_config_url = "%s/%s" % (android_build_config_url_base, build_name.replace("android-", "").replace('-premerge-ci', ''))
         build_android_tag = get_build_config_value(build_config_url, key="MANIFEST_BRANCH")
         toolchain_info = '--'
         firmware_version = '--'
         firmware_url = '--'
 
     ## bugzilla related information
-    build_bugzilla = BuildBugzilla.objects.get(build_name=build_name)
+    build_bugzilla = BuildBugzilla.objects.get(build_name=build_name.replace('-premerge-ci', ''))
     build_new_bug_url_prefix = '%s?product=%s&op_sys=%s&bug_severity=%s&component=%s&keywords=%s&rep_platform=%s&short_desc=%s: ' % ( build_bugzilla.new_bug_url,
                                                                                                                                       build_bugzilla.product,
                                                                                                                                       build_bugzilla.op_sys,
