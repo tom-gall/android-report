@@ -33,7 +33,7 @@ source ${virenv_dir}/bin/activate
 #$ rm -r /path/to/ENV
 
 #https://docs.djangoproject.com/en/1.11/topics/install/#installing-official-release
-pip install Django
+pip install Django=1.11.8
 pip install pyaml
 pip install lava-tool
 pip install django-crispy-forms
