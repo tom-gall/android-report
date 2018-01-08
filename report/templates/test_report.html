@@ -288,7 +288,7 @@ Only failures in the focused1 and focused2 test plans, and zero pass rate module
     <th rowspan=2>Plan</th>
     <th rowspan=2>Module</th>
     <th colspan=4>Base({{ build_info.base_build_no }})</th>
-    <th colspan=4>Current</th>
+    <th colspan=5>Current</th>
     <th rowspan=2>Bugs</th>
     <th rowspan=2>Comments</th>
     <th rowspan=2>Operations</th>
@@ -302,6 +302,7 @@ Only failures in the focused1 and focused2 test plans, and zero pass rate module
     <th>Pass</th>
     <th>Fail</th>
     <th>Total</th>
+    <th>Done</th>
     <th>Pass Rate</th>
 </tr>
 {% for test_info in cts_res %}
@@ -341,6 +342,7 @@ Only failures in the focused1 and focused2 test plans, and zero pass rate module
     {% endwith %}
     <td align='right'> {{ test_info.number_fail }}</td>
     <td align='right'> {{ test_info.number_total }}</td>
+    <td align='right'> {{ test_info.module_done }}</td>
     {% if test_info.number_passrate == 0 %}
     <td align='right' style="background-color:red" > {{ test_info.number_passrate|floatformat:2 }}</td>
     {% elif test_info.number_passrate == 100 %}

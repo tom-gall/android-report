@@ -44,6 +44,9 @@ class JobCache(models.Model):
 
 class Comment(models.Model):
     build_name = models.CharField(max_length=64)
+    # The build that this comment is started
+    build_no = models.CharField(max_length=8, default='', blank=True)
+    # The build that this comment is not work any more
     build_no = models.CharField(max_length=8, default='', blank=True)
     # for cts, test plan
     # for vts, test plan, job_name
@@ -70,7 +73,10 @@ BUG_STATUS_CHOICES = (
 
 class Bug(models.Model):
     build_name = models.CharField(max_length=64)
+    # the build no that this bug is report
     build_no = models.CharField(max_length=8, default='', blank=True)
+    # the build no that this bug is fixed
+    build_no_fixed = models.CharField(max_length=8, default='', blank=True)
     bug_id = models.CharField(max_length=16)
     link = models.CharField(max_length=128)
     subject = models.CharField(max_length=256)

@@ -1098,19 +1098,25 @@ def test_report(request):
             cts_one_job_hash = {}
             for module  in modules_res:
                 temp_hash = {}
-                number = int(module.measurement)
                 module_name = None
-                if module.name.endswith('_executed'):
-                    module_name = module.name.replace('_executed', '')
-                    temp_hash['total'] = number
-                elif module.name.endswith('_passed'):
-                    module_name = module.name.replace('_passed', '')
-                    temp_hash['pass'] = number
-                elif module.name.endswith('_failed'):
-                    module_name = module.name.replace('_failed', '')
-                    temp_hash['fail'] = number
+                if not module.name.endswith('_done'):
+                    number = int(module.measurement)
+                    if module.name.endswith('_executed'):
+                        module_name = module.name.replace('_executed', '')
+                        temp_hash['total'] = number
+                    elif module.name.endswith('_passed'):
+                        module_name = module.name.replace('_passed', '')
+                        temp_hash['pass'] = number
+                    elif module.name.endswith('_failed'):
+                        module_name = module.name.replace('_failed', '')
+                        temp_hash['fail'] = number
+                    else:
+                        # there should be no such case
+                        pass
                 else:
-                    # there should be no such case
+                    # No need to deal with _done result here
+                    module_name = module.name.replace('_done', '')
+                    temp_hash['done'] = module.result
                     pass
 
                 # modules should not be None here
@@ -1124,6 +1130,7 @@ def test_report(request):
                 number_pass = module_res.get('pass')
                 number_fail = module_res.get('fail')
                 number_total = module_res.get('total')
+                module_done = module_res.get('done', 'pass')
                 if number_total == 0:
                     number_passrate = 0
                 else:
@@ -1143,6 +1150,7 @@ def test_report(request):
                                 'number_fail': number_fail,
                                 'number_total': number_total,
                                 'number_passrate': number_passrate,
+                                'module_done': module_done,
                                 'base': base,
                                 'bugs': bugs,
                                 'comments': comments,
