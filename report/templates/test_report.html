@@ -495,13 +495,13 @@ No result for vts test jobs.
 {% for bug in build_bugs %}
 {% if not bug.build_no or bug.build_no == build_info.build_no %}
 <tr>
-    <td>{{ forloop.counter }}</a></td>
+    <td>{{ forloop.counter }}</td>
     <td><a href="{{ bug.link }}">{{ bug.bug_id }}</a></td>
-    <td>{{ bug.plan_suite }}</a></td>
-    <td>{{ bug.module_testcase }}</a></td>
-    <td>{{ bug.subject }}</a></td>
-    <td>{{ bug.status }}</a></td>
-    <td> -- </a></td>
+    <td>{{ bug.plan_suite }}</td>
+    <td>{{ bug.module_testcase }}</td>
+    <td>{{ bug.subject }}</td>
+    <td>{{ bug.status }}</td>
+    <td> -- </td>
 </tr>
 {% endif %}
 {% endfor %}
@@ -510,5 +510,32 @@ No result for vts test jobs.
 Excelent build, no open bugs on it at the moment.
 {% endif %}
 
+<h2>Jobs Duration:</h2>
+{% if jobs_duration %}
+<table border=2>
+<tr>
+    <th>Index</th>
+    <th>Job Id</th>
+    <th>Job Name</th>
+    <th>Duration</th>
+</tr>
+{% for job in jobs_duration %}
+<tr>
+    <td>{{ forloop.counter }}</td>
+    <td><a href="{{ lava_server_job_prefix}}/{{ job.job_id }}">{{ job.job_id }}</a></td>
+    <td>{{ job.job_name }}</td>
+    <td align="right">{{ job.duration }}</td>
+</tr>
+{% endfor %}
+<tr>
+    <td>--</td>
+    <td>--</td>
+    <td>Total</td>
+    <td align="right">{{ total_duration }}</td>
+</tr>
+</table>
+{% else %}
+Sorry, no successful jobs for this build yet.
+{% endif %}
 </div>
 {% endblock %}

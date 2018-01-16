@@ -35,11 +35,11 @@ class JobCache(models.Model):
     job_id = models.CharField(max_length=16)
     job_name = models.CharField(max_length=64)
     status = models.IntegerField(choices=JOB_STATUS_CHOICE)
-    duration = models.FloatField()
+    duration = models.DurationField()
     cached = models.BooleanField(default=False)
 
     def __str__(self):
-        return "%s_%s %s %s#%s %s %.2f" % (self.lava_nick, self.job_id, self.job_name, self.build_name, self.build_no, self.status, self.duration/3600)
+        return "%s_%s %s %s#%s %s %s" % (self.lava_nick, self.job_id, self.job_name, self.build_name, self.build_no, self.status, self.duration)
 
 
 class Comment(models.Model):

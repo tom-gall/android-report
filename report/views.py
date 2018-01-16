@@ -229,6 +229,14 @@ def get_possible_job_names(build_name=DEFAULT_BUILD_NAME):
     return job_name_template_name_hash
 
 
+jobs_to_be_checked_array = [
+    "basic", "boottime", "optee", "weekly",
+    "antutu6", "andebenchpro2015", "benchmarkpi", "caffeinemark", "cf-bench", "gearses2eclair", "geekbench3", "glbenchmark25", "javawhetstone", "jbench", "linpack", "quadrantpro", "rl-sqlite", "scimark", "vellamo3",
+    "cts-focused1-v7a", "cts-focused2-v7a", "cts-media2-v7a", "cts-media-v7a", "cts-opengl-v7a", "cts-part1-v7a", "cts-part2-v7a", "cts-part3-v7a", "cts-part4-v7a", "cts-part5-v7a",
+    "cts-focused1-v8a", "cts-focused2-v8a", "cts-media2-v8a", "cts-media-v8a", "cts-opengl-v8a", "cts-part1-v8a", "cts-part2-v8a", "cts-part3-v8a", "cts-part4-v8a", "cts-part5-v8a",
+    "vts-hal", "vts-kernel-kselftest", "vts-kernel-ltp", "vts-kernel-part1", "vts-library", "vts-performance",
+    ]
+
 def get_jobs(build_name, build_no, lava, job_name_list=[]):
     ## TODO: have the same build tested on 2 different lava instances, and saved as base
     count_in_base = BaseResults.objects.filter(build_name=build_name, build_no=build_no).count()
@@ -238,7 +246,8 @@ def get_jobs(build_name, build_no, lava, job_name_list=[]):
         cached_in_base = False
 
     if not cached_in_base:
-        jobs_to_be_checked = get_possible_job_names(build_name=build_name).keys()
+        ##jobs_to_be_checked = get_possible_job_names(build_name=build_name).keys()
+        jobs_to_be_checked = jobs_to_be_checked_array
         if job_name_list is None or len(job_name_list) == 0 or len(job_name_list) > 1:
             search_condition = "description__icontains__%s-%s" % (build_name, build_no)
         elif len(job_name_list) == 1:
@@ -254,12 +263,34 @@ def get_jobs(build_name, build_no, lava, job_name_list=[]):
         if not cached_in_base:
             job_id = job.get("id")
             job_status = job.get("status")
+            if job_status is None:
+                ## https://staging.validation.linaro.org/static/docs/v2/scheduler.html
+                job_state = job.get('state')
+                job_health = job.get('health')
+                if job_state == 0 or job_state ==1 or job_state == 2:
+                    job_status = 0
+                elif job_state == 3 or job_state == 4:
+                    job_status = 1
+                elif job_state == 5:
+                    if job_health == 0 or job_health == 2:
+                        job_status = 3
+                    elif job_health == 1:
+                        job_status = 2
+                    elif job_health == 3:
+                        job_status = 4
+                    else:
+                        ## not possible
+                        pass
+                else:
+                    ## not possible
+                    pass
+
             if job['start_time'] is None or job['end_time'] is None:
-                job_duration = 0
+                job_duration = datetime.timedelta(seconds=0)
             else:
                 job_start_time = datetime.datetime.strptime(str(job['start_time']), '%Y%m%dT%H:%M:%S')
                 job_end_time =  datetime.datetime.strptime(str(job['end_time']), '%Y%m%dT%H:%M:%S')
-                job_duration = (job_end_time - job_start_time).seconds
+                job_duration = job_end_time - job_start_time
 
             job_description = job.get("description")
             if job_name_list is None or len(job_name_list) == 0 or len(job_name_list) > 1:
@@ -884,6 +915,7 @@ def test_report(request):
     (jobs_failed, total_tests_res) = get_test_results_for_build(build_name, build_no)
 
     lava_nick = build_configs[build_name]['lava_server'].nick
+    successful_job_ids = []
     #######################################################
     ## Get result for basic/optee/weekly tests
     #######################################################
@@ -897,6 +929,8 @@ def test_report(request):
             job_id = None
         else:
             job_id = job_res['result_job_id_status'][0]
+            if job_id not in successful_job_ids:
+                successful_job_ids.append(job_id)
         for test_suite in basic_optee_weekly[job_name]:
             if job_id is None:
                 number_pass = 0
@@ -952,6 +986,8 @@ def test_report(request):
             job_id = None
         else:
             job_id = job_res['result_job_id_status'][0]
+            if job_id not in successful_job_ids:
+                successful_job_ids.append(job_id)
         for test_suite in sorted(benchmarks[job_name].keys()):
             test_cases = benchmarks[job_name][test_suite]
             for test_case in test_cases:
@@ -1024,6 +1060,8 @@ def test_report(request):
             failed_testcases = TestCase.objects.filter(job_id=job_id, lava_nick=lava_nick, suite__endswith='_vts-test', result='fail')
             number_fail = len(failed_testcases)
             number_total = number_pass + number_fail
+            if job_id not in successful_job_ids:
+                successful_job_ids.append(job_id)
 
         if number_total == 0:
             number_passrate = 0.00
@@ -1094,6 +1132,8 @@ def test_report(request):
                            })
         else:
             job_id = job_res['result_job_id_status'][0]
+            if job_id not in successful_job_ids:
+                successful_job_ids.append(job_id)
             modules_res = TestCase.objects.filter(job_id=job_id, lava_nick=lava_nick, suite__endswith='_%s' % job_name)
             cts_one_job_hash = {}
             for module  in modules_res:
@@ -1177,6 +1217,19 @@ def test_report(request):
                     'number_passrate': pass_rate,
                    })
     ##############################################################
+    ## get job duration information from JobCache
+    ##############################################################
+    jobs_duration = []
+    total_duration = datetime.timedelta(seconds=0)
+    for job_id in successful_job_ids:
+        try:
+            job_cache_info = JobCache.objects.get(job_id=job_id, lava_nick=lava_nick)
+            jobs_duration.append(job_cache_info)
+            total_duration = total_duration + job_cache_info.duration
+        except JobCache.DoesNotExist:
+           pass
+
+    ##############################################################
     build_bugs = Bug.objects.filter(build_name=build_name)
     ##############################################################
     try:
@@ -1253,6 +1306,8 @@ def test_report(request):
                    'cts_res': cts_res,
                    'build_bugs': build_bugs,
                    'jobs_failed': jobs_failed,
+                   'jobs_duration': jobs_duration,
+                   'total_duration': total_duration,
                   }
         )
 
