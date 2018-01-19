@@ -12,9 +12,9 @@
 <tr>
 {% for build_no in build_info.build_numbers %}
     {% ifequal build_no build_info.build_no %}
-        <td>{{ build_no }} </td>
+        <td style="padding-left: 3px;padding-right: 3x;">{{ build_no }} </td>
     {% else %}
-        <td><a href="/report/test-report/?build_name={{ build_info.build_name}}&&build_no={{ build_no }}">{{ build_no}} </a></td>
+        <td style="padding-left: 2px;padding-right: 2x;"><a style="margin-bottom: 1px;padding-bottom: 1px;margin-right: 1px;padding-right: 1px;" href="/report/test-report/?build_name={{ build_info.build_name}}&&build_no={{ build_no }}">{{ build_no}} </a></td>
     {% endifequal %}
     &nbsp;&nbsp;
 {% endfor %}
