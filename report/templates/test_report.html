@@ -1,5 +1,6 @@
 {% extends '_layouts/base.html' %}
 
+{% load startswith %}
 {% block title %} Test Report for Build {{ build_info.build_name}}-{{build_info.build_no}}  {% endblock %}
 
 {% block headline %}<h1>Test Report for Build {{ build_info.build_name}}-{{build_info.build_no}}</h1>{% endblock %}
@@ -306,7 +307,13 @@ Only failures in the focused1 and focused2 test plans, and zero pass rate module
     <th>Pass Rate</th>
 </tr>
 {% for test_info in cts_res %}
+
+{% if test_info.job_name|startswith:'cts-focused' %}
+<tr style="background-color:cornsilk;">
+{% else %}
 <tr>
+{% endif %}
+
     <td> {{ forloop.counter }}</td>
     {% if test_info.job_id %}
     <td> <a href="{{ lava_server_job_prefix }}/{{ test_info.job_id }}">{{ test_info.job_name }}</a></td>
@@ -389,6 +396,9 @@ Only failures in the focused1 and focused2 test plans, and zero pass rate module
 No result for cts test jobs.
 {% endif %}
 <hr/>
+
+
+
 <h2>VTS</h2>
 {% if vts_res %}
 <table border="2">
