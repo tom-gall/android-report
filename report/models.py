@@ -47,7 +47,7 @@ class Comment(models.Model):
     # The build that this comment is started
     build_no = models.CharField(max_length=8, default='', blank=True)
     # The build that this comment is not work any more
-    build_no = models.CharField(max_length=8, default='', blank=True)
+    build_no_fixed = models.CharField(max_length=8, default='', blank=True)
     # for cts, test plan
     # for vts, test plan, job_name
     # for basic, test suite
