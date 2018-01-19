@@ -143,6 +143,7 @@ job_status_dict = {0: "Submitted",
                    2: "Complete",
                    3: "Incomplete",
                    4: "Canceled",
+                   5: "NoPermission",
                   }
 
 job_status_string_int = dict((v,k) for k,v in job_status_dict.iteritems())
@@ -381,6 +382,11 @@ def cache_job_result_to_db(job_id, lava, job_status):
 
         JobCache.objects.filter(lava_nick=lava.nick, job_id=job_id).update(cached=True,
                                                                            status=job_status_string_int[job_status])
+
+    except xmlrpclib.ProtocolError as e:
+        # for cases that no permission to check result submitted by others
+        JobCache.objects.filter(lava_nick=lava.nick, job_id=job_id).update(cached=True,
+                                                                           status=5)
 
     except xmlrpclib.Fault as e:
         raise e
