@@ -15,8 +15,8 @@ admin.site.register(Permission)
 
 class TestCaseAdmin(admin.ModelAdmin):
     list_display = ('name', 'result', 'measurement', 'unit', 'suite', 'job_id')
-    search_fields = ('name', 'suite')
-    list_filter = ('name', 'suite')
+    search_fields = ('name', 'suite', 'job_id')
+    list_filter = ('name', 'suite', 'job_id')
 
 admin.site.register(TestCase, TestCaseAdmin)
 
