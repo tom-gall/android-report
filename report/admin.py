@@ -17,6 +17,7 @@ class TestCaseAdmin(admin.ModelAdmin):
     list_display = ('name', 'result', 'measurement', 'unit', 'suite', 'job_id')
     search_fields = ('name', 'suite', 'job_id')
     list_filter = ('name', 'suite', 'job_id')
+    list_per_page = 500
 
 admin.site.register(TestCase, TestCaseAdmin)
 
