@@ -62,3 +62,8 @@ echo "Please update the LAVA_USER_TOKEN and LAVA_USER in report/views.py"
 # Only shows the sql script, not creation
 # python manage.py sqlmigrate report 0002
 
+# cp db.sqlite3 db.sqlite3.bak.$(date +%Y%m%d-%H%M%S)
+# scp android:/android/django_instances/lcr-report/db.sqlite3 ./
+# cat jobs.txt |awk '{print $2}' >job-ids.txt
+# sqlite3 db.sqlite3 "select * from report_testcase where job_id = 99965 ORDER BY name;"
+# sqlite3 db.sqlite3 "delete from report_testcase where job_id = 99859;"

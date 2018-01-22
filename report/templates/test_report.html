@@ -526,7 +526,7 @@ No result for vts test jobs.
     <th>Comments</th>
 </tr>
 {% for bug in build_bugs %}
-{% if not bug.build_no or bug.build_no == build_info.build_no %}
+{% if not bug.build_no or not bug.build_no_fixed or bug.build_no <= build_info.build_no and bug.build_no_fixed > build_info.build_no %}
 <tr>
     <td>{{ forloop.counter }}</td>
     <td><a href="{{ bug.link }}">{{ bug.bug_id }}</a></td>

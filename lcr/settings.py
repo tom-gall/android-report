@@ -27,6 +27,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = [u'127.0.0.1',
                  u'192.168.0.104',
+                 u'android.linaro.org',
                  u'192.168.0.106']
 
 
