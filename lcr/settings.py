@@ -127,6 +127,12 @@ STATIC_URL = '/static/'
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format' : "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s",
+            'datefmt' : "%d/%b/%Y %H:%M:%S"
+        },
+    },
     'filters': {
         'require_debug_false': {
             '()': 'django.utils.log.RequireDebugFalse'
@@ -134,6 +140,18 @@ LOGGING = {
     },
 
     'handlers': {
+        'null': {
+            'level':'DEBUG',
+            'class':'logging.NullHandler',
+        },
+        'logfile': {
+            'level':'DEBUG',
+            'class':'logging.handlers.RotatingFileHandler',
+            'filename': BASE_DIR + "/logfile",
+            'maxBytes': 50000,
+            'backupCount': 2,
+            'formatter': 'standard',
+        },
         'mail_admins': {
             'level': 'ERROR',
             'filters': ['require_debug_false'],
@@ -141,20 +159,33 @@ LOGGING = {
         },
         'console':{
             'level': 'DEBUG',
-            'class': 'logging.StreamHandler'
+            'class': 'logging.StreamHandler',
+            'formatter': 'standard'
         },
     },
 
     'loggers': {
+        'django': {
+            'handlers':['console', 'logfile'],
+            'propagate': True,
+            'level':'WARN',
+        },
         'django.request': {
             #'handlers': ['mail_admins'],
-            'handlers': ['console'],
+            'handlers': ['console', 'logfile'],
             'level': 'INFO',
-            #'propagate': True,
+            'propagate': False,
         },
-        'cities': {
-            'handlers': ['console'],
-            'level': 'INFO'
+
+        #'django.db.backends': {
+        #    'handlers': ['console'],
+        #    'level': 'DEBUG',
+        #    'propagate': False,
+        #},
+        'report': {
+            'handlers': ['console', 'logfile'],
+            'level': 'INFO',
+            #'level': 'DEBUG',
         },
     }
 }

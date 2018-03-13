@@ -15,6 +15,8 @@ import xmlrpclib
 import yaml
 import logging
 
+logger = logging.getLogger(__name__)
+
 from lava_tool.authtoken import AuthenticatingServerProxy, KeyringAuthBackend
 
 # Create your views here.
@@ -42,6 +44,7 @@ benchmarks_common = {  # job_name: {'test_suite':['test_case',]},
                             "meminfo-second": [ 'MemTotal', 'MemFree', 'MemAvailable'],
                          },
 
+                'monkey': { 'monkey': ['monkey-network-stats'] },
                 #'andebenchpro2015': {'andebenchpro2015':[] },
                 'antutu6': { 'antutu6': ['antutu6-sum-mean'] },
                 #'applications': {},
@@ -231,7 +234,7 @@ def get_possible_job_names(build_name=DEFAULT_BUILD_NAME):
 
 
 jobs_to_be_checked_array = [
-    "basic", "boottime", "optee", "weekly",
+    "basic", "boottime", "optee", "weekly", 'monkey',
     "antutu6", "andebenchpro2015", "benchmarkpi", "caffeinemark", "cf-bench", "gearses2eclair", "geekbench3", "glbenchmark25", "javawhetstone", "jbench", "linpack", "quadrantpro", "rl-sqlite", "scimark", "vellamo3",
     "cts-focused1-v7a", "cts-focused2-v7a", "cts-media2-v7a", "cts-media-v7a", "cts-opengl-v7a", "cts-part1-v7a", "cts-part2-v7a", "cts-part3-v7a", "cts-part4-v7a", "cts-part5-v7a",
     "cts-focused1-v8a", "cts-focused2-v8a", "cts-media2-v8a", "cts-media-v8a", "cts-opengl-v8a", "cts-part1-v8a", "cts-part2-v8a", "cts-part3-v8a", "cts-part4-v8a", "cts-part5-v8a",
@@ -261,6 +264,7 @@ def get_jobs(build_name, build_no, lava, job_name_list=[]):
 
     jobs = { }
     for job in jobs_raw:
+        logger.debug("%s %s", job.get("id"), job.get("description"))
         if not cached_in_base:
             job_id = job.get("id")
             job_status = job.get("status")
@@ -811,7 +815,6 @@ def submit_lava_jobs(request):
                                      .replace("%%ANDROID_CACHE%%", "%s/cache%s" % (download_url, img_ext))\
                                      .replace("priority: medium", "priority: %s" % job_priority)
                 try:
-                    logging.info(lava.url)
                     job_id = lava.server.scheduler.submit_job(job_definition)
                     submit_result.append({
                                            "job_name": job_name,
@@ -982,8 +985,9 @@ def test_report(request):
     ## Get result for benchmark tests
     #######################################################
     benchmarks = benchmarks_common.copy()
-    if build_name.find("x15") >= 0:
-        benchmarks.update(glbenchmark25)
+    ## enable glbenchmark25 for both hikey and x15 builds
+    ## if build_name.find("x15") >= 0:
+    benchmarks.update(glbenchmark25)
 
     benchmarks_res = []
     for job_name in sorted(benchmarks.keys()):
