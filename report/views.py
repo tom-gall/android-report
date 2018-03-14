@@ -264,8 +264,8 @@ def get_jobs(build_name, build_no, lava, job_name_list=[]):
 
     jobs = { }
     for job in jobs_raw:
-        logger.debug("%s %s", job.get("id"), job.get("description"))
         if not cached_in_base:
+            logger.debug("%s %s", job.get("id"), job.get("description"))
             job_id = job.get("id")
             job_status = job.get("status")
             if job_status is None:

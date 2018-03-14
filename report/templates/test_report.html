@@ -188,13 +188,21 @@
     <td align='left'>
         {% with test_info.bugs as bugs %}
         {% for bug in bugs %}
-            {% if not bug.build_no %}
-            <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
-            {% elif build_info.build_no > bug.build_no %}
-                {% if not bug.build_no_fixed or build_info.build_no < bug.build_no_fixed %}
+            {% if bug.build_no_fixed and bug.build_no %}
+                {% if build_info.build_no >= bug.build_no and build_info.build_no < bug.build_no_fixed %}
                     <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
                 {% endif %}
-             {% endif %}
+            {% elif bug.build_no_fixed and not bug.build_no %}
+                {% if build_info.build_no < bug.build_no_fixed %}
+                    <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
+                {% endif %}
+            {% elif not bug.build_no_fixed and not bug.build_no %}
+                <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
+            {% elif not bug.build_no_fixed and bug.build_no %}
+                {% if build_info.build_no >= bug.build_no %}
+                    <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
+                {% endif %}
+            {% endif %}
         {% endfor%}
         {% endwith%}
     </td>
@@ -260,10 +268,18 @@ No result for basic test, or optee test, or weekly test jobs
     <td align='left'>
         {% with test_info.bugs as bugs %}
         {% for bug in bugs %}
-            {% if not bug.build_no %}
-            <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
-            {% elif build_info.build_no > bug.build_no %}
-                {% if not bug.build_no_fixed or build_info.build_no < bug.build_no_fixed %}
+            {% if bug.build_no_fixed and bug.build_no %}
+                {% if build_info.build_no >= bug.build_no and build_info.build_no < bug.build_no_fixed %}
+                    <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
+                {% endif %}
+            {% elif bug.build_no_fixed and not bug.build_no %}
+                {% if build_info.build_no < bug.build_no_fixed %}
+                    <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
+                {% endif %}
+            {% elif not bug.build_no_fixed and not bug.build_no %}
+                <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
+            {% elif not bug.build_no_fixed and bug.build_no %}
+                {% if build_info.build_no >= bug.build_no %}
                     <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
                 {% endif %}
             {% endif %}
@@ -368,12 +384,19 @@ Only failures in the focused1 and focused2 test plans, and zero pass rate module
     <td align='left'>
         {% with test_info.bugs as bugs %}
         {% for bug in bugs %}
-            {% if not bug.build_no or bug.build_no == build_info.build_no %}
-            <!-- for backword compability -->
-            <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
-            {% elif build_info.build_no > bug.build_no %}
-                {% if not bug.build_no_fixed or build_info.build_no < bug.build_no_fixed %}
-                    <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
+            {% if bug.build_no_fixed and bug.build_no %}
+                {% if build_info.build_no >= bug.build_no and build_info.build_no < bug.build_no_fixed %}
+                    <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }}</a><br/>
+                {% endif %}
+            {% elif bug.build_no_fixed and not bug.build_no %}
+                {% if build_info.build_no < bug.build_no_fixed %}
+                    <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }}</a><br/>
+                {% endif %}
+            {% elif not bug.build_no_fixed and not bug.build_no %}
+                <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }}</a><br/>
+            {% elif not bug.build_no_fixed and bug.build_no %}
+                {% if build_info.build_no >= bug.build_no %}
+                    <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }}</a><br/>
                 {% endif %}
             {% endif %}
         {% endfor%}
@@ -383,11 +406,18 @@ Only failures in the focused1 and focused2 test plans, and zero pass rate module
         <ul>
         {% with test_info.comments as comments %}
         {% for comment in comments %}
-            {% if not comment.build_no %}
-            <!-- for backword compability -->
-            <li>{{ comment.comment }}</li>
-            {% elif comment.build_no <= build_info.build_no %}
-                {% if not comment.build_no_fixed or comment.build_no_fixed > build_info.build_no %}
+            {% if comment.build_no_fixed and comment.build_no %}
+                {% if build_info.build_no >= comment.build_no and build_info.build_no < comment.build_no_fixed %}
+                    <li>{{ comment.comment }}</li>
+                {% endif %}
+            {% elif comment.build_no_fixed and not comment.build_no %}
+                {% if build_info.build_no < comment.build_no_fixed %}
+                    <li>{{ comment.comment }}</li>
+                {% endif %}
+            {% elif not comment.build_no_fixed and not comment.build_no %}
+                <li>{{ comment.comment }}</li>
+            {% elif not comment.build_no_fixed and comment.build_no %}
+                {% if build_info.build_no >= comment.build_no %}
                     <li>{{ comment.comment }}</li>
                 {% endif %}
             {% endif %}
@@ -485,11 +515,18 @@ No result for cts test jobs.
     <td align='left'>
         {% with test_info.bugs as bugs %}
         {% for bug in bugs %}
-            {% if not bug.build_no %}
+            {% if bug.build_no_fixed and bug.build_no %}
+                {% if build_info.build_no >= bug.build_no and build_info.build_no < bug.build_no_fixed %}
+                    <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
+                {% endif %}
+            {% elif bug.build_no_fixed and not bug.build_no %}
+                {% if build_info.build_no < bug.build_no_fixed %}
+                    <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
+                {% endif %}
+            {% elif not bug.build_no_fixed and not bug.build_no %}
                 <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
-            {% elif build_info.build_no > bug.build_no %}
-                {% if not bug.build_no_fixed or build_info.build_no < bug.build_no_fixed %}
-                    <!-- bug not fixed or this build is before the fixed build no -->
+            {% elif not bug.build_no_fixed and bug.build_no %}
+                {% if build_info.build_no >= bug.build_no %}
                     <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
                 {% endif %}
             {% endif %}
