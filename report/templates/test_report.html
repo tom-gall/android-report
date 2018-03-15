@@ -563,17 +563,53 @@ No result for vts test jobs.
     <th>Comments</th>
 </tr>
 {% for bug in build_bugs %}
-{% if not bug.build_no or not bug.build_no_fixed or bug.build_no <= build_info.build_no and bug.build_no_fixed > build_info.build_no %}
-<tr>
-    <td>{{ forloop.counter }}</td>
-    <td><a href="{{ bug.link }}">{{ bug.bug_id }}</a></td>
-    <td>{{ bug.plan_suite }}</td>
-    <td>{{ bug.module_testcase }}</td>
-    <td>{{ bug.subject }}</td>
-    <td>{{ bug.status }}</td>
-    <td> -- </td>
-</tr>
-{% endif %}
+    {% if bug.build_no_fixed and bug.build_no %}
+        {% if build_info.build_no >= bug.build_no and build_info.build_no < bug.build_no_fixed %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td><a href="{{ bug.link }}">{{ bug.bug_id }}</a></td>
+                <td>{{ bug.plan_suite }}</td>
+                <td>{{ bug.module_testcase }}</td>
+                <td>{{ bug.subject }}</td>
+                <td>{{ bug.status }}</td>
+                <td> -- </td>
+            </tr>
+        {% endif %}
+    {% elif bug.build_no_fixed and not bug.build_no %}
+        {% if build_info.build_no < bug.build_no_fixed %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td><a href="{{ bug.link }}">{{ bug.bug_id }}</a></td>
+                <td>{{ bug.plan_suite }}</td>
+                <td>{{ bug.module_testcase }}</td>
+                <td>{{ bug.subject }}</td>
+                <td>{{ bug.status }}</td>
+                <td> -- </td>
+            </tr>
+        {% endif %}
+    {% elif not bug.build_no_fixed and not bug.build_no %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td><a href="{{ bug.link }}">{{ bug.bug_id }}</a></td>
+                <td>{{ bug.plan_suite }}</td>
+                <td>{{ bug.module_testcase }}</td>
+                <td>{{ bug.subject }}</td>
+                <td>{{ bug.status }}</td>
+                <td> -- </td>
+            </tr>
+    {% elif not bug.build_no_fixed and bug.build_no %}
+        {% if build_info.build_no >= bug.build_no %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td><a href="{{ bug.link }}">{{ bug.bug_id }}</a></td>
+                <td>{{ bug.plan_suite }}</td>
+                <td>{{ bug.module_testcase }}</td>
+                <td>{{ bug.subject }}</td>
+                <td>{{ bug.status }}</td>
+                <td> -- </td>
+            </tr>
+        {% endif %}
+    {% endif %}
 {% endfor %}
 </table>
 {% else %}
