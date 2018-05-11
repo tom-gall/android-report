@@ -33,17 +33,18 @@ source ${virenv_dir}/bin/activate
 #$ rm -r /path/to/ENV
 
 #https://docs.djangoproject.com/en/1.11/topics/install/#installing-official-release
-pip install Django=1.11.8
+pip install Django==1.11.8
 pip install pyaml
 pip install lava-tool
 pip install django-crispy-forms
+pip install django psycopg2
 
 # https://docs.djangoproject.com/en/1.11/intro/tutorial01/
 python -m django --version
 #python manage.py startapp ${instance_report_app}
 # django-admin startproject ${instance_name}
 cd ${work_root} && git clone https://git.linaro.org/people/yongqin.liu/public/lcr-report.git
-cd ${instance_dir} && python manage.py runserver 0.0.0.0:8000
+cd ${instance_dir} && python manage.py runserver 0.0.0.0:9000
 echo "Please update the LAVA_USER_TOKEN and LAVA_USER in report/views.py"
 
 # python manage.py createsuperuser

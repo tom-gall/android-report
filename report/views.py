@@ -167,26 +167,47 @@ class LavaInstance(object):
 
 DEFAULT_USER = "yongqin.liu"
 LAVAS = {}
-for lava in LAVA.objects.all():
-    LAVAS[lava.nick] = LavaInstance(nick=lava.nick, user=DEFAULT_USER)
-
-build_configs = {}
-
-for build in BuildConfig.objects.all():
-    build_config = {
-                    'lava_server': LAVAS[build.lava.nick],
-                    'img_ext': build.img_ext,
-                    'template_dir': build.template_dir,
-                    'base_build': {
-                                    'build_name': build.base_build_name,
-                                    'build_no': build.base_build_no,
-                                   },
-                   }
-    build_configs[build.build_name] = build_config
+def initialize_all_lavas():
+    global LAVAS
+    if len(LAVAS) > 0:
+        return LAVAS
+    for lava in LAVA.objects.all():
+        LAVAS[lava.nick] = LavaInstance(nick=lava.nick, user=DEFAULT_USER)
 
 
-build_names = build_configs.keys()
-build_names = sorted(build_names)
+BUILD_CONFIGS = {}
+BUILD_NAMES = []
+def get_all_build_configs():
+    global BUILD_NAMES
+    global BUILD_CONFIGS
+
+    if len(BUILD_CONFIGS) > 0:
+        return BUILD_CONFIGS
+
+    initialize_all_lavas()
+    for build in BuildConfig.objects.all():
+        build_config = {
+                        'lava_server': LAVAS[build.lava.nick],
+                        'img_ext': build.img_ext,
+                        'template_dir': build.template_dir,
+                        'base_build': {
+                                        'build_name': build.base_build_name,
+                                        'build_no': build.base_build_no,
+                                       },
+                       }
+        BUILD_CONFIGS[build.build_name] = build_config
+        BUILD_NAMES.append(build.build_name)
+
+    BUILD_NAMES = sorted(BUILD_NAMES)
+    return BUILD_CONFIGS
+
+
+def get_all_build_names():
+    if len(BUILD_NAMES) == 0:
+        get_all_build_configs()
+
+    return BUILD_NAMES
+
 
 DEFAULT_BUILD_NAME = "android-lcr-reference-hikey-o"
 def get_possible_builds(build_name=DEFAULT_BUILD_NAME):
@@ -200,7 +221,7 @@ def get_possible_builds(build_name=DEFAULT_BUILD_NAME):
     return all_builds
 
 def get_possible_templates(build_name=DEFAULT_BUILD_NAME):
-    url = 'https://git.linaro.org/qa/test-plans.git/tree/android/%s' % build_configs[build_name]['template_dir']
+    url = 'https://git.linaro.org/qa/test-plans.git/tree/android/%s' % get_all_build_configs()[build_name]['template_dir']
     try:
         response = urllib2.urlopen(url)
     except urllib2.HTTPError:
@@ -220,7 +241,7 @@ def get_possible_job_names(build_name=DEFAULT_BUILD_NAME):
     pat_json = re.compile('"job_name": "%%JOB_NAME%%-%%ANDROID_META_BUILD%%-(\S+)"')
     job_name_template_name_hash = {}
     for template in templates:
-        url = '%s/%s/%s' % (template_url_prefix, build_configs[build_name]['template_dir'], template)
+        url = '%s/%s/%s' % (template_url_prefix, get_all_build_configs()[build_name]['template_dir'], template)
         response = urllib2.urlopen(url)
         html = response.read()
         job_names = pat.findall(html)
@@ -418,7 +439,7 @@ def resubmit_job(request):
                         'errors': True,
                       })
 
-    lava = build_configs[build_name]['lava_server']
+    lava = get_all_build_configs()[build_name]['lava_server']
 
     new_job_ids = []
     for job_id in job_ids:
@@ -454,7 +475,7 @@ def is_job_cached(job_id, lava):
 def get_test_results_for_build(build_name, build_no, job_name_list=[]):
     jobs_failed = []
     total_tests_res = {}
-    lava = build_configs[build_name]['lava_server']
+    lava = get_all_build_configs()[build_name]['lava_server']
 
     jobs = get_jobs(build_name, build_no, lava, job_name_list=job_name_list)
     for job_name, job_details in jobs.items():
@@ -539,7 +560,7 @@ def jobs(request):
                   {
                    'jobs_failed': jobs_failed,
                    'jobs_result': sorted(total_tests_res.items()),
-                   'lava_server_job_prefix': build_configs[build_name]['lava_server'].job_url_prefix,
+                   'lava_server_job_prefix': get_all_build_configs()[build_name]['lava_server'].job_url_prefix,
                    'build_info': build_info,
                   }
         )
@@ -682,7 +703,7 @@ def compare(request):
     return render(request, 'result-comparison.html',
                   {
                    "build_info": build_info,
-                   'lava_server_job_prefix': build_configs[build_name]['lava_server'].job_url_prefix,
+                   'lava_server_job_prefix': get_all_build_configs()[build_name]['lava_server'].job_url_prefix,
                    'form': form,
                    'compare_results': compare_results,
                   }
@@ -748,7 +769,7 @@ def checklist(request):
     return render(request, 'checklist.html',
                   {
                    "build_info": build_info,
-                   'lava_server_job_prefix': build_configs[build_name]['lava_server'].job_url_prefix,
+                   'lava_server_job_prefix': get_all_build_configs()[build_name]['lava_server'].job_url_prefix,
                    'form': form,
                    'checklist_results': checklist_results,
                    'all_build_numbers': all_build_numbers,
@@ -781,7 +802,7 @@ def submit_lava_jobs(request):
         all_build_numbers.reverse()
 
         form = JobSubmissionForm(request.POST)
-        form.fields["build_name"].choices = zip(build_names, build_names)
+        form.fields["build_name"].choices = zip(get_all_build_names(), get_all_build_names())
         form.fields["build_no"].choices = zip(all_build_numbers, all_build_numbers)
         form.fields["jobs"].choices = zip(jobs, jobs)
         if form.is_valid():
@@ -791,19 +812,19 @@ def submit_lava_jobs(request):
             jobs = cd['jobs']
             job_priority = cd['job_priority']
             lava_nick = cd['lava_nick']
-            ##lava = build_configs[build_name]['lava_server']
+            ##lava = get_all_build_configs()[build_name]['lava_server']
             lava = LAVAS[lava_nick]
 
             submit_result = []
             for job_name in jobs:
                 template = job_template[job_name]
-                url = '%s/%s/%s' % (template_url_prefix, build_configs[build_name]['template_dir'], template)
+                url = '%s/%s/%s' % (template_url_prefix, get_all_build_configs()[build_name]['template_dir'], template)
                 response = urllib2.urlopen(url)
                 html = response.read()
 
                 meta_url = "%s/%s/%s" % (ci_job_url_base, build_name, build_no)
                 download_url = "%s/%s/%s" % (android_snapshot_url_base, build_name, build_no)
-                img_ext = build_configs[build_name]['img_ext']
+                img_ext = get_all_build_configs()[build_name]['img_ext']
                 job_definition = html.replace("%%JOB_NAME%%", build_name)\
                                      .replace("%%ANDROID_META_BUILD%%", build_no)\
                                      .replace("%%ANDROID_META_NAME%%", build_name)\
@@ -858,7 +879,7 @@ def submit_lava_jobs(request):
                         'lava_nick': 'lkft',
                        }
         form = JobSubmissionForm(initial=form_initial)
-        form.fields["build_name"].choices = zip(build_names, build_names)
+        form.fields["build_name"].choices = zip(get_all_build_names(), get_all_build_names())
         form.fields["build_no"].choices = zip(all_build_numbers, all_build_numbers)
         form.fields["jobs"].choices = zip(jobs, jobs)
 
@@ -870,7 +891,7 @@ def submit_lava_jobs(request):
 @login_required
 def index(request):
     builds = {}
-    for build_name in build_names:
+    for build_name in get_all_build_names():
         build_config_url = "%s/%s" % (android_build_config_url_base, build_name.replace("android-", "").replace('-premerge-ci', ''))
         build_android_tag = get_build_config_value(build_config_url, key="MANIFEST_BRANCH")
         builds[build_name] = {
@@ -917,13 +938,13 @@ def test_report(request):
             ## no need to clean cache from base since there is no cache yet
             cache_to_base = False
 
-    base_build_name = build_configs[build_name]['base_build']['build_name']
-    base_build_no = build_configs[build_name]['base_build']['build_no']
+    base_build_name = get_all_build_configs()[build_name]['base_build']['build_name']
+    base_build_no = get_all_build_configs()[build_name]['base_build']['build_no']
 
 
     (jobs_failed, total_tests_res) = get_test_results_for_build(build_name, build_no)
 
-    lava_nick = build_configs[build_name]['lava_server'].nick
+    lava_nick = get_all_build_configs()[build_name]['lava_server'].nick
     successful_job_ids = []
     #######################################################
     ## Get result for basic/optee/weekly tests
@@ -1308,7 +1329,7 @@ def test_report(request):
 
     return render(request, 'test_report.html',
                   {
-                   'lava_server_job_prefix': build_configs[build_name]['lava_server'].job_url_prefix,
+                   'lava_server_job_prefix': get_all_build_configs()[build_name]['lava_server'].job_url_prefix,
                    'build_info': build_info,
                    'basic_optee_weekly_res': basic_optee_weekly_res,
                    'benchmarks_res': benchmarks_res,
@@ -1418,7 +1439,7 @@ if __name__ == "__main__":
 #    for job_name, job_result in checklist_results.items():    for test_name, test_result in job_result.items():
 #    print str(checklist_results)
 
-    lava_server = build_configs[build_name]['lava_server']
+    lava_server = get_all_build_configs()[build_name]['lava_server']
 
     jobs = get_jobs(build_name, build_no, lava_server, job_name_list=[])
     print str(jobs)

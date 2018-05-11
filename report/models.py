@@ -5,11 +5,11 @@ from django.db import models
 
 # Create your models here.
 class TestCase(models.Model):
-    name = models.CharField(max_length=128)
+    name = models.CharField(max_length=256)
     result = models.CharField(max_length=16)
     measurement = models.DecimalField( max_digits=20, decimal_places=2, null=True)
     unit = models.CharField(max_length=128, null=True)
-    suite = models.CharField(max_length=16)
+    suite = models.CharField(max_length=32)
     job_id = models.CharField(max_length=16)
     lava_nick = models.CharField(max_length=64)
 
