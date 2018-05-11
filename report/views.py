@@ -779,14 +779,11 @@ def checklist(request):
 
 
 class JobSubmissionForm(forms.Form):
+    initialize_all_lavas();
+    nicks = sorted(LAVAS.keys())
     build_name = forms.ChoiceField(label='Build Name')
     build_no = forms.ChoiceField(label='Build No.')
-    lava_nick= forms.ChoiceField(label='LAVA Instance',
-                                     choices=(
-                                              ("lkft", "lkft"),
-                                              ("production", "production"),
-                                              ("staging", "staging"),
-                                             ))
+    lava_nick= forms.ChoiceField(label='LAVA Instance', choices=(zip(nicks, nicks)))
     job_priority = forms.ChoiceField(label='Priority', choices=zip(job_priority_list, job_priority_list))
     jobs = forms.MultipleChoiceField(widget=forms.CheckboxSelectMultiple)
 
