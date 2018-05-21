@@ -1,5 +1,13 @@
 #!/bin/bash
 
+if [ "/*" = "$0" ]; then
+    echo "Please run this script with absolute path"
+    exit 1
+fi
+
+if [ -n "$1" ]; then
+    work_root=$1
+fi
 if [ -d "${work_root}" ]; then
     work_root=${work_root}
 elif [ -d /sata250/django_instances ]; then
@@ -24,6 +32,10 @@ cd ${virenv_dir}
 curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
 sudo python get-pip.py
 
+sudo apt-get update
+#sudo apt-get install python-django-auth-ldap
+## dependency for python-ldap
+sudo apt-get install libsasl2-dev python-dev libldap2-dev libssl-dev
 # https://virtualenv.pypa.io/en/stable/
 sudo pip install virtualenv
 virtualenv ${virenv_dir}
@@ -38,14 +50,17 @@ pip install pyaml
 pip install lava-tool
 pip install django-crispy-forms
 pip install django psycopg2
+pip install python-ldap # will install the 3.0 version
+# https://django-auth-ldap.readthedocs.io/en/latest/install.html
+pip install django-auth-ldap # needs python-ldap >= 3.0
 
 # https://docs.djangoproject.com/en/1.11/intro/tutorial01/
 python -m django --version
 #python manage.py startapp ${instance_report_app}
 # django-admin startproject ${instance_name}
 cd ${work_root} && git clone https://git.linaro.org/people/yongqin.liu/public/lcr-report.git
-cd ${instance_dir} && python manage.py runserver 0.0.0.0:9000
-echo "Please update the LAVA_USER_TOKEN and LAVA_USER in report/views.py"
+#cd ${instance_dir} && python manage.py runserver 0.0.0.0:9000
+#echo "Please update the LAVA_USER_TOKEN and LAVA_USER in report/views.py"
 
 # python manage.py createsuperuser
 # By running makemigrations, you’re telling Django that you’ve made some changes to your models (in this case,

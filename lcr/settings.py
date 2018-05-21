@@ -12,6 +12,12 @@ https://docs.djangoproject.com/en/1.11/ref/settings/
 
 import os
 
+db_name = ""
+db_username = ""
+db_passwd = ""
+bind_user=""
+bind_passwd=""
+
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -85,9 +91,9 @@ DATABASES = {
     #}
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'lcrreport',
-        'USER': 'lcrreport',
-        'PASSWORD': '',
+        'NAME': '%s' % db_name,
+        'USER': '%s' % db_username,
+        'PASSWORD': '%s' % db_passwd,
         'HOST': 'localhost',
         'PORT': '',
     }
@@ -201,3 +207,26 @@ LOGGING = {
 #DATA_UPLOAD_MAX_NUMBER_FIELDS = 100000
 
 CRISPY_TEMPLATE_PACK = 'bootstrap3'
+
+#######################################################################
+#######################################################################
+## Setting to use linaro login
+INSTALLED_APPS.append('ldap')
+INSTALLED_APPS.append('django_auth_ldap')
+import ldap
+from django_auth_ldap.config import (LDAPSearch, LDAPSearchUnion)
+
+AUTHENTICATION_BACKENDS = ['django_auth_ldap.backend.LDAPBackend',
+                           'django.contrib.auth.backends.ModelBackend']
+
+AUTH_LDAP_SERVER_URI = "ldap://login.linaro.org"
+AUTH_LDAP_BIND_DN = "uid=%s,ou=staff,ou=accounts,dc=linaro,dc=org" % (bind_user)
+AUTH_LDAP_BIND_PASSWORD = "%s" % ( bind_passwd )
+# AUTH_LDAP_USER_SEARCH and AUTH_LDAP_USER_DN_TEMPLATE are mutually
+#AUTH_LDAP_USER_DN_TEMPLATE = "uid=%(user)s,ou=staff,ou=accounts,dc=linaro,dc=org"
+AUTH_LDAP_USER_SEARCH = LDAPSearch("ou=staff,ou=accounts,dc=linaro,dc=org",
+    ldap.SCOPE_SUBTREE, "(uid=%(user)s)")
+AUTH_LDAP_USER_ATTR_MAP = {
+  "first_name": "givenName",
+  "email": "mail"
+}
