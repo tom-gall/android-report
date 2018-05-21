@@ -220,6 +220,40 @@ def get_possible_builds(build_name=DEFAULT_BUILD_NAME):
     all_builds.reverse()
     return all_builds
 
+def read_kernel_version(makefile_url):
+    try:
+        response = urllib2.urlopen(makefile_url)
+    except urllib2.HTTPError:
+        return "--"
+
+    content = response.read()
+    #VERSION = 4
+    #PATCHLEVEL = 14
+    #SUBLEVEL = 40
+    pat_version = re.compile("\nVERSION = (?P<version_no>\d+)\n")
+    version_vals = pat_version.findall(content)
+    if len(version_vals) > 0:
+        version_val = version_vals[0]
+    else:
+        version_val = 'X'
+
+    pat_patchlevel = re.compile("\nPATCHLEVEL = (?P<patchlevel>\d+)\n")
+    patchlevel_vals = pat_patchlevel.findall(content)
+    if len(patchlevel_vals) > 0:
+        patchlevel_val = patchlevel_vals[0]
+    else:
+        patchlevel_val = 'X'
+
+    pat_sublevel = re.compile("\nSUBLEVEL = (?P<sublevel>\d+)\n")
+    sublevel_vals = pat_sublevel.findall(content)
+    if len(sublevel_vals) > 0:
+        sublevel_val = sublevel_vals[0]
+    else:
+        sublevel_val = 'X'
+
+    return "%s.%s.%s" % (version_val, patchlevel_val, sublevel_val)
+
+
 def get_possible_templates(build_name=DEFAULT_BUILD_NAME):
     url = 'https://git.linaro.org/qa/test-plans.git/tree/android/%s' % get_all_build_configs()[build_name]['template_dir']
     try:
@@ -1275,11 +1309,11 @@ def test_report(request):
         pinned_manifest_url = '%s/pinned-manifest.xml' % images_url
         if build_name.find('x15') >= 0:
             kernel_commit = get_commit_from_pinned_manifest(pinned_manifest_url, 'kernel/ti/x15')
-            kernel_url = 'http://git.ti.com/android/kernel/commit/%s' % kernel_commit
-            kernel_version = '4.4.91'
+            kernel_url = "http://git.ti.com/ti-linux-kernel/ti-linux-kernel/blobs/raw/%s/Makefile" % kernel_commit
+            kernel_version = read_kernel_version(kernel_url)
         else:
             kernel_url = '--'
-            kernel_version = '4.9.60'
+            kernel_version = '--'
 
         build_config_url = "%s/%s" % (android_build_config_url_base, build_name.replace("android-", "").replace('-premerge-ci', ''))
         build_android_tag = get_build_config_value(build_config_url, key="MANIFEST_BRANCH")
