@@ -424,6 +424,8 @@ def cache_job_result_to_db(job_id, lava, job_status):
                 test["measurement"] = None
             else:
                 test["measurement"] = "{:.2f}".format(float(test.get("measurement")))
+
+            need_cache = False
             try:
                 # not set again if already cached
                 TestCase.objects.get(name=test.get("name"),
@@ -431,6 +433,15 @@ def cache_job_result_to_db(job_id, lava, job_status):
                                      lava_nick=lava.nick,
                                      job_id=job_id)
             except TestCase.DoesNotExist:
+                need_cache = True
+            except TestCase.MultipleObjectsReturned:
+                TestCase.objects.filter(name=test.get("name"),
+                                        suite=test.get("suite"),
+                                        lava_nick=lava.nick,
+                                        job_id=job_id).delete()
+                need_cache = True
+
+            if need_cache:
                 TestCase.objects.create(name=test.get("name"),
                                         result=test.get("result"),
                                         measurement=test.get("measurement"),
