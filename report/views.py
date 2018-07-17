@@ -92,30 +92,36 @@ vts = [
       ]
 
 # test_suite is the same as job name
-cts_v7a = [ 'cts-focused1-v7a',
-            'cts-focused2-v7a',
-            'cts-media-v7a',
-            'cts-media2-v7a',
-            'cts-opengl-v7a',
-            'cts-part1-v7a',
-            'cts-part2-v7a',
-            'cts-part3-v7a',
-            'cts-part4-v7a',
-            'cts-part5-v7a',
+cts_v7a = [ 'cts-focused1-armeabi-v7a',
+            'cts-focused2-armeabi-v7a',
+            'cts-media-armeabi-v7a',
+            'cts-media2-armeabi-v7a',
+            'cts-opengl-armeabi-v7a',
+            'cts-part1-armeabi-v7a',
+            'cts-part2-armeabi-v7a',
+            'cts-part3-armeabi-v7a',
+            'cts-part4-armeabi-v7a',
+            'cts-part5-armeabi-v7a',
           ]
 
 # test_suite is the same as job name
-cts_v8a = [ 'cts-focused1-v8a',
-            'cts-focused2-v8a',
-            'cts-media-v8a',
-            'cts-media2-v8a',
-            'cts-opengl-v8a',
-            'cts-part1-v8a',
-            'cts-part2-v8a',
-            'cts-part3-v8a',
-            'cts-part4-v8a',
-            'cts-part5-v8a',
+cts_v8a = [ 'cts-focused1-arm64-v8a',
+            'cts-focused2-arm64-v8a',
+            'cts-media-arm64-v8a',
+            'cts-media2-arm64-v8a',
+            'cts-opengl-arm64-v8a',
+            'cts-part1-arm64-v8a',
+            'cts-part2-arm64-v8a',
+            'cts-part3-arm64-v8a',
+            'cts-part4-arm64-v8a',
+            'cts-part5-arm64-v8a',
           ]
+
+jobs_to_be_checked_array = [
+    "basic", "boottime", "optee", "weekly", 'monkey',
+    "antutu6", "andebenchpro2015", "benchmarkpi", "caffeinemark", "cf-bench", "gearses2eclair", "geekbench3", "glbenchmark25", "javawhetstone", "jbench", "linpack", "quadrantpro", "rl-sqlite", "scimark", "vellamo3",
+    ]
+jobs_to_be_checked_array = jobs_to_be_checked_array + cts_v8a + cts_v7a + vts
 
 android_snapshot_url_base = "https://snapshots.linaro.org/android"
 ci_job_url_base = 'https://ci.linaro.org/job'
@@ -287,14 +293,6 @@ def get_possible_job_names(build_name=DEFAULT_BUILD_NAME):
     sorted(job_name_template_name_hash.items())
     return job_name_template_name_hash
 
-
-jobs_to_be_checked_array = [
-    "basic", "boottime", "optee", "weekly", 'monkey',
-    "antutu6", "andebenchpro2015", "benchmarkpi", "caffeinemark", "cf-bench", "gearses2eclair", "geekbench3", "glbenchmark25", "javawhetstone", "jbench", "linpack", "quadrantpro", "rl-sqlite", "scimark", "vellamo3",
-    "cts-focused1-v7a", "cts-focused2-v7a", "cts-media2-v7a", "cts-media-v7a", "cts-opengl-v7a", "cts-part1-v7a", "cts-part2-v7a", "cts-part3-v7a", "cts-part4-v7a", "cts-part5-v7a",
-    "cts-focused1-v8a", "cts-focused2-v8a", "cts-media2-v8a", "cts-media-v8a", "cts-opengl-v8a", "cts-part1-v8a", "cts-part2-v8a", "cts-part3-v8a", "cts-part4-v8a", "cts-part5-v8a",
-    "vts-hal", "vts-kernel-kselftest", "vts-kernel-ltp", "vts-kernel-part1", "vts-library", "vts-performance",
-    ]
 
 def get_jobs(build_name, build_no, lava, job_name_list=[]):
     ## TODO: have the same build tested on 2 different lava instances, and saved as base
