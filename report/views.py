@@ -1127,8 +1127,8 @@ def test_report(request):
             failed_testcases = []
         else:
             job_id = job_res['result_job_id_status'][0]
-            number_pass = len(TestCase.objects.filter(job_id=job_id, lava_nick=lava_nick, suite__endswith='_vts-test', result='pass'))
-            failed_testcases = TestCase.objects.filter(job_id=job_id, lava_nick=lava_nick, suite__endswith='_vts-test', result='fail')
+            number_pass = len(TestCase.objects.filter(job_id=job_id, lava_nick=lava_nick, suite__contains='_vts-', result='pass'))
+            failed_testcases = TestCase.objects.filter(job_id=job_id, lava_nick=lava_nick, suite__contains='_vts-', result='fail')
             number_fail = len(failed_testcases)
             number_total = number_pass + number_fail
             if job_id not in successful_job_ids:
