@@ -1,0 +1,30 @@
+{% extends '_layouts/base.html' %}
+
+{% load startswith %}
+{% block title %} Trend for build {{ build_name }}  {% endblock %}
+
+{% block headline %}<h1>Trend for Build {{ build_name }}</h1>{% endblock %}
+
+{% block content %}
+<h2>Trend Chart</h2>
+TBD
+<h2>Data List</h2>
+<table border=2>
+<tr>
+    <th>Build Number</th>
+    {% for test_case in test_cases %}
+    <th>{{ test_case }}</th>
+    {% endfor %}
+</tr>
+{% for one_build in trend_data %}
+<tr>
+	<td align="left"> <a href="/report/test-report/?build_name={{ build_name }}&build_no={{ one_build.build_no }}">{{ one_build.build_no }}</a></td>
+	{% with one_build.test_cases_res as test_cases_res %}
+	{% for test_case_res in test_cases_res %}
+	<td align="right"> {{test_case_res.measurement}} </td>
+	{% endfor %}
+	{% endwith %}
+</tr>
+{% endfor %}
+</table>
+{% endblock %}

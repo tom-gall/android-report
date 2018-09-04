@@ -24,7 +24,7 @@ from models import TestCase, JobCache, BaseResults, Bug, BuildSummary, LAVA, LAV
 
 basic_weekly = { # job_name: ['test_suite', ],
                         #"basic": [ "meminfo", 'meminfo-first', 'meminfo-second', "busybox", "ping", "linaro-android-kernel-tests", "tjbench"],
-                        "basic": [ 'meminfo-first', 'meminfo-second', "busybox", "ping", "linaro-android-kernel-tests", "tjbench"],
+                        "basic": [ "busybox", "ping", "linaro-android-kernel-tests", "tjbench"],
                         "weekly": [ 'media-codecs', 'piglit-gles2', 'piglit-gles3', 'piglit-glslparser', 'piglit-shader-runner', 'stringbench', 'libc-bench'],
                      }
 
@@ -1467,6 +1467,65 @@ def add_comment(request):
                       {
                         "form": form,
                         "build_info": build_info,
+                      })
+
+
+@login_required
+def show_trend(request):
+    if request.method == 'POST':
+        build_name = request.POST.get("build_name")
+        job_name = request.POST.get("job_name")
+        test_suite = request.POST.get("test_suite", '')
+        test_case = request.POST.get("test_case", '')
+    else: # GET
+        build_name = request.GET.get("build_name")
+        job_name = request.GET.get("job_name")
+        test_suite = request.GET.get("test_suite", '')
+        test_case = request.GET.get("test_case" , '')
+
+    jobs_raw = JobCache.objects.filter(build_name=build_name, cached=True,job_name=job_name)
+    if test_case:
+        test_cases = { test_case }
+    else:
+        test_cases = benchmarks_common.get(job_name).get(test_suite)
+
+    trend_data = []
+    for job in jobs_raw:
+        job_id = job.job_id
+        lava_nick = job.lava_nick
+        build_no = job.build_no
+        one_build = { "build_no": build_no,
+                      "build_name": build_name,
+                      "job_id": job_id,
+                      "lava_nick": lava_nick
+                    }
+        test_cases_res = []
+        for test_case in test_cases:
+            try:
+                #test_result = TestCase.objects.filter(job_id=job_id, lava_nick=lava_nick, suite__endswith=test_suite, name=test_case)[0]
+                test_result = TestCase.objects.get(job_id=job_id, lava_nick=lava_nick, suite__endswith=test_suite, name=test_case)
+                test_cases_res.append({
+                                         "test_case": test_case,
+                                         "measurement": test_result.measurement,
+                                         "unit": test_result.unit,
+                                         "suite": test_suite
+                                        })
+            except TestCase.DoesNotExist:
+                test_cases_res.append({
+                                     "test_case": test_case,
+                                     "measurement": 0,
+                                     "unit": '--',
+                                     "suite": test_suite,
+                                    })
+
+        one_build['test_cases_res'] = test_cases_res
+        trend_data.append(one_build)
+
+    return render(request, 'show_trend.html',
+                      {
+                        "build_name": build_name,
+                        "test_cases": test_cases,
+                        "trend_data": trend_data
                       })
 
 

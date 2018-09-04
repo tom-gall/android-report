@@ -14,7 +14,7 @@
     {% ifequal build_no build_info.build_no %}
         <td style="padding-left: 3px;padding-right: 3x;">{{ build_no }} </td>
     {% else %}
-        <td style="padding-left: 2px;padding-right: 2x;"><a style="margin-bottom: 1px;padding-bottom: 1px;margin-right: 1px;padding-right: 1px;" href="/report/test-report/?build_name={{ build_info.build_name}}&&build_no={{ build_no }}">{{ build_no}} </a></td>
+        <td style="padding-left: 2px;padding-right: 2x;"><a style="margin-bottom: 1px;padding-bottom: 1px;margin-right: 1px;padding-right: 1px;" href="/report/test-report/?build_name={{ build_info.build_name }}&&build_no={{ build_no }}">{{ build_no}} </a></td>
     {% endifequal %}
     &nbsp;&nbsp;
 {% endfor %}
@@ -247,8 +247,8 @@ No result for basic test, or optee test, or weekly test jobs
     {% else %}
     <td> {{ test_info.job_name }}</td>
     {% endif %}
-    <td> {{ test_info.test_suite }}</td>
-    <td> {{ test_info.test_case }}</td>
+    <td> <a href="/report/show-trend/?build_name={{ build_info.build_name }}&job_name={{ test_info.job_name }}&test_suite={{ test_info.test_suite }}">{{ test_info.test_suite }}</a></td>
+    <td> <a href="/report/show-trend/?build_name={{ build_info.build_name }}&job_name={{ test_info.job_name }}&test_suite={{ test_info.test_suite }}&test_case={{ test_info.test_case }}">{{ test_info.test_case }}</a></td>
     <td> {{ test_info.unit }}</td>
     {% with test_info.base as base %}
     {% if base %}
