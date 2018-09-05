@@ -1477,17 +1477,37 @@ def show_trend(request):
         job_name = request.POST.get("job_name")
         test_suite = request.POST.get("test_suite", '')
         test_case = request.POST.get("test_case", '')
+        category = request.POST.get("category", 'benchmark')
     else: # GET
         build_name = request.GET.get("build_name")
         job_name = request.GET.get("job_name")
         test_suite = request.GET.get("test_suite", '')
         test_case = request.GET.get("test_case" , '')
+        category = request.GET.get("category", 'benchmark')
 
     jobs_raw = JobCache.objects.filter(build_name=build_name, cached=True,job_name=job_name)
-    if test_case:
-        test_cases = { test_case }
+    if category == 'cts':
+        if test_case: # only module specified
+            test_cases = [
+                            '%s_passed' % test_case,
+                            '%s_failed' % test_case,
+                            '%s_executed' % test_case,
+                         ]
+        else:
+            #TODO when job specified
+            test_cases = []
+    elif category == 'vts':
+        # TODO
+        test_cases = []
+    elif category == 'basic':
+        # TODO
+        test_cases = []
     else:
-        test_cases = benchmarks_common.get(job_name).get(test_suite)
+        # benchmark
+        if test_case: # testcase specified
+            test_cases = [ test_case ]
+        else: # both test suite and test case specified
+            test_cases = benchmarks_common.get(job_name).get(test_suite)
 
     trend_data = []
     for job in jobs_raw:

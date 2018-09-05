@@ -344,7 +344,7 @@ Only failures in the focused1 and focused2 test plans, and zero pass rate module
     {% else %}
     <td> {{ test_info.job_name }}</td>
     {% endif %}
-    <td align='left'> {{ test_info.module_name }}</td>
+    <td align='left'> <a href="/report/show-trend/?category=cts&build_name={{ build_info.build_name }}&job_name={{ test_info.job_name }}&test_suite={{ test_info.job_name }}&test_case={{ test_info.module_name }}">{{ test_info.module_name }}</a></td>
     {% with test_info.base as base %}
     {% if base %}
     <td align='right'> {{ base.number_pass }}</td>
