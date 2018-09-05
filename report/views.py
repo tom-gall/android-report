@@ -1542,7 +1542,7 @@ def show_trend(request):
         trend_data.append(one_build)
 
     def get_buildno(item):
-        return item.get('build_no')
+        return int(item.get('build_no'))
 
     sorted_trend_data = sorted(trend_data, key=get_buildno, reverse=True)
     return render(request, 'show_trend.html',
