@@ -306,7 +306,19 @@ No result for benchmark test jobs.
 
 <h2>CTS</h2>
 {% if cts_res %}
-Only failures in the focused1 and focused2 test plans, and zero pass rate modules will be focused.
+<div>
+<ul>
+<li>Only failures in the focused1 and focused2 test plans, and zero pass rate modules will be focused.</li>
+<li>How to find the full cts logs:</li>
+<ol>
+<li>Click the link in the Plan column to open the lava job page</li>
+<li>Click the result icon <span class="glyphicon glyphicon-signal"> </span> of the Results item, to go to the result page</li>
+<li>Click the View test suite icon <span class="glyphicon glyphicon-eye-open"> </span> of the n-cts-plan-arch(like 1_cts-focused1-armeabi-v7a) test suite</li>
+<li>Click the test-attachment test to go to a new page for details</li>
+<li>Open the link of the reference item to download the full CTS logs</li>
+</ol>
+</ul>
+</div>
 <table border="2">
 <tr>
     <th rowspan=2>Index</th>
@@ -444,8 +456,6 @@ Only failures in the focused1 and focused2 test plans, and zero pass rate module
 No result for cts test jobs.
 {% endif %}
 <hr/>
-
-
 
 <h2>VTS</h2>
 {% if vts_res %}
