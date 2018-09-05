@@ -1252,8 +1252,14 @@ def test_report(request):
                 except BaseResults.DoesNotExist:
                     base = None
 
-                bugs = Bug.objects.filter(build_name=build_name, plan_suite=job_name, module_testcase=module_name)
-                comments = Comment.objects.filter(build_name=build_name, plan_suite=job_name, module_testcase=module_name)
+                bugs = list(Bug.objects.filter(build_name=build_name, plan_suite=job_name, module_testcase=module_name))
+                bugs_old = list(Bug.objects.filter(build_name=build_name, plan_suite=job_name.replace('-armeabi', '').replace('-arm64',''), module_testcase=module_name))
+                bugs = bugs + bugs_old
+
+                comments = list(Comment.objects.filter(build_name=build_name, plan_suite=job_name, module_testcase=module_name))
+                comments_old = list(Comment.objects.filter(build_name=build_name, plan_suite=job_name.replace('-armeabi', '').replace('-arm64',''), module_testcase=module_name))
+                comments = comments + comments_old
+
                 cts_res.append({'job_name': job_name,
                                 'job_id': job_id,
                                 'module_name': module_name,
