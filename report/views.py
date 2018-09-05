@@ -1521,11 +1521,15 @@ def show_trend(request):
         one_build['test_cases_res'] = test_cases_res
         trend_data.append(one_build)
 
+    def get_buildno(item):
+        return item.get('build_no')
+
+    sorted_trend_data = sorted(trend_data, key=get_buildno, reverse=True)
     return render(request, 'show_trend.html',
                       {
                         "build_name": build_name,
                         "test_cases": test_cases,
-                        "trend_data": trend_data
+                        "trend_data": sorted_trend_data
                       })
 
 
