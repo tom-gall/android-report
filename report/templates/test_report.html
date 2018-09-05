@@ -226,12 +226,18 @@ No result for basic test, or optee test, or weekly test jobs
 
 <h2>Benchmarks</h2>
 {% if benchmarks_res %}
+<div>
+<ul>
+<li>Click on the links in the "Test Suite" column will redirect to the history data list page for that Test Suite</li>
+<li>Click on the links in the "Test Case" column will redirect to the history data list page for that Test Case</li>
+</ul>
+</div>
 <table border="2">
 <tr>
     <th>Index</th>
     <th>Benchmarks</th>
     <th>Test Suite</th>
-    <th>Test Cases</th>
+    <th>Test Case</th>
     <th>Unit</th>
     <th>Base({{ build_info.base_build_no }})</th>
     <th>Current</th>
@@ -317,6 +323,7 @@ No result for benchmark test jobs.
 <li>Click the test-attachment test to go to a new page for details</li>
 <li>Open the link of the reference item to download the full CTS logs</li>
 </ol>
+<li>Click on the links in the Module column will redirect to the history data list page for that CTS module</li>
 </ul>
 </div>
 <table border="2">
