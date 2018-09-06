@@ -1491,6 +1491,7 @@ def show_trend(request):
         test_case = request.GET.get("test_case" , '')
         category = request.GET.get("category", 'benchmark')
 
+    chart_title = test_suite
     jobs_raw = JobCache.objects.filter(build_name=build_name, cached=True,job_name=job_name)
     if category == 'cts':
         if test_case: # only module specified
@@ -1499,6 +1500,7 @@ def show_trend(request):
                             '%s_failed' % test_case,
                             '%s_executed' % test_case,
                          ]
+            chart_title = '%s %s' % (chart_title, test_case)
         else:
             #TODO when job specified
             test_cases = []
@@ -1512,6 +1514,7 @@ def show_trend(request):
         # benchmark
         if test_case: # testcase specified
             test_cases = [ test_case ]
+            chart_title = '%s %s' % (chart_title, test_case)
         else: # both test suite and test case specified
             test_cases = benchmarks_common.get(job_name).get(test_suite)
 
@@ -1555,7 +1558,8 @@ def show_trend(request):
                       {
                         "build_name": build_name,
                         "test_cases": test_cases,
-                        "trend_data": sorted_trend_data
+                        "trend_data": sorted_trend_data,
+                        'chart_title': chart_title,
                       })
 
 
