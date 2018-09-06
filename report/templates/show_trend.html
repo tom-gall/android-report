@@ -1,57 +1,62 @@
 {% extends '_layouts/base.html' %}
 
-{% load startswith %}
+{% load static%}
+{% load getatindex%}
 {% block title %} Trend for build {{ build_name }}  {% endblock %}
 
 {% block headline %}<h1>Trend for Build {{ build_name }}</h1>{% endblock %}
 
 {% block javascript %}
 {% if trend_data %}
-<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
-<script type="text/javascript">
-    google.charts.load('current', {'packages':['line']});
-    google.charts.setOnLoadCallback(drawChart);
-
-    function drawChart() {
-        var data = new google.visualization.DataTable();
-        data.addColumn('number', 'Build Number');
-        {% for test_case in test_cases %}
-        data.addColumn('number', '{{ test_case }}');
-        {% endfor %}
-
-        data.addRows([
-        {% for one_build in trend_data %}
-            [{{ one_build.build_no }},
-            {% with one_build.test_cases_res as test_cases_res %}
-            {% for test_case_res in test_cases_res %}
-                {{test_case_res.measurement}},
-            {% endfor %}
-            {% endwith %}
-            ],
-        {% endfor %}
-            ]);
-
-        var options = {
-            chart: {
-                title: 'Trend Chart for {{ build_name }} on {{ chart_title }} ',
-                //subtitle: 'in millions of dollars (USD)'
-            },
-            width: 1200,
-            height: 500
-        };
-
-        var chart = new google.charts.Line(document.getElementById('linechart_material'));
-
-        chart.draw(data, google.charts.Line.convertOptions(options));
-    }
-</script>
+<!-- http://www.chartjs.org/docs/latest/charts/line.html -->
+<script src="{% static "report/Chart.min.js" %}"></script>
+<!-- http://google.github.io/palette.js/ -->
+<script src="{% static "report/palette.js" %}"></script>
 {% endif %}
 {% endblock %}
+
 {% block content %}
 {% if trend_data %}
 <h2>Trend Chart</h2>
-<div id="linechart_material" style="width: 1200px; height: 500px"></div>
+<canvas id="myChart"></canvas>
+<script type="text/javascript">
+var ctx = document.getElementById('myChart').getContext('2d');
+var colors = palette('mpn65', {{ test_cases|length }}).map(function(hex) {
+            return '#' + hex;
+            });
+var chart = new Chart(ctx, {
+    // The type of chart we want to create
+    type: 'line',
 
+    // The data for our dataset
+    data: {
+        labels: [
+                {% for one_build in trend_data reversed %}
+                "{{ one_build.build_no }}",
+                {% endfor %}
+                ],
+        datasets: [
+            {% for test_case in test_cases %}
+            {
+                label: "{{ test_case }} ",
+                borderColor: colors[{{forloop.counter0}}],
+                "lineTension": 0,
+                "fill":false,
+                data: [
+                {% for one_build in trend_data reversed %}
+                    {% with one_build.test_cases_res|get_at_index:forloop.parentloop.counter0 as test_case_res %}
+                        {{ test_case_res.measurement }},
+                    {% endwith %}
+                {% endfor %}
+                ],
+            },
+            {% endfor %}
+        ],
+    },
+    // Configuration options go here
+    options: {}
+});
+</script>
 <h2>Data List</h2>
 <table border=2>
 <tr>
