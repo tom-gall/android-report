@@ -130,6 +130,11 @@
 
 <h2>Basic Weekly</h2>
 {% if basic_optee_weekly_res %}
+<div>
+<ul>
+<li>Click on the links in the "Test Name" column will redirect to the history data list page for that job</li>
+</ul>
+</div>
 <table border="2">
 <tr>
     <th rowspan=2>Index</th>
@@ -158,7 +163,7 @@
     {% else %}
     <td> {{ test_info.job_name }}</td>
     {% endif %}
-    <td align='left'> {{ test_info.test_suite }}</td>
+    <td align='left'><a href="/report/show-trend/?category=basic&build_name={{ build_info.build_name }}&job_name={{ test_info.job_name }}">{{ test_info.test_suite }}</a></td>
     {% with test_info.base as base %}
     {% if base %}
     <td align='right'> {{ base.number_pass }}</td>
@@ -523,9 +528,15 @@ No result for cts test jobs.
             <td> -- </td>
         {% else %}
             <td>
+                {% if failed_testcases|length > 6 %}
+                <div style="height: 150px; width:600px; overflow: auto">
+                {% else %}
+                <div style="width:600px; overflow: auto">
+                {% endif %}
                 {% for test_case in failed_testcases %}
                 {{ test_case.name }} <br/>
                 {% endfor %}
+            </div>
             </td>
         {% endifequal %}
     {% endwith%}

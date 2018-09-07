@@ -1492,7 +1492,7 @@ def show_trend(request):
         category = request.GET.get("category", 'benchmark')
 
     chart_title = test_suite
-    jobs_raw = JobCache.objects.filter(build_name=build_name, cached=True,job_name=job_name)
+
     if category == 'cts':
         if test_case: # only module specified
             test_cases = [
@@ -1508,8 +1508,16 @@ def show_trend(request):
         # TODO
         test_cases = []
     elif category == 'basic':
-        # TODO
         test_cases = []
+        basic_optee_weekly = basic_weekly.copy()
+        if build_name.find("hikey") >= 0:
+            basic_optee_weekly.update(optee)
+        if job_name:
+            test_cases.extend(basic_optee_weekly[job_name])
+        else:
+            for job in basic_optee_weekly:
+                test_cases.extend(basic_optee_weekly[job])
+
     else:
         # benchmark
         if test_case: # testcase specified
@@ -1517,6 +1525,19 @@ def show_trend(request):
             chart_title = '%s %s' % (chart_title, test_case)
         else: # both test suite and test case specified
             test_cases = benchmarks_common.get(job_name).get(test_suite)
+
+    if category == 'basic':
+        if job_name:
+            jobs_raw = list(JobCache.objects.filter(build_name=build_name, cached=True, job_name=job_name))
+        else:
+            basic_optee_weekly = basic_weekly.copy()
+            if build_name.find("hikey") >= 0:
+                basic_optee_weekly.update(optee)
+            jobs_raw = []
+            for job in basic_optee_weekly:
+                jobs_raw = jobs_raw + list(JobCache.objects.filter(build_name=build_name, cached=True, job_name=job))
+    else:
+        jobs_raw = list(JobCache.objects.filter(build_name=build_name, cached=True, job_name=job_name))
 
     trend_data = []
     for job in jobs_raw:
@@ -1530,22 +1551,34 @@ def show_trend(request):
                     }
         test_cases_res = []
         for test_case in test_cases:
-            try:
-                #test_result = TestCase.objects.filter(job_id=job_id, lava_nick=lava_nick, suite__endswith=test_suite, name=test_case)[0]
-                test_result = TestCase.objects.get(job_id=job_id, lava_nick=lava_nick, suite__endswith=test_suite, name=test_case)
+            if category == 'basic':
+                number_pass = len(TestCase.objects.filter(job_id=job_id, lava_nick=lava_nick, suite__endswith='_%s' % test_case, result='pass'))
+                #number_fail = len(TestCase.objects.filter(job_id=job_id, lava_nick=lava_nick, suite__endswith='_%s' % test_case, result='fail'))
+                #number_skip = len(TestCase.objects.filter(job_id=job_id, lava_nick=lava_nick, suite__endswith='_%s' % test_case, result='skip'))
                 test_cases_res.append({
                                          "test_case": test_case,
-                                         "measurement": test_result.measurement,
-                                         "unit": test_result.unit,
-                                         "suite": test_suite
+                                         "measurement": number_pass,
+                                         "unit": '--',
+                                         "suite": test_case
                                         })
-            except TestCase.DoesNotExist:
-                test_cases_res.append({
-                                     "test_case": test_case,
-                                     "measurement": 0,
-                                     "unit": '--',
-                                     "suite": test_suite,
-                                    })
+                #logger.info( "%s : %s" % (test_case, str(test_cases_res)))
+            else:
+                try:
+                    #test_result = TestCase.objects.filter(job_id=job_id, lava_nick=lava_nick, suite__endswith=test_suite, name=test_case)[0]
+                    test_result = TestCase.objects.get(job_id=job_id, lava_nick=lava_nick, suite__endswith=test_suite, name=test_case)
+                    test_cases_res.append({
+                                             "test_case": test_case,
+                                             "measurement": test_result.measurement,
+                                             "unit": test_result.unit,
+                                             "suite": test_suite
+                                            })
+                except TestCase.DoesNotExist:
+                    test_cases_res.append({
+                                         "test_case": test_case,
+                                         "measurement": 0,
+                                         "unit": '--',
+                                         "suite": test_suite,
+                                        })
 
         one_build['test_cases_res'] = test_cases_res
         trend_data.append(one_build)
