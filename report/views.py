@@ -408,9 +408,26 @@ def get_yaml_result(job_id, lava):
     return tests_res
 
 def cache_job_result_to_db(job_id, lava, job_status):
+    total_res = []
+    limit_number = 5000
     try:
-        res = lava.server.results.get_testjob_results_yaml(job_id)
-        for test in yaml.load(res):
+        # res = lava.server.results.get_testjob_results_yaml(job_id)
+        suite_list = yaml.load(lava.server.results.get_testjob_suites_list_yaml(job_id))
+        for suite in suite_list:
+            if suite['name'] == "lava":
+                continue
+            total_count = 0
+            fetch_number = 0
+            while True:
+                suite_testcase_list = lava.server.results.get_testsuite_results_yaml(job_id,
+                                                 suite['name'], limit_number, total_count)
+                res_part = yaml.load(suite_testcase_list)
+                total_res = total_res + res_part
+                total_count = len(total_res)
+                if len(res_part) < limit_number:
+                    break
+
+        for test in total_res:
             if test.get("suite") == "lava":
                 continue
             if pat_ignore.match(test.get("name")):
