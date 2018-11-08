@@ -39,7 +39,7 @@ class JobCache(models.Model):
     cached = models.BooleanField(default=False)
 
     def __str__(self):
-        return "%s_%s %s %s#%s %s %s" % (self.lava_nick, self.job_id, self.job_name, self.build_name, self.build_no, self.status, self.duration)
+        return "%s_%s %s %s#%s %s %s %s" % (self.lava_nick, self.job_id, self.job_name, self.build_name, self.build_no, self.status, self.duration, self.cached)
 
 
 class Comment(models.Model):

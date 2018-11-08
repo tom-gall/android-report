@@ -22,7 +22,7 @@ class TestCaseAdmin(admin.ModelAdmin):
 admin.site.register(TestCase, TestCaseAdmin)
 
 class JobCacheAdmin(admin.ModelAdmin):
-    list_display = ('job_id', 'job_name', 'lava_nick', 'status', 'duration', 'build_name', 'build_no')
+    list_display = ('job_id', 'job_name', 'lava_nick', 'status', 'cached', 'duration', 'build_name', 'build_no')
     search_fields = ('job_id', 'job_name', 'build_name', 'build_no')
 
 admin.site.register(JobCache, JobCacheAdmin)

@@ -362,8 +362,8 @@ def get_jobs(build_name, build_no, lava, job_name_list=[]):
                 local_job_name = job_name_list[0]
 
             try:
-                JobCache.objects.get(job_id=job_id, lava_nick=lava.nick)
-                JobCache.objects.filter(lava_nick=lava.nick, job_id=job_id).update(
+                if not JobCache.objects.get(job_id=job_id, lava_nick=lava.nick).cached:
+                    JobCache.objects.filter(lava_nick=lava.nick, job_id=job_id).update(
                                         build_name=build_name, build_no=build_no,
                                         lava_nick=lava.nick, job_id=job_id, job_name=local_job_name, status=job_status,
                                         duration=job_duration, cached=False)
@@ -450,10 +450,10 @@ def cache_job_result_to_db(job_id, lava, job_status):
 
         JobCache.objects.filter(lava_nick=lava.nick, job_id=job_id).update(cached=True,
                                                                            status=job_status_string_int[job_status])
-
     except xmlrpclib.ProtocolError as e:
+        logger.info("Got error in cache_job_result_to_db for job_id=%s, lava_nick=%s: %s" % (job_id, lava.nick, str(e)))
         # for cases that no permission to check result submitted by others
-        JobCache.objects.filter(lava_nick=lava.nick, job_id=job_id).update(cached=True,
+        JobCache.objects.filter(lava_nick=lava.nick, job_id=job_id).update(cached=False,
                                                                            status=5)
 
     except xmlrpclib.Fault as e:
