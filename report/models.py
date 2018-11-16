@@ -9,7 +9,7 @@ class TestCase(models.Model):
     result = models.CharField(max_length=16)
     measurement = models.DecimalField( max_digits=20, decimal_places=2, null=True)
     unit = models.CharField(max_length=128, null=True)
-    suite = models.CharField(max_length=32)
+    suite = models.CharField(max_length=64)
     job_id = models.CharField(max_length=16)
     lava_nick = models.CharField(max_length=64)
 
