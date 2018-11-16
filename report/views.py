@@ -140,6 +140,7 @@ pat_ignore = re.compile(".*("
 
 names_ignore = ["test-attachment",
                 "test-skipped",
+                'install-fastboot',
                 "subtests-fail-rate", 'test-cases-fail-rate', # "regression_4003_XTS", "regression_4003_NO_XTS",
                 "tradefed-test-run", "check-adb-connectivity",
                 "3D-mean","Overall_Score-mean", "Memory_Bandwidth_Add_Multi_Core-mean", "Platform-mean", "Memory_Bandwidth-mean", "Memory_Bandwidth_Copy_Single_Core-mean", "Memory_Latency_64M_range-mean", "Memory_Bandwidth_Scale_Single_Core-mean", "Memory_Bandwidth_Copy_Multi_Core-mean", "Storage-mean", "Memory_Bandwidth_Triad_Single_Core-mean", "CoreMark-PRO_Base-mean", "Memory_Bandwidth_Add_Single_Core-mean", "CoreMark-PRO_Peak-mean", "Memory_Bandwidth_Scale_Multi_Core-mean", "Memory_Latency-mean", "Memory_Bandwidth_Triad_Multi_Core-mean",
@@ -1611,6 +1612,114 @@ def show_trend(request):
                         "trend_data": sorted_trend_data,
                         'chart_title': chart_title,
                       })
+
+
+@login_required
+def show_cts_failures(request):
+    if request.method == 'POST':
+        build_name = request.POST.get("build_name")
+        job_name = request.POST.get("job_name")
+        job_ids = request.POST.get("job_ids", '')
+    else: # GET
+        build_name = request.GET.get("build_name")
+        job_name = request.GET.get("job_name")
+        job_ids = request.GET.get("job_ids", '')
+
+    cts = cts_v7a + []
+    if build_name.find("hikey") >= 0:
+        cts = cts_v7a + cts_v8a
+
+    # does not work
+    def download_request(url, path):
+        r = requests.get(url, stream=True)
+        if r.status_code == 200:
+            with open(path, "wb") as fd:
+                 fd.write(r.content)
+            #with open(temp_path, 'wb') as temp_fd:
+            #r.raw.decode_content = True
+            #shutil.copyfileobj(r.raw, fd)
+            print("File is saved to %s" % path)
+        else:
+            print('Failed to download file: %s' % attachment_url)
+
+    def download_urllib2(url, path):
+        import urllib2
+        f = urllib2.urlopen(url)
+        data = f.read()
+        with open(path, "wb") as fd:
+            fd.write(data)
+        print("File is saved to %s" % path)
+
+    def download_urllib(url, path):
+        import urllib
+        def Schedule(a,b,c):
+            '''
+            a: the number downloaded of blocks
+            b: the size of the block
+            c: the size of the file
+            '''
+            per = 100.0 * a * b / c
+            if per > 100 :
+                per = 100
+                sys.stdout.write("\r %.2f%%" % per)
+                sys.stdout.flush()
+                sys.stdout.write('\n')
+            else:
+                sys.stdout.write("\r %.2f%%" % per)
+                sys.stdout.flush()
+        urllib.urlretrieve(url, path, Schedule)
+        print("File is saved to %s" % path)
+
+    def extract(tar_path):
+        try:
+            tar = tarfile.open(tar_path, "r")
+            for f_name in tar.getnames():
+                if f_name.endswith("/test_result.xml"):
+                    result_fd = tar.extractfile(f_name)
+                    try:
+                        root = ET.fromstring(result_fd.read())
+                        for elem in root.findall('Module'):
+                            if 'abi' in elem.attrib.keys():
+                                module_name = '.'.join([elem.attrib['abi'], elem.attrib['name']])
+                            else:
+                                module_name = elem.attrib['name']
+
+                            test_cases = elem.findall('.//TestCase')
+                            for test_case in test_cases:
+                                failed_tests = test_case.findall('.//Test[@result="fail"]')
+                                for failed_test in failed_tests:
+                                    test_name = '%s/%s.%s' % (module_name, test_case.get("name"), failed_test.get("name"))
+                                    stacktrace = failed_test.find('.//Failure/StackTrace').text
+                                    print "%s\n%s" % (test_name, stacktrace)
+                                    print "========================="
+                    except ET.ParseError as e:
+                        logger.error('xml.etree.ElementTree.ParseError: %s' % e)
+                        logger.info('Please Check %s manually' % xml_file)
+                else:
+                    continue
+            tar.close()
+        except Exception, e:
+            raise Exception, e
+
+    attachment_case_name = 'test-attachment'
+    lava_server = get_all_build_configs()[build_name]['lava_server']
+
+    for job_id in job_ids:
+        suite_list = lava_server.results.get_testjob_suites_list_yaml(job_id)
+        for suite in suite_list:
+            # 1_cts-focused1-arm64-v8a
+            test_suite_name = re.sub('^\d+_', '', test_suite['name'])
+            if not test_suite_name in cts:
+                continue
+
+            attachment = yaml.load(lava_server.results.get_testcase_results_yaml(job_id, suite_name, attachment_case_name))
+            # http://archive.validation.linaro.org/artifacts/team/qa/2018/11/07/17/43/tradefed-output-20181107180851.tar.xz
+            attachment_url = attachment[0].get('metadata').get('reference')
+            (temp_fd, temp_path) = tempfile.mkstemp(suffix='.tar.xz', text=False)
+            download_urllib(attachment_url, temp_path)
+            tar_f = temp_path.replace(".xz", '')
+            os.system("xz -d %s" % temp_path)
+            extract(tar_f)
 
 
 if __name__ == "__main__":
