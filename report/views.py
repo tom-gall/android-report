@@ -14,6 +14,10 @@ import urllib2
 import xmlrpclib
 import yaml
 import logging
+import tempfile
+import os
+import tarfile
+import xml.etree.ElementTree as ET
 
 logger = logging.getLogger(__name__)
 
@@ -1130,6 +1134,7 @@ def test_report(request):
     ########### result for vts ##############################
     #########################################################
     vts_res = []
+    vts_job_ids = []
     summary = {
                 'pass': 0,
                 'fail': 0,
@@ -1176,6 +1181,8 @@ def test_report(request):
                         'bugs': bugs,
                         'comments': comments,
                        })
+        if job_id and str(job_id) not in vts_job_ids:
+            vts_job_ids.append(str(job_id))
         if cache_to_base and job_id is not None:
             BaseResults.objects.create(build_name=build_name, build_no=build_no, job_name=job_name, job_id=job_id, lava_nick=lava_nick,
                                        number_pass=number_pass, number_fail=number_fail, number_total=number_total, number_passrate=number_passrate,
@@ -1203,6 +1210,7 @@ def test_report(request):
     if build_name.find("hikey") >= 0:
         cts = cts_v7a + cts_v8a
     cts_res = []
+    cts_job_ids = []
     summary = {
                 'pass': 0,
                 'fail': 0,
@@ -1281,6 +1289,8 @@ def test_report(request):
                 cts_res.append({'job_name': job_name,
                                 'job_id': job_id,
                                 'module_name': module_name,
+                                'module_abi': module_name.split('.')[0],
+                                'module_name_noabi': module_name.split('.')[1],
                                 'number_pass': number_pass,
                                 'number_fail': number_fail,
                                 'number_total': number_total,
@@ -1290,6 +1300,8 @@ def test_report(request):
                                 'bugs': bugs,
                                 'comments': comments,
                                })
+                if job_id and str(job_id) not in cts_job_ids:
+                    cts_job_ids.append(str(job_id))
                 if cache_to_base:
                     BaseResults.objects.create(build_name=build_name, build_no=build_no, job_name=job_name, job_id=job_id, lava_nick=lava_nick,
                                                number_pass=number_pass, number_fail=number_fail, number_total=number_total, number_passrate=number_passrate,
@@ -1398,7 +1410,9 @@ def test_report(request):
                    'basic_optee_weekly_res': basic_optee_weekly_res,
                    'benchmarks_res': benchmarks_res,
                    'vts_res': vts_res,
+                   'vts_job_ids': ','.join(vts_job_ids),
                    'cts_res': cts_res,
+                   'cts_job_ids': ','.join(cts_job_ids),
                    'build_bugs': build_bugs,
                    'jobs_failed': jobs_failed,
                    'jobs_duration': jobs_duration,
@@ -1615,19 +1629,7 @@ def show_trend(request):
 
 
 @login_required
-def show_cts_failures(request):
-    if request.method == 'POST':
-        build_name = request.POST.get("build_name")
-        job_name = request.POST.get("job_name")
-        job_ids = request.POST.get("job_ids", '')
-    else: # GET
-        build_name = request.GET.get("build_name")
-        job_name = request.GET.get("job_name")
-        job_ids = request.GET.get("job_ids", '')
-
-    cts = cts_v7a + []
-    if build_name.find("hikey") >= 0:
-        cts = cts_v7a + cts_v8a
+def show_cts_vts_failures(request):
 
     # does not work
     def download_request(url, path):
@@ -1667,10 +1669,11 @@ def show_cts_failures(request):
             else:
                 sys.stdout.write("\r %.2f%%" % per)
                 sys.stdout.flush()
+        logger.info('Start to download: %s to path: %s' % (url, path))
         urllib.urlretrieve(url, path, Schedule)
         print("File is saved to %s" % path)
 
-    def extract(tar_path):
+    def extract(tar_path, failed_testcases_all={}):
         try:
             tar = tarfile.open(tar_path, "r")
             for f_name in tar.getnames():
@@ -1680,18 +1683,25 @@ def show_cts_failures(request):
                         root = ET.fromstring(result_fd.read())
                         for elem in root.findall('Module'):
                             if 'abi' in elem.attrib.keys():
-                                module_name = '.'.join([elem.attrib['abi'], elem.attrib['name']])
+                                module_name = '-'.join([elem.attrib['name'], elem.attrib['abi']])
                             else:
+                                # should not be here
                                 module_name = elem.attrib['name']
 
+                            failed_tests_module = failed_testcases_all.get(module_name)
+                            if not failed_tests_module:
+                                failed_tests_module = []
+                                failed_testcases_all[module_name] = failed_tests_module
+
+                            # test classes
                             test_cases = elem.findall('.//TestCase')
                             for test_case in test_cases:
                                 failed_tests = test_case.findall('.//Test[@result="fail"]')
                                 for failed_test in failed_tests:
-                                    test_name = '%s/%s.%s' % (module_name, test_case.get("name"), failed_test.get("name"))
+                                    test_name = '%s#%s' % (test_case.get("name"), failed_test.get("name"))
                                     stacktrace = failed_test.find('.//Failure/StackTrace').text
-                                    print "%s\n%s" % (test_name, stacktrace)
-                                    print "========================="
+                                    ## ignore duplicate cases as the jobs are for different modules
+                                    failed_tests_module.append({'test_name': test_name, 'stacktrace': stacktrace})
                     except ET.ParseError as e:
                         logger.error('xml.etree.ElementTree.ParseError: %s' % e)
                         logger.info('Please Check %s manually' % xml_file)
@@ -1701,25 +1711,68 @@ def show_cts_failures(request):
         except Exception, e:
             raise Exception, e
 
-    attachment_case_name = 'test-attachment'
-    lava_server = get_all_build_configs()[build_name]['lava_server']
 
+    if request.method == 'POST':
+        build_name = request.POST.get("build_name")
+        build_no = request.POST.get("build_no")
+        job_name = request.POST.get("job_name")
+        job_ids_str = request.POST.get("job_ids", '')
+    else: # GET
+        build_name = request.GET.get("build_name")
+        build_no = request.GET.get("build_no")
+        job_name = request.GET.get("job_name")
+        job_ids_str = request.GET.get("job_ids", '')
+
+    job_ids = job_ids_str.split(',')
+    cts = cts_v7a + []
+    if build_name.find("hikey") >= 0:
+        cts = cts_v7a + cts_v8a
+
+    attachment_case_name = 'test-attachment'
+    lava_server = get_all_build_configs()[build_name]['lava_server'].server
+
+    job_attachments = {}
     for job_id in job_ids:
-        suite_list = lava_server.results.get_testjob_suites_list_yaml(job_id)
-        for suite in suite_list:
+        suite_list =  yaml.load(lava_server.results.get_testjob_suites_list_yaml(job_id))
+        for test_suite in suite_list:
             # 1_cts-focused1-arm64-v8a
             test_suite_name = re.sub('^\d+_', '', test_suite['name'])
             if not test_suite_name in cts:
                 continue
 
-            attachment = yaml.load(lava_server.results.get_testcase_results_yaml(job_id, suite_name, attachment_case_name))
+            attachment = yaml.load(lava_server.results.get_testcase_results_yaml(job_id, test_suite['name'], attachment_case_name))
             # http://archive.validation.linaro.org/artifacts/team/qa/2018/11/07/17/43/tradefed-output-20181107180851.tar.xz
             attachment_url = attachment[0].get('metadata').get('reference')
             (temp_fd, temp_path) = tempfile.mkstemp(suffix='.tar.xz', text=False)
             download_urllib(attachment_url, temp_path)
             tar_f = temp_path.replace(".xz", '')
             os.system("xz -d %s" % temp_path)
-            extract(tar_f)
+            job_attachments[job_id] = tar_f
+
+    download_failures = []
+    for job_id in job_ids:
+        if not job_attachments.get(job_id):
+            download_failures.append(job_id)
+
+    failures = {}
+    if not download_failures:
+        for job_id in job_ids:
+            extract(job_attachments.get(job_id), failed_testcases_all=failures)
+            os.system("rm -fr %s" % job_attachments.get(job_id))
+
+    build_info = {
+                  'build_name': build_name,
+                  'build_no': build_no,
+                 }
+
+    failures = collections.OrderedDict(sorted(failures.items()))
+    return render(request, 'cts_vts_failures.html',
+                      {
+                        "failures": failures,
+                        "build_info": build_info,
+                        'download_failures': download_failures
+                      })
+
 
 
 if __name__ == "__main__":

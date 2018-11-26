@@ -1,0 +1,42 @@
+{% extends '_layouts/base.html' %}
+
+{% load static%}
+{% load startswith %}
+{% block title %} CTS/VTS failures for Build {{ build_info.build_name}}-{{build_info.build_no}}  {% endblock %}
+
+{% block headline %}<h1>CTS/VTS failures for Build {{ build_info.build_name}}-{{build_info.build_no}}</h1>{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static "report/css/compatibility_result.css" %}">
+{% endblock %}
+
+{% block content %}
+
+<div align="left">
+{% for module_abi, module_failures in failures.items %}
+{% if module_failures|length > 0 %}
+<table class="testdetails">
+<tbody>
+<tr>
+    <td class="module" colspan="3">
+        <a name="{{module_abi}}">{{module_abi}} has {{ module_failures|length }} failures</a>
+    </td>
+</tr>
+<tr>
+    <th width="30%">Test</th>
+    <th>Details</th>
+</tr>
+{% for failure in module_failures %}
+<tr>
+    <td class="testname">{{failure.test_name}}</td>
+    <td class="failuredetails"><div class="details">{{failure.stacktrace}}</div></td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+<hr/>
+{% endif %}
+{% endfor %}
+</div>
+
+{% endblock %}

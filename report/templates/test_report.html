@@ -395,7 +395,11 @@ No result for benchmark test jobs.
     <td align='right'> {{ test_info.number_pass }}</td>
     {% endif %}
     {% endwith %}
+    {% if test_info.number_fail|add:0 > 0 %}
+    <td align='right'> <a href="/report/show-cts-vts-failures/?build_name={{ build_info.build_name }}&build_no={{ build_info.build_no }}&job_name={{ test_info.job_name }}&test_suite={{ test_info.job_name }}&test_case={{ test_info.module_name }}&job_ids={{ cts_job_ids }}#{{ test_info.module_name_noabi }}-{{test_info.module_abi}}">{{ test_info.number_fail }}</a></td>
+    {% else  %}
     <td align='right'> {{ test_info.number_fail }}</td>
+    {% endif %}
     <td align='right'> {{ test_info.number_total }}</td>
     <td align='right'> {{ test_info.module_done }}</td>
     {% if test_info.number_passrate == 0 %}
