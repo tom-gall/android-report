@@ -10,6 +10,7 @@ import collections
 import datetime
 import re
 import sys
+import urllib
 import urllib2
 import xmlrpclib
 import yaml
@@ -17,6 +18,7 @@ import logging
 import tempfile
 import os
 import tarfile
+import zipfile
 import xml.etree.ElementTree as ET
 
 logger = logging.getLogger(__name__)
@@ -25,6 +27,8 @@ from lava_tool.authtoken import AuthenticatingServerProxy, KeyringAuthBackend
 
 # Create your views here.
 from models import TestCase, JobCache, BaseResults, Bug, BuildSummary, LAVA, LAVAUser, BuildBugzilla, BuildConfig, Comment
+
+from lcr.settings import FILES_DIR
 
 basic_weekly = { # job_name: ['test_suite', ],
                         #"basic": [ "meminfo", 'meminfo-first', 'meminfo-second', "busybox", "ping", "linaro-android-kernel-tests", "tjbench"],
@@ -1630,6 +1634,7 @@ def show_trend(request):
 
 @login_required
 def show_cts_vts_failures(request):
+    TEST_RESULT_XML_NAME = 'test_result.xml'
 
     # does not work
     def download_request(url, path):
@@ -1653,7 +1658,6 @@ def show_cts_vts_failures(request):
         print("File is saved to %s" % path)
 
     def download_urllib(url, path):
-        import urllib
         def Schedule(a,b,c):
             '''
             a: the number downloaded of blocks
@@ -1673,44 +1677,52 @@ def show_cts_vts_failures(request):
         urllib.urlretrieve(url, path, Schedule)
         print("File is saved to %s" % path)
 
-    def extract(tar_path, failed_testcases_all={}):
+    def extract(result_zip_path, failed_testcases_all={}):
+        try:
+            with zipfile.ZipFile(result_zip_path, 'r') as f_zip_fd:
+                try:
+                    root = ET.fromstring(f_zip_fd.read(TEST_RESULT_XML_NAME))
+                    for elem in root.findall('Module'):
+                        if 'abi' in elem.attrib.keys():
+                            module_name = '-'.join([elem.attrib['name'], elem.attrib['abi']])
+                        else:
+                            # should not be here
+                            module_name = elem.attrib['name']
+
+                        failed_tests_module = failed_testcases_all.get(module_name)
+                        if not failed_tests_module:
+                            failed_tests_module = []
+                            failed_testcases_all[module_name] = failed_tests_module
+
+                        # test classes
+                        test_cases = elem.findall('.//TestCase')
+                        for test_case in test_cases:
+                            failed_tests = test_case.findall('.//Test[@result="fail"]')
+                            for failed_test in failed_tests:
+                                test_name = '%s#%s' % (test_case.get("name"), failed_test.get("name"))
+                                stacktrace = failed_test.find('.//Failure/StackTrace').text
+                                ## ignore duplicate cases as the jobs are for different modules
+                                failed_tests_module.append({'test_name': test_name, 'stacktrace': stacktrace})
+                except ET.ParseError as e:
+                    logger.error('xml.etree.ElementTree.ParseError: %s' % e)
+                    logger.info('Please Check %s manually' % result_zip_path)
+        except Exception, e:
+            raise Exception, e
+
+    def extract_save_result(tar_path, result_zip_path):
+        # https://pymotw.com/2/zipfile/
         try:
             tar = tarfile.open(tar_path, "r")
             for f_name in tar.getnames():
                 if f_name.endswith("/test_result.xml"):
                     result_fd = tar.extractfile(f_name)
-                    try:
-                        root = ET.fromstring(result_fd.read())
-                        for elem in root.findall('Module'):
-                            if 'abi' in elem.attrib.keys():
-                                module_name = '-'.join([elem.attrib['name'], elem.attrib['abi']])
-                            else:
-                                # should not be here
-                                module_name = elem.attrib['name']
+                    with zipfile.ZipFile(result_zip_path, 'w') as f_zip_fd:
+                        f_zip_fd.writestr(TEST_RESULT_XML_NAME, result_fd.read(), compress_type=zipfile.ZIP_DEFLATED)
+                        logger.info('Save result in %s to %s' % (tar_path, result_zip_path))
 
-                            failed_tests_module = failed_testcases_all.get(module_name)
-                            if not failed_tests_module:
-                                failed_tests_module = []
-                                failed_testcases_all[module_name] = failed_tests_module
-
-                            # test classes
-                            test_cases = elem.findall('.//TestCase')
-                            for test_case in test_cases:
-                                failed_tests = test_case.findall('.//Test[@result="fail"]')
-                                for failed_test in failed_tests:
-                                    test_name = '%s#%s' % (test_case.get("name"), failed_test.get("name"))
-                                    stacktrace = failed_test.find('.//Failure/StackTrace').text
-                                    ## ignore duplicate cases as the jobs are for different modules
-                                    failed_tests_module.append({'test_name': test_name, 'stacktrace': stacktrace})
-                    except ET.ParseError as e:
-                        logger.error('xml.etree.ElementTree.ParseError: %s' % e)
-                        logger.info('Please Check %s manually' % xml_file)
-                else:
-                    continue
             tar.close()
         except Exception, e:
             raise Exception, e
-
 
     if request.method == 'POST':
         build_name = request.POST.get("build_name")
@@ -1730,49 +1742,67 @@ def show_cts_vts_failures(request):
 
     attachment_case_name = 'test-attachment'
     lava_server = get_all_build_configs()[build_name]['lava_server'].server
+    lava_nick = get_all_build_configs()[build_name]['lava_server'].nick
 
-    job_attachments = {}
+    def get_result_file_path(lava_nick=lava_nick, job_id='', build_name=build_name, build_no=build_no):
+        return os.path.join(FILES_DIR, "%s-%s-%s-%s.zip" % (lava_nick, job_id, build_name, build_no))
+
+    logger.info('Start to get attachment url info for jobs: %s' % (str(job_ids)))
+    job_attachments_url = {}
     for job_id in job_ids:
+        result_file_path = get_result_file_path(job_id=job_id)
+        if os.path.exists(result_file_path):
+            continue
         suite_list =  yaml.load(lava_server.results.get_testjob_suites_list_yaml(job_id))
         for test_suite in suite_list:
             # 1_cts-focused1-arm64-v8a
             test_suite_name = re.sub('^\d+_', '', test_suite['name'])
             if not test_suite_name in cts:
                 continue
-
             attachment = yaml.load(lava_server.results.get_testcase_results_yaml(job_id, test_suite['name'], attachment_case_name))
             # http://archive.validation.linaro.org/artifacts/team/qa/2018/11/07/17/43/tradefed-output-20181107180851.tar.xz
-            attachment_url = attachment[0].get('metadata').get('reference')
-            (temp_fd, temp_path) = tempfile.mkstemp(suffix='.tar.xz', text=False)
-            download_urllib(attachment_url, temp_path)
-            tar_f = temp_path.replace(".xz", '')
-            os.system("xz -d %s" % temp_path)
-            job_attachments[job_id] = tar_f
+            job_attachments_url[job_id] = attachment[0].get('metadata').get('reference')
+
+    logger.info('Start to download result file for jobs: %s' % (str(job_ids)))
+    for job_id in job_ids:
+        if not job_attachments_url.get(job_id):
+            continue
+        (temp_fd, temp_path) = tempfile.mkstemp(suffix='.tar.xz', text=False)
+        download_urllib(job_attachments_url.get(job_id), temp_path)
+        tar_f = temp_path.replace(".xz", '')
+        os.system("xz -d %s" % temp_path)
+        result_file_path = get_result_file_path(job_id=job_id)
+        extract_save_result(tar_f, result_file_path)
+        os.unlink(tar_f)
 
     download_failures = []
     for job_id in job_ids:
-        if not job_attachments.get(job_id):
+        result_file_path = get_result_file_path(job_id=job_id)
+        if not os.path.exists(result_file_path):
             download_failures.append(job_id)
 
+    logger.info('Start to extract failures for jobs: %s' % (str(job_ids)))
     failures = {}
-    if not download_failures:
+    if download_failures:
+        # process for download failures
+        pass
+    else:
         for job_id in job_ids:
-            extract(job_attachments.get(job_id), failed_testcases_all=failures)
-            os.system("rm -fr %s" % job_attachments.get(job_id))
+            result_file_path = get_result_file_path(job_id=job_id)
+            extract(result_file_path, failed_testcases_all=failures)
 
     build_info = {
-                  'build_name': build_name,
-                  'build_no': build_no,
-                 }
+                    'build_name': build_name,
+                    'build_no': build_no,
+                }
 
     failures = collections.OrderedDict(sorted(failures.items()))
     return render(request, 'cts_vts_failures.html',
-                      {
+                    {
                         "failures": failures,
                         "build_info": build_info,
                         'download_failures': download_failures
-                      })
-
+                    })
 
 
 if __name__ == "__main__":
