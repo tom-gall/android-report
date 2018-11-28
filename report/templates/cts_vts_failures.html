@@ -13,22 +13,31 @@
 {% block content %}
 
 <div align="left">
-{% for module_abi, module_failures in failures.items %}
+{% for module_name, module_failures in failures.items %}
 {% if module_failures|length > 0 %}
 <table class="testdetails">
 <tbody>
 <tr>
     <td class="module" colspan="3">
-        <a name="{{module_abi}}">{{module_abi}} has {{ module_failures|length }} failures</a>
+        <a name="{{module_name}}">{{module_name}} has {{ module_failures|length }} failures</a>
     </td>
 </tr>
 <tr>
     <th width="30%">Test</th>
+    <th width="10%">Abis</th>
     <th>Details</th>
 </tr>
-{% for failure in module_failures %}
+{% for testcase_name, failure in module_failures.items %}
 <tr>
     <td class="testname">{{failure.test_name}}</td>
+    <td class="abi">
+        {% with failure.abis as abis %}
+        {% for abi in abis %}
+        {% if not forloop.first %}<br/>{% endif %}
+        {{ abi }}
+        {% endfor %}
+        {% endwith %}
+    </td>
     <td class="failuredetails"><div class="details">{{failure.stacktrace}}</div></td>
 </tr>
 {% endfor %}

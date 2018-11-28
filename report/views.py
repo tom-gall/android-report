@@ -61,7 +61,8 @@ benchmarks_common = {  # job_name: {'test_suite':['test_case',]},
                                       'Caffeinemark-Method-score-mean', 'Caffeinemark-score-mean', 'Caffeinemark-Sieve-score-mean', 'Caffeinemark-String-score-mean']},
                 'cf-bench': {'cf-bench': ['cfbench-Overall-Score-mean', 'cfbench-Java-Score-mean', 'cfbench-Native-Score-mean']},
                 'gearses2eclair': {'gearses2eclair': ['gearses2eclair-mean',]},
-                'geekbench3': {'geekbench3': ['geekbench-multi-core-mean', 'geekbench-single-core-mean']},
+                #'geekbench3': {'geekbench3': ['geekbench-multi-core-mean', 'geekbench-single-core-mean']},
+                'geekbench4': {'geekbench4': ['geekbench-multi-core-mean', 'geekbench-single-core-mean']},
                 'javawhetstone': {'javawhetstone': ['javawhetstone-MWIPS-mean', 'javawhetstone-N1-float-mean', 'javawhetstone-N2-float-mean', 'javawhetstone-N3-if-mean', 'javawhetstone-N4-fixpt-mean',
                                        'javawhetstone-N5-cos-mean', 'javawhetstone-N6-float-mean', 'javawhetstone-N7-equal-mean', 'javawhetstone-N8-exp-mean',]},
                 'jbench': {'jbench': ['jbench-mean',]},
@@ -1678,36 +1679,36 @@ def show_cts_vts_failures(request):
         print("File is saved to %s" % path)
 
     def extract(result_zip_path, failed_testcases_all={}):
-        try:
-            with zipfile.ZipFile(result_zip_path, 'r') as f_zip_fd:
-                try:
-                    root = ET.fromstring(f_zip_fd.read(TEST_RESULT_XML_NAME))
-                    for elem in root.findall('Module'):
-                        if 'abi' in elem.attrib.keys():
-                            module_name = '-'.join([elem.attrib['name'], elem.attrib['abi']])
-                        else:
-                            # should not be here
-                            module_name = elem.attrib['name']
+        with zipfile.ZipFile(result_zip_path, 'r') as f_zip_fd:
+            try:
+                root = ET.fromstring(f_zip_fd.read(TEST_RESULT_XML_NAME))
+                for elem in root.findall('Module'):
+                    abi = elem.attrib['abi']
+                    module_name = elem.attrib['name']
 
-                        failed_tests_module = failed_testcases_all.get(module_name)
-                        if not failed_tests_module:
-                            failed_tests_module = []
-                            failed_testcases_all[module_name] = failed_tests_module
+                    failed_tests_module = failed_testcases_all.get(module_name)
+                    if not failed_tests_module:
+                        failed_tests_module = {}
+                        failed_testcases_all[module_name] = failed_tests_module
 
-                        # test classes
-                        test_cases = elem.findall('.//TestCase')
-                        for test_case in test_cases:
-                            failed_tests = test_case.findall('.//Test[@result="fail"]')
-                            for failed_test in failed_tests:
-                                test_name = '%s#%s' % (test_case.get("name"), failed_test.get("name"))
-                                stacktrace = failed_test.find('.//Failure/StackTrace').text
-                                ## ignore duplicate cases as the jobs are for different modules
-                                failed_tests_module.append({'test_name': test_name, 'stacktrace': stacktrace})
-                except ET.ParseError as e:
-                    logger.error('xml.etree.ElementTree.ParseError: %s' % e)
-                    logger.info('Please Check %s manually' % result_zip_path)
-        except Exception, e:
-            raise Exception, e
+                    # test classes
+                    test_cases = elem.findall('.//TestCase')
+                    for test_case in test_cases:
+                        failed_tests = test_case.findall('.//Test[@result="fail"]')
+                        for failed_test in failed_tests:
+                            test_name = '%s#%s' % (test_case.get("name"), failed_test.get("name"))
+                            stacktrace = failed_test.find('.//Failure/StackTrace').text
+                            ## ignore duplicate cases as the jobs are for different modules
+                            failed_testcase = failed_tests_module.get(test_name)
+                            if failed_testcase and (not abi in failed_testcase.get('abis')):
+                                failed_testcase.get('abis').append(abi)
+                            else:
+                                failed_tests_module[test_name]= {'test_name': test_name,
+                                                                 'stacktrace': stacktrace,
+                                                                 'abis':[abi]}
+            except ET.ParseError as e:
+                logger.error('xml.etree.ElementTree.ParseError: %s' % e)
+                logger.info('Please Check %s manually' % result_zip_path)
 
     def extract_save_result(tar_path, result_zip_path):
         # https://pymotw.com/2/zipfile/
@@ -1791,12 +1792,15 @@ def show_cts_vts_failures(request):
             result_file_path = get_result_file_path(job_id=job_id)
             extract(result_file_path, failed_testcases_all=failures)
 
+    # sort failures
+    for module_name, failures_in_module in failures.items():
+        failures[module_name] = collections.OrderedDict(sorted(failures_in_module.items()))
+    failures = collections.OrderedDict(sorted(failures.items()))
+
     build_info = {
                     'build_name': build_name,
                     'build_no': build_no,
                 }
-
-    failures = collections.OrderedDict(sorted(failures.items()))
     return render(request, 'cts_vts_failures.html',
                     {
                         "failures": failures,

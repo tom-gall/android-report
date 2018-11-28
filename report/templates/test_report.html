@@ -319,7 +319,7 @@ No result for benchmark test jobs.
 {% if cts_res %}
 <div>
 <ul>
-<li>Only failures in the focused1 and focused2 test plans, and zero pass rate modules will be focused.</li>
+<li>Only failures in the focused1 and focused2 test plans, and zero pass rate modules will be focused on.</li>
 <li>How to find the full cts logs:</li>
 <ol>
 <li>Click the link in the Plan column to open the lava job page</li>
@@ -329,6 +329,7 @@ No result for benchmark test jobs.
 <li>Open the link of the reference item to download the full CTS logs</li>
 </ol>
 <li>Click on the links in the Module column will redirect to the history data list page for that CTS module</li>
+<li>Click on the links in the Current(Fail) column will redirect to the CTS failure details page</li>
 </ul>
 </div>
 <table border="2">
@@ -396,7 +397,7 @@ No result for benchmark test jobs.
     {% endif %}
     {% endwith %}
     {% if test_info.number_fail|add:0 > 0 %}
-    <td align='right'> <a href="/report/show-cts-vts-failures/?build_name={{ build_info.build_name }}&build_no={{ build_info.build_no }}&job_name={{ test_info.job_name }}&test_suite={{ test_info.job_name }}&test_case={{ test_info.module_name }}&job_ids={{ cts_job_ids }}#{{ test_info.module_name_noabi }}-{{test_info.module_abi}}">{{ test_info.number_fail }}</a></td>
+    <td align='right'> <a href="/report/show-cts-vts-failures/?build_name={{ build_info.build_name }}&build_no={{ build_info.build_no }}&job_name={{ test_info.job_name }}&test_suite={{ test_info.job_name }}&test_case={{ test_info.module_name }}&job_ids={{ cts_job_ids }}#{{ test_info.module_name_noabi }}">{{ test_info.number_fail }}</a></td>
     {% else  %}
     <td align='right'> {{ test_info.number_fail }}</td>
     {% endif %}
