@@ -1913,7 +1913,7 @@ def file_bug(request):
             bug.description = cd['description']
             bug.bug_severity = cd['severity']
             bug.op_sys = cd['os']
-            bug.rep_platform = cd['hardware']
+            bug.platform = cd['hardware']
             bug.version = cd['version']
             bug.keywords = 'LCR'
 
