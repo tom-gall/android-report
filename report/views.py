@@ -1871,7 +1871,7 @@ def show_cts_vts_failures(request):
     build_info = {
                     'build_name': build_name,
                     'build_no': build_no,
-                    'bugzilla_api_url': '%s/show_bug.cgi?id=' % build_bugzilla.new_bug_url.replace('/enter_bug.cgi', ''),
+                    'bugzilla_show_bug_prefix': '%s/show_bug.cgi?id=' % build_bugzilla.new_bug_url.replace('/enter_bug.cgi', ''),
                 }
     return render(request, 'cts_vts_failures.html',
                     {
@@ -1885,8 +1885,7 @@ def show_cts_vts_failures(request):
 class BugCreationForm(forms.Form):
     build_name = forms.CharField(label='Build Name', widget=forms.TextInput(attrs={'size': 80}))
     build_no = forms.CharField(label='Build No.')
-    lava_nick= forms.CharField(label='LAVA Instance')
-    product= forms.CharField(label='Product', widget=forms.TextInput(attrs={'readonly': True}))
+    product = forms.CharField(label='Product', widget=forms.TextInput(attrs={'readonly': True}))
     component = forms.CharField(label='Component', widget=forms.TextInput(attrs={'readonly': True}))
     version = forms.CharField(label='Version', widget=forms.TextInput(attrs={'readonly': True}) )
     os = forms.CharField(label='Os', widget=forms.TextInput(attrs={'readonly': True}))
@@ -1897,12 +1896,52 @@ class BugCreationForm(forms.Form):
 
 @login_required
 def file_bug(request):
+    submit_result = False
     if request.method == 'POST':
         build_name = request.POST.get("build_name")
         build_no = request.POST.get("build_no")
-        job_name = request.POST.get("job_name")
-        job_ids_str = request.POST.get("job_id", '')
-        form = BugCreationForm()
+
+        form = BugCreationForm(request.POST)
+        if form.is_valid():
+            cd = form.cleaned_data
+            build_name = cd['build_name']
+
+            bug = bugzilla.DotDict()
+            bug.product = cd['product']
+            bug.component = cd['component']
+            bug.summary = cd['summary']
+            bug.description = cd['description']
+            bug.bug_severity = cd['severity']
+            bug.op_sys = cd['os']
+            bug.rep_platform = cd['hardware']
+            bug.version = cd['version']
+            bug.keywords = 'LCR'
+
+            build_bugzilla = get_all_build_configs()[build_name]['build_bugzilla']
+            bugzilla_instance = get_all_build_configs()[build_name]['bugzilla_instance']
+            bug_id = bugzilla_instance.post_bug(bug).id
+
+            submit_result = True
+            build_info = {
+                      'build_name': build_name,
+                      'build_no': build_no,
+                      'bug_id': bug_id,
+                      'bugzilla_show_bug_prefix': '%s/show_bug.cgi?id=' % build_bugzilla.new_bug_url.replace('/enter_bug.cgi', ''),
+                     }
+            return render(request, 'file_bug.html',
+                          {
+                            "submit_result": submit_result,
+                            'build_info': build_info,
+                            'form': 'form'
+                          })
+
+        else:
+            # not possible here since all are selectable elements
+            return render(request, 'file_bug.html',
+                      {
+                        "form": form,
+                        'submit_result': False,
+                      })
     else: # GET
         build_name = request.GET.get("build_name")
         build_no = request.GET.get("build_no")
@@ -1914,14 +1953,11 @@ def file_bug(request):
         job_ids = job_ids_str.split(',')
         lava = get_all_build_configs()[build_name]['lava_server']
         lava_server = lava.server
-        lava_nick = lava.nick
-        bugzilla_instance = get_all_build_configs()[build_name]['bugzilla_instance']
         build_bugzilla = get_all_build_configs()[build_name]['build_bugzilla']
         
         form_initial = {
                         "build_name": build_name,
                         "build_no": build_no,
-                        'lava_nick': lava_nick,
                         'product': build_bugzilla.product,
                         'component': build_bugzilla.component,
                         'severity': build_bugzilla.bug_severity,
@@ -1961,7 +1997,6 @@ def file_bug(request):
                 metadata = {
                             'job_id': job_id,
                             'result_url': get_attachment_url(job_id=job_id, lava_server=lava_server, build_name=build_name),
-                            'lava_nick': lava_nick,
                             'build_no': build_no,
                             'build_name': build_name,
                             }
@@ -1986,9 +2021,15 @@ def file_bug(request):
 
         form_initial['description'] = description
         form = BugCreationForm(initial=form_initial)
+
+        build_info = {
+                      'build_name': build_name,
+                      'build_no': build_no,
+                     }
     return render(request, 'file_bug.html',
                     {
                         "form": form,
+                        'build_info': build_info,
                     })
 
 if __name__ == "__main__":

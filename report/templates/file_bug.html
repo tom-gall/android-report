@@ -7,16 +7,8 @@
 {% block content %}
 <div align="center">
 {% if not from.errors and submit_result %}
-<div>Jobs submission status</div>
-<table border=2>
-<tr>
-    <th>Job Name</th>
-    <th>Job Template</th>
-    <th>Job ID</th>
-    <th>Comment</th>
-</tr>
+<div>Bug created successfully <a href="{{build_info.bugzilla_show_bug_prefix}}{{build_info.bug_id}}">{{build_info.bug_id}}</a></div>
 
-</table>
 {% else %}
 <div>{{ form.errors }}</div>
 <form action="/report/file-bug/" method="post">
