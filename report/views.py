@@ -20,6 +20,7 @@ import os
 import tarfile
 import zipfile
 import xml.etree.ElementTree as ET
+import bugzilla
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ from lava_tool.authtoken import AuthenticatingServerProxy, KeyringAuthBackend
 # Create your views here.
 from models import TestCase, JobCache, BaseResults, Bug, BuildSummary, LAVA, LAVAUser, BuildBugzilla, BuildConfig, Comment
 
-from lcr.settings import FILES_DIR
+from lcr.settings import FILES_DIR, BUGZILLA_API_KEY
 
 basic_weekly = { # job_name: ['test_suite', ],
                         #"basic": [ "meminfo", 'meminfo-first', 'meminfo-second', "busybox", "ping", "linaro-android-kernel-tests", "tjbench"],
@@ -61,8 +62,8 @@ benchmarks_common = {  # job_name: {'test_suite':['test_case',]},
                                       'Caffeinemark-Method-score-mean', 'Caffeinemark-score-mean', 'Caffeinemark-Sieve-score-mean', 'Caffeinemark-String-score-mean']},
                 'cf-bench': {'cf-bench': ['cfbench-Overall-Score-mean', 'cfbench-Java-Score-mean', 'cfbench-Native-Score-mean']},
                 'gearses2eclair': {'gearses2eclair': ['gearses2eclair-mean',]},
+                'geekbench4': {'geekbench4': ['Geekbench4-Multi-Core-mean', 'Geekbench4-Single-Core-mean']},
                 #'geekbench3': {'geekbench3': ['geekbench-multi-core-mean', 'geekbench-single-core-mean']},
-                'geekbench4': {'geekbench4': ['geekbench-multi-core-mean', 'geekbench-single-core-mean']},
                 'javawhetstone': {'javawhetstone': ['javawhetstone-MWIPS-mean', 'javawhetstone-N1-float-mean', 'javawhetstone-N2-float-mean', 'javawhetstone-N3-if-mean', 'javawhetstone-N4-fixpt-mean',
                                        'javawhetstone-N5-cos-mean', 'javawhetstone-N6-float-mean', 'javawhetstone-N7-equal-mean', 'javawhetstone-N8-exp-mean',]},
                 'jbench': {'jbench': ['jbench-mean',]},
@@ -128,7 +129,7 @@ cts_v8a = [ 'cts-focused1-arm64-v8a',
 
 jobs_to_be_checked_array = [
     "basic", "boottime", "optee", "weekly", 'monkey',
-    "antutu6", "andebenchpro2015", "benchmarkpi", "caffeinemark", "cf-bench", "gearses2eclair", "geekbench3", "glbenchmark25", "javawhetstone", "jbench", "linpack", "quadrantpro", "rl-sqlite", "scimark", "vellamo3",
+    "antutu6", "andebenchpro2015", "benchmarkpi", "caffeinemark", "cf-bench", "gearses2eclair", "geekbench4", "glbenchmark25", "javawhetstone", "jbench", "linpack", "quadrantpro", "rl-sqlite", "scimark", "vellamo3",
     ]
 jobs_to_be_checked_array = jobs_to_be_checked_array + cts_v8a + cts_v7a + vts
 
@@ -136,6 +137,8 @@ android_snapshot_url_base = "https://snapshots.linaro.org/android"
 ci_job_url_base = 'https://ci.linaro.org/job'
 android_build_config_url_base = "https://android-git.linaro.org/android-build-configs.git/plain"
 template_url_prefix = "https://git.linaro.org/qa/test-plans.git/plain/android/"
+
+TEST_RESULT_XML_NAME = 'test_result.xml'
 
 pat_ignore = re.compile(".*("
                         "-stderr"
@@ -202,6 +205,10 @@ def get_all_build_configs():
 
     initialize_all_lavas()
     for build in BuildConfig.objects.all():
+        build_bugzilla = BuildBugzilla.objects.get(build_name=build.build_name.replace('-premerge-ci', ''))
+        new_bug_url = build_bugzilla.new_bug_url
+        bugzilla_api_url = "%s/rest" % new_bug_url.replace('/enter_bug.cgi', '')
+
         build_config = {
                         'lava_server': LAVAS[build.lava.nick],
                         'img_ext': build.img_ext,
@@ -210,6 +217,8 @@ def get_all_build_configs():
                                         'build_name': build.base_build_name,
                                         'build_no': build.base_build_no,
                                        },
+                        'build_bugzilla': build_bugzilla,
+                        'bugzilla_instance': bugzilla.Bugzilla(url=bugzilla_api_url, api_key=BUGZILLA_API_KEY),
                        }
         BUILD_CONFIGS[build.build_name] = build_config
         BUILD_NAMES.append(build.build_name)
@@ -1633,9 +1642,31 @@ def show_trend(request):
                       })
 
 
+def get_result_file_path(job_id=None, build_name=None, build_no=None):
+    if (job_id is None) or (build_name is None) or ( build_no is None):
+        return None
+    lava_nick = get_all_build_configs()[build_name]['lava_server'].nick
+    return os.path.join(FILES_DIR, "%s-%s-%s-%s.zip" % (lava_nick, job_id, build_name, build_no))
+
+def get_attachment_url(job_id=None, lava_server=None, build_name=None):
+    attachment_case_name = 'test-attachment'
+    cts = cts_v7a + []
+    if build_name.find("hikey") >= 0:
+        cts = cts_v7a + cts_v8a
+
+    suite_list =  yaml.load(lava_server.results.get_testjob_suites_list_yaml(job_id))
+    for test_suite in suite_list:
+        # 1_cts-focused1-arm64-v8a
+        test_suite_name = re.sub('^\d+_', '', test_suite['name'])
+        if not test_suite_name in cts:
+            continue
+        attachment = yaml.load(lava_server.results.get_testcase_results_yaml(job_id, test_suite['name'], attachment_case_name))
+        # http://archive.validation.linaro.org/artifacts/team/qa/2018/11/07/17/43/tradefed-output-20181107180851.tar.xz
+        return attachment[0].get('metadata').get('reference')
+    return None
+
 @login_required
 def show_cts_vts_failures(request):
-    TEST_RESULT_XML_NAME = 'test_result.xml'
 
     # does not work
     def download_request(url, path):
@@ -1678,7 +1709,20 @@ def show_cts_vts_failures(request):
         urllib.urlretrieve(url, path, Schedule)
         print("File is saved to %s" % path)
 
-    def extract(result_zip_path, failed_testcases_all={}):
+
+    def extract(result_zip_path, failed_testcases_all={}, metadata={}):
+        '''
+            failures = {
+                    'module_name': {
+                        'test_name': {
+                                        'test_name': 'test_name', #class#TestName
+                                        'stacktrace': 'stackstrace',
+                                        'abis': [abi1, abi2],
+                                        'job_id': 'job_id',
+                                    },
+                    },
+            }
+        '''
         with zipfile.ZipFile(result_zip_path, 'r') as f_zip_fd:
             try:
                 root = ET.fromstring(f_zip_fd.read(TEST_RESULT_XML_NAME))
@@ -1702,10 +1746,14 @@ def show_cts_vts_failures(request):
                             failed_testcase = failed_tests_module.get(test_name)
                             if failed_testcase and (not abi in failed_testcase.get('abis')):
                                 failed_testcase.get('abis').append(abi)
+                                failed_testcase.get('job_ids').append(metadata.get('job_id'))
                             else:
-                                failed_tests_module[test_name]= {'test_name': test_name,
-                                                                 'stacktrace': stacktrace,
-                                                                 'abis':[abi]}
+                                failed_tests_module[test_name]= {
+                                                                    'test_name': test_name,
+                                                                    'stacktrace': stacktrace,
+                                                                    'abis': [abi],
+                                                                    'job_ids': [metadata.get('job_id')],
+                                                                }
             except ET.ParseError as e:
                 logger.error('xml.etree.ElementTree.ParseError: %s' % e)
                 logger.info('Please Check %s manually' % result_zip_path)
@@ -1737,32 +1785,19 @@ def show_cts_vts_failures(request):
         job_ids_str = request.GET.get("job_ids", '')
 
     job_ids = job_ids_str.split(',')
-    cts = cts_v7a + []
-    if build_name.find("hikey") >= 0:
-        cts = cts_v7a + cts_v8a
 
-    attachment_case_name = 'test-attachment'
     lava_server = get_all_build_configs()[build_name]['lava_server'].server
     lava_nick = get_all_build_configs()[build_name]['lava_server'].nick
-
-    def get_result_file_path(lava_nick=lava_nick, job_id='', build_name=build_name, build_no=build_no):
-        return os.path.join(FILES_DIR, "%s-%s-%s-%s.zip" % (lava_nick, job_id, build_name, build_no))
+    bugzilla_instance = get_all_build_configs()[build_name]['bugzilla_instance']
+    build_bugzilla = get_all_build_configs()[build_name]['build_bugzilla']
 
     logger.info('Start to get attachment url info for jobs: %s' % (str(job_ids)))
     job_attachments_url = {}
     for job_id in job_ids:
-        result_file_path = get_result_file_path(job_id=job_id)
+        result_file_path = get_result_file_path(build_name=build_name, build_no=build_no, job_id=job_id)
         if os.path.exists(result_file_path):
             continue
-        suite_list =  yaml.load(lava_server.results.get_testjob_suites_list_yaml(job_id))
-        for test_suite in suite_list:
-            # 1_cts-focused1-arm64-v8a
-            test_suite_name = re.sub('^\d+_', '', test_suite['name'])
-            if not test_suite_name in cts:
-                continue
-            attachment = yaml.load(lava_server.results.get_testcase_results_yaml(job_id, test_suite['name'], attachment_case_name))
-            # http://archive.validation.linaro.org/artifacts/team/qa/2018/11/07/17/43/tradefed-output-20181107180851.tar.xz
-            job_attachments_url[job_id] = attachment[0].get('metadata').get('reference')
+        job_attachments_url[job_id] = get_attachment_url(job_id=job_id, lava_server=lava_server, build_name=build_name)
 
     logger.info('Start to download result file for jobs: %s' % (str(job_ids)))
     for job_id in job_ids:
@@ -1772,13 +1807,13 @@ def show_cts_vts_failures(request):
         download_urllib(job_attachments_url.get(job_id), temp_path)
         tar_f = temp_path.replace(".xz", '')
         os.system("xz -d %s" % temp_path)
-        result_file_path = get_result_file_path(job_id=job_id)
+        result_file_path = get_result_file_path(build_name=build_name, build_no=build_no, job_id=job_id)
         extract_save_result(tar_f, result_file_path)
         os.unlink(tar_f)
 
     download_failures = []
     for job_id in job_ids:
-        result_file_path = get_result_file_path(job_id=job_id)
+        result_file_path = get_result_file_path(build_name=build_name, build_no=build_no, job_id=job_id)
         if not os.path.exists(result_file_path):
             download_failures.append(job_id)
 
@@ -1789,8 +1824,44 @@ def show_cts_vts_failures(request):
         pass
     else:
         for job_id in job_ids:
-            result_file_path = get_result_file_path(job_id=job_id)
-            extract(result_file_path, failed_testcases_all=failures)
+            result_file_path = get_result_file_path(build_name=build_name, build_no=build_no, job_id=job_id)
+            metadata = {
+                'job_id': job_id,
+                'result_url': job_attachments_url.get(job_id),
+                'lava_nick': lava_nick,
+                'build_no': build_no,
+                'build_name': build_name,
+                }
+            extract(result_file_path, failed_testcases_all=failures, metadata=metadata)
+
+    '''
+        failures = {
+                'module_name': {
+                    'test_name': {
+                                    'test_name': 'test_name',
+                                    'stacktrace': 'stackstrace',
+                                    'abis': [abi1, abi2]
+                                },
+                },
+        }
+    '''
+    bugs = []
+    terms = [
+                {u'platform': build_bugzilla.rep_platform},
+                {u'op_sys': build_bugzilla.op_sys},
+                {u'product': build_bugzilla.product},
+            ]
+    for bug in bugzilla_instance.search_bugs(terms).bugs:
+        bugs.append(bugzilla.DotDict(bug))
+
+    for module_name, failures_in_module in failures.items():
+        for test_name, failure in failures_in_module.items():
+            for bug in bugs:
+                if bug.summary.find('%s %s' % (module_name, test_name)) >= 0:
+                    if failure.get('bugs'):
+                        failure['bugs'].append(bug)
+                    else:
+                        failure['bugs'] = [bug]
 
     # sort failures
     for module_name, failures_in_module in failures.items():
@@ -1800,6 +1871,7 @@ def show_cts_vts_failures(request):
     build_info = {
                     'build_name': build_name,
                     'build_no': build_no,
+                    'bugzilla_api_url': '%s/show_bug.cgi?id=' % build_bugzilla.new_bug_url.replace('/enter_bug.cgi', ''),
                 }
     return render(request, 'cts_vts_failures.html',
                     {
@@ -1808,6 +1880,116 @@ def show_cts_vts_failures(request):
                         'download_failures': download_failures
                     })
 
+
+
+class BugCreationForm(forms.Form):
+    build_name = forms.CharField(label='Build Name', widget=forms.TextInput(attrs={'size': 80}))
+    build_no = forms.CharField(label='Build No.')
+    lava_nick= forms.CharField(label='LAVA Instance')
+    product= forms.CharField(label='Product', widget=forms.TextInput(attrs={'readonly': True}))
+    component = forms.CharField(label='Component', widget=forms.TextInput(attrs={'readonly': True}))
+    version = forms.CharField(label='Version', widget=forms.TextInput(attrs={'readonly': True}) )
+    os = forms.CharField(label='Os', widget=forms.TextInput(attrs={'readonly': True}))
+    hardware = forms.CharField(label='Hardware', widget=forms.TextInput(attrs={'readonly': True}))
+    severity = forms.CharField(label='Severity')
+    summary = forms.CharField(label='Summary', widget=forms.TextInput(attrs={'size': 80}))
+    description = forms.CharField(label='Description', widget=forms.Textarea(attrs={'cols': 80}))
+
+@login_required
+def file_bug(request):
+    if request.method == 'POST':
+        build_name = request.POST.get("build_name")
+        build_no = request.POST.get("build_no")
+        job_name = request.POST.get("job_name")
+        job_ids_str = request.POST.get("job_id", '')
+        form = BugCreationForm()
+    else: # GET
+        build_name = request.GET.get("build_name")
+        build_no = request.GET.get("build_no")
+        job_name = request.GET.get("job_name")
+        job_ids_str = request.GET.get("job_ids")
+        module_name = request.GET.get("module_name")
+        test_name = request.GET.get("test_name")
+
+        job_ids = job_ids_str.split(',')
+        lava = get_all_build_configs()[build_name]['lava_server']
+        lava_server = lava.server
+        lava_nick = lava.nick
+        bugzilla_instance = get_all_build_configs()[build_name]['bugzilla_instance']
+        build_bugzilla = get_all_build_configs()[build_name]['build_bugzilla']
+        
+        form_initial = {
+                        "build_name": build_name,
+                        "build_no": build_no,
+                        'lava_nick': lava_nick,
+                        'product': build_bugzilla.product,
+                        'component': build_bugzilla.component,
+                        'severity': build_bugzilla.bug_severity,
+                        'os': build_bugzilla.op_sys,
+                        'hardware': build_bugzilla.rep_platform,
+                        }
+        if build_name.endswith('-p') or build_name.endswith('-p-premerge-ci'):
+            form_initial['version'] = 'PIE-9.0'
+        elif build_name.endswith('-o') or build_name.endswith('-o-premerge-ci'):
+            form_initial['version'] = 'OREO-8.1'
+        else:    
+            form_initial['version'] = 'Master'
+
+        form_initial['summary'] = '%s: %s %s' % (build_bugzilla.short_desc_prefix, module_name, test_name)
+
+        def extract_abi_stacktrace(result_zip_path, module_name='', test_name=''):
+            class_method = test_name.split('#')
+            with zipfile.ZipFile(result_zip_path, 'r') as f_zip_fd:
+                try:
+                    root = ET.fromstring(f_zip_fd.read(TEST_RESULT_XML_NAME))
+                    for elem in root.findall('.//Module[@name="%s"]' %(module_name)):
+                        abi = elem.attrib['abi']
+                        for stacktrace_node in root.findall('.//TestCase[@name="%s"]/Test[@name="%s"]/Failure/StackTrace' %(class_method[0], class_method[1])):
+                            stacktrace = stacktrace_node.text
+                            return (abi, stacktrace)
+                except ET.ParseError as e:
+                    logger.error('xml.etree.ElementTree.ParseError: %s' % e)
+                    logger.info('Please Check %s manually' % result_zip_path)
+            return (None, None)
+
+        abis = []
+        stacktrace_msg = None
+        
+        for job_id in job_ids:
+            result_file_path = get_result_file_path(build_name=build_name, build_no=build_no, job_id=job_id)
+            if os.path.exists(result_file_path):
+                metadata = {
+                            'job_id': job_id,
+                            'result_url': get_attachment_url(job_id=job_id, lava_server=lava_server, build_name=build_name),
+                            'lava_nick': lava_nick,
+                            'build_no': build_no,
+                            'build_name': build_name,
+                            }
+                (abi, stacktrace) = extract_abi_stacktrace(result_file_path, module_name=module_name, test_name=test_name)
+                if not abi in abis:
+                    abis.append(abi)
+                if not stacktrace_msg:
+                    stacktrace_msg = stacktrace 
+        
+        description = '%s %s' % (module_name, test_name)
+        description += '\n\nABIs:\n%s' % (' '.join(abis))
+        description += '\n\nStackTrace: %s' % (stacktrace_msg)
+        description += '\n\nLava Job:'
+        for job_id in job_ids:
+            description += '\n%s/%s' % (lava.job_url_prefix, job_id)
+
+        description += '\n\nResult File Url:'
+        for job_id in job_ids:
+            description += '\n%s' % get_attachment_url(job_id=job_id, lava_server=lava_server, build_name=build_name)
+
+        description += '\n\nImages Url:\n%s/%s/%s' % (android_snapshot_url_base, build_name, build_no)
+
+        form_initial['description'] = description
+        form = BugCreationForm(initial=form_initial)
+    return render(request, 'file_bug.html',
+                    {
+                        "form": form,
+                    })
 
 if __name__ == "__main__":
     build_name = "android-lcr-reference-hikey-o"

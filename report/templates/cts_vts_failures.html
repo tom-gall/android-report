@@ -1,7 +1,7 @@
 {% extends '_layouts/base.html' %}
 
 {% load static%}
-{% load startswith %}
+{% load escapesharp %}
 {% block title %} CTS/VTS failures for Build {{ build_info.build_name}}-{{build_info.build_no}}  {% endblock %}
 
 {% block headline %}<h1>CTS/VTS failures for Build {{ build_info.build_name}}-{{build_info.build_no}}</h1>{% endblock %}
@@ -43,7 +43,16 @@
         {% endwith %}
     </td>
     <td class="failuredetails"><div class="details" nowrap>{{failure.stacktrace}}</div></td>
-    <td>&nbsp;</td>
+    <td>
+        {% with failure.bugs as bugs %}
+        {% for bug in bugs %}
+        {% if not forloop.first %}<br/>{% endif %}
+        <a target="_blank" href="{{build_info.bugzilla_api_url}}{{bug.id}}">{{ bug.id }}</a>
+        {% empty %}
+        <a target='_blank' href="/report/file-bug?build_name={{ build_info.build_name}}&build_no={{build_info.build_no}}&module_name={{module_name}}&test_name={{failure.test_name|escapesharp}}&job_ids={{failure.job_ids|join:','}}">Report Android Bug</a>&nbsp;
+        {% endfor %}
+        {% endwith %}
+    </td>
     <td>&nbsp;</td>
     <td>&nbsp;</td>
     <td>&nbsp;</td>

@@ -1,0 +1,31 @@
+{% extends '_layouts/base.html' %}
+
+{% block title %} Bug Creation {% endblock %}
+
+{% block headline %}<h1>Bug Creation</h1>{% endblock %}
+
+{% block content %}
+<div align="center">
+{% if not from.errors and submit_result %}
+<div>Jobs submission status</div>
+<table border=2>
+<tr>
+    <th>Job Name</th>
+    <th>Job Template</th>
+    <th>Job ID</th>
+    <th>Comment</th>
+</tr>
+
+</table>
+{% else %}
+<div>{{ form.errors }}</div>
+<form action="/report/file-bug/" method="post">
+    {% csrf_token %}
+    <table border="2" >
+    {{ form.as_table }}
+    </table>
+    <input type="submit" id="submit_btn" value="submit" />
+</form>
+{% endif %}
+</div>
+{% endblock %}

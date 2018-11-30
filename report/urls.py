@@ -15,6 +15,7 @@ urlpatterns = [
     url(r'^add-comment/.*$', views.add_comment, name='add_comment'),
     url(r'^show-trend/.*$', views.show_trend, name='show_trend'),
     url(r'^show-cts-vts-failures/.*$', views.show_cts_vts_failures, name='show_cts_vts_failures'),
+    url(r'^file-bug/.*$', views.file_bug, name='file_bug'),
 
     url(r'^accounts/register/$', accountviews.SignUpView.as_view(), name='signup'),
     url(r'^accounts/login/$', accountviews.LoginView.as_view(), name='login'),
