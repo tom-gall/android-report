@@ -1760,18 +1760,15 @@ def show_cts_vts_failures(request):
 
     def extract_save_result(tar_path, result_zip_path):
         # https://pymotw.com/2/zipfile/
-        try:
-            tar = tarfile.open(tar_path, "r")
-            for f_name in tar.getnames():
-                if f_name.endswith("/test_result.xml"):
-                    result_fd = tar.extractfile(f_name)
-                    with zipfile.ZipFile(result_zip_path, 'w') as f_zip_fd:
-                        f_zip_fd.writestr(TEST_RESULT_XML_NAME, result_fd.read(), compress_type=zipfile.ZIP_DEFLATED)
-                        logger.info('Save result in %s to %s' % (tar_path, result_zip_path))
+        tar = tarfile.open(tar_path, "r")
+        for f_name in tar.getnames():
+            if f_name.endswith("/test_result.xml"):
+                result_fd = tar.extractfile(f_name)
+                with zipfile.ZipFile(result_zip_path, 'w') as f_zip_fd:
+                    f_zip_fd.writestr(TEST_RESULT_XML_NAME, result_fd.read(), compress_type=zipfile.ZIP_DEFLATED)
+                    logger.info('Save result in %s to %s' % (tar_path, result_zip_path))
 
-            tar.close()
-        except Exception, e:
-            raise Exception, e
+        tar.close()
 
     if request.method == 'POST':
         build_name = request.POST.get("build_name")
