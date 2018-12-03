@@ -413,21 +413,8 @@ No result for benchmark test jobs.
     <td align='left'>
         {% with test_info.bugs as bugs %}
         {% for bug in bugs %}
-            {% if bug.build_no_fixed and bug.build_no %}
-                {% if build_info.build_no|add:"0" >= bug.build_no|add:"0" and build_info.build_no|add:"0" < bug.build_no_fixed|add:"0" %}
-                    <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }}</a><br/>
-                {% endif %}
-            {% elif bug.build_no_fixed and not bug.build_no %}
-                {% if build_info.build_no|add:"0" < bug.build_no_fixed|add:"0" %}
-                    <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }}</a><br/>
-                {% endif %}
-            {% elif not bug.build_no_fixed and not bug.build_no %}
-                <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }}</a><br/>
-            {% elif not bug.build_no_fixed and bug.build_no %}
-                {% if build_info.build_no|add:"0" >= bug.build_no|add:"0" %}
-                    <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }}</a><br/>
-                {% endif %}
-            {% endif %}
+            {% if not forloop.first %}<br/>{% endif %}
+            <a target="_blank" href="{{build_info.bugzilla_show_bug_prefix}}{{bug.id}}">{{ bug.id }}</a>
         {% endfor%}
         {% endwith%}
     </td>
@@ -518,7 +505,11 @@ No result for cts test jobs.
     {% endif %}
     {% endwith %}
     <td align='right'> {{ test_info.number_pass }}</td>
+    {% if test_info.number_fail|add:0 > 0 %}
+    <td align='right'> <a href="/report/show-cts-vts-failures/?build_name={{ build_info.build_name }}&build_no={{ build_info.build_no }}&job_name={{ test_info.job_name }}&job_ids={{ vts_job_ids }}">{{ test_info.number_fail }}</a></td>
+    {% else  %}
     <td align='right'> {{ test_info.number_fail }}</td>
+    {% endif %}
     <td align='right'> {{ test_info.number_total }}</td>
 
     {% if test_info.number_passrate == 0 %}
@@ -548,22 +539,9 @@ No result for cts test jobs.
     <td align='left'>
         {% with test_info.bugs as bugs %}
         {% for bug in bugs %}
-            {% if bug.build_no_fixed and bug.build_no %}
-                {% if build_info.build_no|add:"0" >= bug.build_no|add:"0" and build_info.build_no|add:"0" < bug.build_no_fixed|add:"0" %}
-                    <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
-                {% endif %}
-            {% elif bug.build_no_fixed and not bug.build_no %}
-                {% if build_info.build_no|add:"0" < bug.build_no_fixed|add:"0" %}
-                    <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
-                {% endif %}
-            {% elif not bug.build_no_fixed and not bug.build_no %}
-                <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
-            {% elif not bug.build_no_fixed and bug.build_no %}
-                {% if build_info.build_no|add:"0" >= bug.build_no|add:"0" %}
-                    <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
-                {% endif %}
-            {% endif %}
-        {% endfor%}
+            {% if not forloop.first %}<br/>{% endif %}
+            <a target="_blank" href="{{build_info.bugzilla_show_bug_prefix}}{{bug.id}}">{{ bug.id }}</a>
+    {% endfor%}
         {% endwith%}
     </td>
     <td align='left'>

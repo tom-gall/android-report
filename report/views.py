@@ -1017,7 +1017,7 @@ def test_report(request):
     base_build_name = get_all_build_configs()[build_name]['base_build']['build_name']
     base_build_no = get_all_build_configs()[build_name]['base_build']['build_no']
 
-
+    bugs_total = get_bugs_for_build(build_name=build_name)
     (jobs_failed, total_tests_res) = get_test_results_for_build(build_name, build_no)
 
     lava_nick = get_all_build_configs()[build_name]['lava_server'].nick
@@ -1183,6 +1183,10 @@ def test_report(request):
 
         bugs = Bug.objects.filter(build_name=build_name, plan_suite=job_name, module_testcase=job_name)
         comments = Comment.objects.filter(build_name=build_name, plan_suite=job_name, module_testcase=job_name)
+        bugs = []
+        for bug in bugs_total:
+            if bug.summary.find('%s' % (job_name)) >= 0:
+                bugs.append(bug)
 
         vts_res.append({'job_name': job_name,
                         'job_id': job_id,
@@ -1292,9 +1296,10 @@ def test_report(request):
                 except BaseResults.DoesNotExist:
                     base = None
 
-                bugs = list(Bug.objects.filter(build_name=build_name, plan_suite=job_name, module_testcase=module_name))
-                bugs_old = list(Bug.objects.filter(build_name=build_name, plan_suite=job_name.replace('-armeabi', '').replace('-arm64',''), module_testcase=module_name))
-                bugs = bugs + bugs_old
+                bugs = []
+                for bug in bugs_total:
+                    if bug.summary.find('%s' % (module_name.split('.')[1])) >= 0:
+                        bugs.append(bug)
 
                 comments = list(Comment.objects.filter(build_name=build_name, plan_suite=job_name, module_testcase=module_name))
                 comments_old = list(Comment.objects.filter(build_name=build_name, plan_suite=job_name.replace('-armeabi', '').replace('-arm64',''), module_testcase=module_name))
@@ -1410,6 +1415,7 @@ def test_report(request):
                     'ci_link': '%s/%s/%s' % (ci_job_url_base, build_name, build_no),
                     'base_build_no': base_build_no,
                     'new_bug_url_prefix': build_new_bug_url_prefix,
+                    'bugzilla_show_bug_prefix': '%s/show_bug.cgi?id=' % build_bugzilla.new_bug_url.replace('/enter_bug.cgi', ''),
                     'firmware_url': firmware_url,
                     'firmware_version': firmware_version,
                     'toolchain_info': toolchain_info,
@@ -1650,20 +1656,55 @@ def get_result_file_path(job_id=None, build_name=None, build_no=None):
 
 def get_attachment_url(job_id=None, lava_server=None, build_name=None):
     attachment_case_name = 'test-attachment'
-    cts = cts_v7a + []
-    if build_name.find("hikey") >= 0:
-        cts = cts_v7a + cts_v8a
+    cts_vts = [] + cts_v7a + cts_v7a + vts
 
     suite_list =  yaml.load(lava_server.results.get_testjob_suites_list_yaml(job_id))
     for test_suite in suite_list:
         # 1_cts-focused1-arm64-v8a
         test_suite_name = re.sub('^\d+_', '', test_suite['name'])
-        if not test_suite_name in cts:
+        if not test_suite_name in cts_vts:
             continue
         attachment = yaml.load(lava_server.results.get_testcase_results_yaml(job_id, test_suite['name'], attachment_case_name))
         # http://archive.validation.linaro.org/artifacts/team/qa/2018/11/07/17/43/tradefed-output-20181107180851.tar.xz
         return attachment[0].get('metadata').get('reference')
     return None
+
+
+def get_bug_version_from_build_name(build_name=None):
+    if not build_name:
+        return 'Master'
+    version_str = None
+    if build_name.endswith('-p') or build_name.endswith('-p-premerge-ci'):
+        version_str = 'PIE-9.0'
+    elif build_name.endswith('-o') or build_name.endswith('-o-premerge-ci'):
+        version_str = 'OREO-8.1'
+    else:
+        version_str = 'Master'
+    return version_str
+
+
+def get_bugs_for_build(build_name=None):
+    bugs = []
+    if not build_name:
+        return bugs
+
+    bugzilla_instance = get_all_build_configs()[build_name]['bugzilla_instance']
+    build_bugzilla = get_all_build_configs()[build_name]['build_bugzilla']
+
+    terms = [
+                {u'product': build_bugzilla.product},
+                {u'component': build_bugzilla.component},
+                {u'platform': build_bugzilla.rep_platform},
+                {u'op_sys': build_bugzilla.op_sys},
+                {u'version': get_bug_version_from_build_name(build_name)},
+                {u'keywords': 'LCR'}
+            ]
+
+    for bug in bugzilla_instance.search_bugs(terms).bugs:
+        bugs.append(bugzilla.DotDict(bug))
+
+    return bugs
+
 
 @login_required
 def show_cts_vts_failures(request):
@@ -1744,9 +1785,12 @@ def show_cts_vts_failures(request):
                             stacktrace = failed_test.find('.//Failure/StackTrace').text
                             ## ignore duplicate cases as the jobs are for different modules
                             failed_testcase = failed_tests_module.get(test_name)
-                            if failed_testcase and (not abi in failed_testcase.get('abis')):
-                                failed_testcase.get('abis').append(abi)
-                                failed_testcase.get('job_ids').append(metadata.get('job_id'))
+                            if failed_testcase:
+                                if not abi in failed_testcase.get('abis'):
+                                    failed_testcase.get('abis').append(abi)
+                                job_id = metadata.get('job_id')
+                                if not job_id in failed_testcase.get('job_ids'):
+                                    failed_testcase.get('job_ids').append(job_id)
                             else:
                                 failed_tests_module[test_name]= {
                                                                     'test_name': test_name,
@@ -1773,12 +1817,10 @@ def show_cts_vts_failures(request):
     if request.method == 'POST':
         build_name = request.POST.get("build_name")
         build_no = request.POST.get("build_no")
-        job_name = request.POST.get("job_name")
         job_ids_str = request.POST.get("job_ids", '')
     else: # GET
         build_name = request.GET.get("build_name")
         build_no = request.GET.get("build_no")
-        job_name = request.GET.get("job_name")
         job_ids_str = request.GET.get("job_ids", '')
 
     job_ids = job_ids_str.split(',')
@@ -1842,23 +1884,21 @@ def show_cts_vts_failures(request):
                 },
         }
     '''
-    bugs = []
-    terms = [
-                {u'platform': build_bugzilla.rep_platform},
-                {u'op_sys': build_bugzilla.op_sys},
-                {u'product': build_bugzilla.product},
-            ]
-    for bug in bugzilla_instance.search_bugs(terms).bugs:
-        bugs.append(bugzilla.DotDict(bug))
-
+    bugs = get_bugs_for_build(build_name=build_name)
     for module_name, failures_in_module in failures.items():
         for test_name, failure in failures_in_module.items():
             for bug in bugs:
-                if bug.summary.find('%s %s' % (module_name, test_name)) >= 0:
+                if test_name.find(module_name) >=0:
+                    search_key = test_name
+                else:
+                    search_key = '%s %s' % (module_name, test_name)
+
+                if bug.summary.find(search_key) >= 0:
                     if failure.get('bugs'):
                         failure['bugs'].append(bug)
                     else:
                         failure['bugs'] = [bug]
+
 
     # sort failures
     for module_name, failures_in_module in failures.items():
@@ -1942,16 +1982,20 @@ def file_bug(request):
     else: # GET
         build_name = request.GET.get("build_name")
         build_no = request.GET.get("build_no")
-        job_name = request.GET.get("job_name")
         job_ids_str = request.GET.get("job_ids")
         module_name = request.GET.get("module_name")
         test_name = request.GET.get("test_name")
 
-        job_ids = job_ids_str.split(',')
+        job_ids_tmp = job_ids_str.split(',')
+        job_ids = []
+        for job_id in job_ids_tmp:
+            if not job_id in job_ids:
+                job_ids.append(job_id)
+
         lava = get_all_build_configs()[build_name]['lava_server']
         lava_server = lava.server
         build_bugzilla = get_all_build_configs()[build_name]['build_bugzilla']
-        
+
         form_initial = {
                         "build_name": build_name,
                         "build_no": build_no,
@@ -1961,16 +2005,19 @@ def file_bug(request):
                         'os': build_bugzilla.op_sys,
                         'hardware': build_bugzilla.rep_platform,
                         }
-        if build_name.endswith('-p') or build_name.endswith('-p-premerge-ci'):
-            form_initial['version'] = 'PIE-9.0'
-        elif build_name.endswith('-o') or build_name.endswith('-o-premerge-ci'):
-            form_initial['version'] = 'OREO-8.1'
-        else:    
-            form_initial['version'] = 'Master'
 
-        form_initial['summary'] = '%s: %s %s' % (build_bugzilla.short_desc_prefix, module_name, test_name)
+        form_initial['version'] = get_bug_version_from_build_name(build_name=build_name)
+        if test_name.find(module_name) >=0:
+            job_name = JobCache.objects.get(job_id=job_ids[0], lava_nick=lava.nick).job_name
+            form_initial['summary'] = '%s: %s %s' % (build_bugzilla.short_desc_prefix, job_name, test_name)
+            description = '%s %s' % (job_name, test_name)
+        else:
+            form_initial['summary'] = '%s: %s %s' % (build_bugzilla.short_desc_prefix, module_name, test_name)
+            description = '%s %s' % (module_name, test_name)
 
         def extract_abi_stacktrace(result_zip_path, module_name='', test_name=''):
+            abis = []
+            stacktrace = ''
             class_method = test_name.split('#')
             with zipfile.ZipFile(result_zip_path, 'r') as f_zip_fd:
                 try:
@@ -1978,12 +2025,14 @@ def file_bug(request):
                     for elem in root.findall('.//Module[@name="%s"]' %(module_name)):
                         abi = elem.attrib['abi']
                         for stacktrace_node in root.findall('.//TestCase[@name="%s"]/Test[@name="%s"]/Failure/StackTrace' %(class_method[0], class_method[1])):
-                            stacktrace = stacktrace_node.text
-                            return (abi, stacktrace)
+                            if not stacktrace:
+                                stacktrace = stacktrace_node.text
+                            if not abi in abis:
+                                abis.append(abi)
                 except ET.ParseError as e:
                     logger.error('xml.etree.ElementTree.ParseError: %s' % e)
                     logger.info('Please Check %s manually' % result_zip_path)
-            return (None, None)
+            return (abis, stacktrace)
 
         abis = []
         stacktrace_msg = None
@@ -1997,13 +2046,13 @@ def file_bug(request):
                             'build_no': build_no,
                             'build_name': build_name,
                             }
-                (abi, stacktrace) = extract_abi_stacktrace(result_file_path, module_name=module_name, test_name=test_name)
-                if not abi in abis:
-                    abis.append(abi)
+                (abis_sub, stacktrace) = extract_abi_stacktrace(result_file_path, module_name=module_name, test_name=test_name)
+                for abi in abis_sub:
+                    if not abi in abis:
+                        abis.append(abi)
                 if not stacktrace_msg:
-                    stacktrace_msg = stacktrace 
-        
-        description = '%s %s' % (module_name, test_name)
+                    stacktrace_msg = stacktrace
+
         description += '\n\nABIs:\n%s' % (' '.join(abis))
         description += '\n\nStackTrace: %s' % (stacktrace_msg)
         description += '\n\nLava Job:'
