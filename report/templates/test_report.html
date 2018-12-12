@@ -463,16 +463,32 @@ No result for cts test jobs.
 
 <h2>VTS</h2>
 {% if vts_res %}
+<div>
+<ul>
+<li>How to find the full vts logs:</li>
+<ol>
+<li>Click the link in the Plan column to open the lava job page</li>
+<li>Click the result icon <span class="glyphicon glyphicon-signal"> </span> of the Results item, to go to the result page</li>
+<li>Click the View test suite icon <span class="glyphicon glyphicon-eye-open"> </span> of the n-vts-test(like 1_vts-hal) test suite</li>
+<li>Click the test-attachment test to go to a new page for details</li>
+<li>Open the link of the reference item to download the full CTS logs</li>
+</ol>
+<li>Click on the links in the Module column will redirect to the history data list page for that VTS module</li>
+<li>Click on the links in the Current(Fail) column will redirect to the VTS failure details page</li>
+</ul>
+</div>
 <table border="2">
 <tr>
     <th rowspan=2>Index</th>
     <th rowspan=2>Plan</th>
+    <th rowspan=2>Module</th>
     <th colspan=4>Base({{ build_info.base_build_no }})</th>
-    <th colspan=4>Current</th>
-    <th rowspan=2>Current Failed Test Cases</th>
+    <th colspan=5>Current</th>
     <th rowspan=2>Bugs</th>
+    <th rowspan=2>Comments</th>
     <th rowspan=2>Operations</th>
 </tr>
+
 <tr>
     <th>Pass</th>
     <th>Fail</th>
@@ -481,16 +497,18 @@ No result for cts test jobs.
     <th>Pass</th>
     <th>Fail</th>
     <th>Total</th>
+    <th>Done</th>
     <th>Pass Rate</th>
 </tr>
 {% for test_info in vts_res %}
 <tr>
-    <td>{{ forloop.counter }}</a></td>
+    <td> {{ forloop.counter }}</td>
     {% if test_info.job_id %}
     <td> <a href="{{ lava_server_job_prefix }}/{{ test_info.job_id }}">{{ test_info.job_name }}</a></td>
     {% else %}
     <td> {{ test_info.job_name }}</td>
     {% endif %}
+    <td align='left'> <a href="/report/show-trend/?category=cts&build_name={{ build_info.build_name }}&job_name={{ test_info.job_name }}&test_suite={{ test_info.job_name }}&test_case={{ test_info.module_name }}">{{ test_info.module_name }}</a></td>
     {% with test_info.base as base %}
     {% if base %}
     <td align='right'> {{ base.number_pass }}</td>
@@ -503,55 +521,70 @@ No result for cts test jobs.
     <td align='right'> -- </td>
     <td align='right'> -- </td>
     {% endif %}
-    {% endwith %}
+    {% if test_info.number_pass|add:0 > base.number_pass|add:0 %}
     <td align='right'> {{ test_info.number_pass }}</td>
+    {% elif test_info.number_pass|add:0 < base.number_pass|add:0  %}
+    <td align='right'> {{ test_info.number_pass }}</td>
+    {% else  %}
+    <td align='right'> {{ test_info.number_pass }}</td>
+    {% endif %}
+    {% endwith %}
     {% if test_info.number_fail|add:0 > 0 %}
-    <td align='right'> <a href="/report/show-cts-vts-failures/?build_name={{ build_info.build_name }}&build_no={{ build_info.build_no }}&job_name={{ test_info.job_name }}&job_ids={{ vts_job_ids }}">{{ test_info.number_fail }}</a></td>
+    <td align='right'> <a href="/report/show-cts-vts-failures/?build_name={{ build_info.build_name }}&build_no={{ build_info.build_no }}&job_name={{ test_info.job_name }}&test_suite={{ test_info.job_name }}&test_case={{ test_info.module_name }}&job_ids={{ vts_job_ids }}#{{ test_info.module_name_noabi }}">{{ test_info.number_fail }}</a></td>
     {% else  %}
     <td align='right'> {{ test_info.number_fail }}</td>
     {% endif %}
     <td align='right'> {{ test_info.number_total }}</td>
-
+    <td align='right'> {{ test_info.module_done }}</td>
     {% if test_info.number_passrate == 0 %}
     <td align='right' style="background-color:red" > {{ test_info.number_passrate|floatformat:2 }}</td>
     {% elif test_info.number_passrate == 100 %}
     <td align='right' style="background-color:green" > {{ test_info.number_passrate|floatformat:2 }}</td>
-    {% else %}
-    <td align='right'> {{ test_info.number_passrate|floatformat:2 }}</td>
+    {% else  %}
+    <td align='right'  > {{ test_info.number_passrate|floatformat:2 }}</td>
     {% endif %}
-    {% with test_info.failed_testcases as failed_testcases %}
-        {% ifequal test_info.number_total 0 %}
-            <td> -- </td>
-        {% else %}
-            <td>
-                {% if failed_testcases|length > 6 %}
-                <div style="height: 150px; width:600px; overflow: auto">
-                {% else %}
-                <div style="width:600px; overflow: auto">
-                {% endif %}
-                {% for test_case in failed_testcases %}
-                {{ test_case.name }} <br/>
-                {% endfor %}
-            </div>
-            </td>
-        {% endifequal %}
-    {% endwith%}
     <td align='left'>
         {% with test_info.bugs as bugs %}
         {% for bug in bugs %}
             {% if not forloop.first %}<br/>{% endif %}
             <a target="_blank" href="{{build_info.bugzilla_show_bug_prefix}}{{bug.id}}">{{ bug.id }}</a>
-    {% endfor%}
+        {% endfor%}
         {% endwith%}
     </td>
+    <td>
+        <ul>
+        {% with test_info.comments as comments %}
+        {% for comment in comments %}
+            {% if comment.build_no_fixed and comment.build_no %}
+                {% if build_info.build_no|add:"0" >= comment.build_no|add:"0" and build_info.build_no|add:"0" < comment.build_no_fixed|add:"0" %}
+                    <li>{{ comment.comment }}</li>
+                {% endif %}
+            {% elif comment.build_no_fixed and not comment.build_no %}
+                {% if build_info.build_no|add:"0" < comment.build_no_fixed|add:"0" %}
+                    <li>{{ comment.comment }}</li>
+                {% endif %}
+            {% elif not comment.build_no_fixed and not comment.build_no %}
+                <li>{{ comment.comment }}</li>
+            {% elif not comment.build_no_fixed and comment.build_no %}
+                {% if build_info.build_no|add:"0" >= comment.build_no|add:"0" %}
+                    <li>{{ comment.comment }}</li>
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+        {% endwith %}
+        </ul>
+        {% ifnotequal test_info.number_passrate 100 %}
+        <a target='_blank' href="/report/add-comment/?build_name={{ build_info.build_name }}&build_no={{ build_info.build_no }}&plan_suite={{ test_info.job_name }}&&module_testcase={{ test_info.module_name }}">Add Comment</a><br/>
+        {% endifnotequal %}
+    </td>
     <td align='left'>
-        <a target='_blank' href="/report/add-bug/?build_name={{ build_info.build_name }}&plan_suite={{ test_info.job_name }}&&module_testcase={{ test_info.job_name }}">Add Bug</a><br/>
-        {% ifequal test_info.number_passrate 0 %}
-        <a target='_blank' href="{{ build_info.new_bug_url_prefix }}{{ test_info.job_name }}">Report Android Bug</a>&nbsp;
+        {% ifnotequal test_info.number_passrate 100 %}
+        <a target='_blank' href="/report/add-bug/?build_name={{ build_info.build_name }}&build_no={{ build_info.build_no }}&plan_suite={{ test_info.job_name }}&&module_testcase={{ test_info.module_name }}">Add Bug</a><br/>
+        <a target='_blank' href="{{ build_info.new_bug_url_prefix }}{{ test_info.module_name }}">Report Android Bug</a>&nbsp;
         <!--
         <a target='_blank' href="https://bugs.linaro.org/enter_bug.cgi?product=LAVA%20Framework">Report LAVA Bug</a>&nbsp;
         -->
-        {% endifequal %}
+        {% endifnotequal %}
     </td>
 </tr>
 {% endfor %}

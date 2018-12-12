@@ -1144,204 +1144,158 @@ def test_report(request):
                                                plan_suite=test_suite, module_testcase=test_case)
 
 
-    #########################################################
-    ########### result for vts ##############################
-    #########################################################
-    vts_res = []
-    vts_job_ids = []
-    summary = {
-                'pass': 0,
-                'fail': 0,
-                'total': 0,
-               }
-    for job_name in vts:
-        job_res = total_tests_res.get(job_name)
-        if job_res is None:
-            job_id = None
-            number_pass = 0
-            number_fail = 0
-            number_total = 0
-            failed_testcases = []
-        else:
-            job_id = job_res['result_job_id_status'][0]
-            number_pass = len(TestCase.objects.filter(job_id=job_id, lava_nick=lava_nick, suite__contains='_vts-', result='pass'))
-            failed_testcases = TestCase.objects.filter(job_id=job_id, lava_nick=lava_nick, suite__contains='_vts-', result='fail')
-            number_fail = len(failed_testcases)
-            number_total = number_pass + number_fail
-            if job_id not in successful_job_ids:
-                successful_job_ids.append(job_id)
+    def get_modules_hash_for_one_job(job_id=None, lava_nick=None, suite_name=None):
+        modules_res = TestCase.objects.filter(job_id=job_id, lava_nick=lava_nick, suite__endswith='_%s' % suite_name)
+        cts_one_job_hash = {}
+        for module  in modules_res:
+            temp_hash = {}
+            module_name = None
+            if not module.name.endswith('_done'):
+                number = int(module.measurement)
+                if module.name.endswith('_executed'):
+                    module_name = module.name.replace('_executed', '')
+                    temp_hash['total'] = number
+                elif module.name.endswith('_passed'):
+                    module_name = module.name.replace('_passed', '')
+                    temp_hash['pass'] = number
+                elif module.name.endswith('_failed'):
+                    module_name = module.name.replace('_failed', '')
+                    temp_hash['fail'] = number
+                else:
+                    # there should be no such case
+                    pass
+            else:
+                # No need to deal with _done result here
+                module_name = module.name.replace('_done', '')
+                temp_hash['done'] = module.result
+                pass
 
-        if number_total == 0:
-            number_passrate = 0.00
-        else:
-            number_passrate = float(number_pass * 100 / number_total)
+            # modules should not be None here
+            if cts_one_job_hash.get(module_name) is None:
+                cts_one_job_hash[module_name] = temp_hash
+            else:
+                cts_one_job_hash[module_name].update(temp_hash)
+        return cts_one_job_hash
 
-        try:
-            base = BaseResults.objects.get(build_name=base_build_name, build_no=base_build_no, plan_suite=job_name, module_testcase=job_name)
-        except BaseResults.DoesNotExist:
-            base = None
+    def get_cts_vts_res(total_tests_res={}, cts_vts=[], successful_job_ids=[],
+                        lava_nick=None, bugs_total=[],
+                        base_build_name=None, base_build_no=None,
+                        build_name=None, build_no=None):
+        cts_vts_job_ids = []
+        cts_vts_res = []
+        summary = {
+                    'pass': 0,
+                    'fail': 0,
+                    'total': 0,
+                   }
+        for job_name in sorted(cts_vts):
+            job_res = total_tests_res.get(job_name)
+            if job_res is None:
+                cts_vts_res.append({'job_name': job_name,
+                                'job_id': None,
+                                'module_name': '--',
+                                'number_pass': 0,
+                                'number_fail': 0,
+                                'number_total': 0,
+                                'number_passrate': 0,
+                               })
+            else:
+                job_id = job_res['result_job_id_status'][0]
+                logger.info("%s %s" % ( job_id, job_name))
+                if job_id not in successful_job_ids:
+                    successful_job_ids.append(job_id)
 
-        bugs = Bug.objects.filter(build_name=build_name, plan_suite=job_name, module_testcase=job_name)
-        comments = Comment.objects.filter(build_name=build_name, plan_suite=job_name, module_testcase=job_name)
-        bugs = []
-        for bug in bugs_total:
-            if bug.summary.find('%s' % (job_name)) >= 0:
-                bugs.append(bug)
+                cts_one_job_hash = get_modules_hash_for_one_job(job_id=job_id, lava_nick=lava_nick, suite_name=job_name)
+                for module_name in sorted(cts_one_job_hash.keys()):
+                    module_res = cts_one_job_hash[module_name]
+                    number_pass = module_res.get('pass')
+                    number_fail = module_res.get('fail')
+                    number_total = module_res.get('total')
+                    module_done = module_res.get('done', 'pass')
+                    if number_total == 0:
+                        number_passrate = 0
+                    else:
+                        number_passrate = float(number_pass * 100 / number_total )
 
-        vts_res.append({'job_name': job_name,
-                        'job_id': job_id,
-                        'number_pass': number_pass,
-                        'number_fail': number_fail,
-                        'number_total': number_total,
-                        'number_passrate': number_passrate,
-                        'failed_testcases': failed_testcases,
-                        'base': base,
-                        'bugs': bugs,
-                        'comments': comments,
+                    try:
+                        base = BaseResults.objects.get(build_name=base_build_name, build_no=base_build_no, plan_suite=job_name, module_testcase=module_name)
+                    except BaseResults.DoesNotExist:
+                        base = None
+
+                    bugs = []
+                    for bug in bugs_total:
+                        if bug.summary.find('%s' % (module_name.split('.')[1])) >= 0:
+                            bugs.append(bug)
+
+                    comments = list(Comment.objects.filter(build_name=build_name, plan_suite=job_name, module_testcase=module_name))
+                    comments_old = list(Comment.objects.filter(build_name=build_name, plan_suite=job_name.replace('-armeabi', '').replace('-arm64',''), module_testcase=module_name))
+                    comments = comments + comments_old
+
+                    cts_vts_res.append({'job_name': job_name,
+                                    'job_id': job_id,
+                                    'module_name': module_name,
+                                    'module_abi': module_name.split('.')[0],
+                                    'module_name_noabi': module_name.split('.')[1],
+                                    'number_pass': number_pass,
+                                    'number_fail': number_fail,
+                                    'number_total': number_total,
+                                    'number_passrate': number_passrate,
+                                    'module_done': module_done,
+                                    'base': base,
+                                    'bugs': bugs,
+                                    'comments': comments,
+                                   })
+                    if job_id and str(job_id) not in cts_vts_job_ids:
+                        cts_vts_job_ids.append(str(job_id))
+                    if cache_to_base:
+                        BaseResults.objects.create(build_name=build_name, build_no=build_no, job_name=job_name, job_id=job_id, lava_nick=lava_nick,
+                                                   number_pass=number_pass, number_fail=number_fail, number_total=number_total, number_passrate=number_passrate,
+                                                   plan_suite=job_name, module_testcase=module_name)
+
+                    summary['pass'] = summary['pass'] + number_pass
+                    summary['fail'] = summary['fail'] + number_fail
+                    summary['total'] = summary['total'] + number_total
+
+
+        pass_rate = 0
+        if  summary['total'] != 0:
+            pass_rate = float(summary['pass'] * 100 / summary['total'])
+        cts_vts_res.append({'job_name': "Summary",
+                        'job_id': None,
+                        'module_name': 'Total',
+                        'number_pass': summary['pass'],
+                        'number_fail': summary['fail'],
+                        'number_total': summary['total'],
+                        'number_passrate': pass_rate,
                        })
-        if job_id and str(job_id) not in vts_job_ids:
-            vts_job_ids.append(str(job_id))
-        if cache_to_base and job_id is not None:
-            BaseResults.objects.create(build_name=build_name, build_no=build_no, job_name=job_name, job_id=job_id, lava_nick=lava_nick,
-                                       number_pass=number_pass, number_fail=number_fail, number_total=number_total, number_passrate=number_passrate,
-                                       plan_suite=job_name, module_testcase=job_name)
+        return (cts_vts_res, cts_vts_job_ids)
 
-        summary['pass'] = summary['pass'] + number_pass
-        summary['fail'] = summary['fail'] + number_fail
-        summary['total'] = summary['total'] + number_total
-
-    pass_rate = 0
-    if summary['total'] != 0:
-        pass_rate = float(summary['pass'] * 100 / summary['total'])
-    vts_res.append({'job_name': "Summary",
-                    'job_id': '--',
-                    'number_pass': summary['pass'],
-                    'number_fail': summary['fail'],
-                    'number_total': summary['total'],
-                    'number_passrate': pass_rate,
-                    'failed_testcases': [],
-                   })
     #########################################################
     ########### result for cts ##############################
     #########################################################
     cts = cts_v7a + []
     if build_name.find("hikey") >= 0:
         cts = cts_v7a + cts_v8a
-    cts_res = []
-    cts_job_ids = []
-    summary = {
-                'pass': 0,
-                'fail': 0,
-                'total': 0,
-               }
-    for job_name in sorted(cts):
-        job_res = total_tests_res.get(job_name)
-        if job_res is None:
-            cts_res.append({'job_name': job_name,
-                            'job_id': None,
-                            'module_name': '--',
-                            'number_pass': 0,
-                            'number_fail': 0,
-                            'number_total': 0,
-                            'number_passrate': 0,
-                           })
-        else:
-            job_id = job_res['result_job_id_status'][0]
-            if job_id not in successful_job_ids:
-                successful_job_ids.append(job_id)
-            modules_res = TestCase.objects.filter(job_id=job_id, lava_nick=lava_nick, suite__endswith='_%s' % job_name)
-            cts_one_job_hash = {}
-            for module  in modules_res:
-                temp_hash = {}
-                module_name = None
-                if not module.name.endswith('_done'):
-                    number = int(module.measurement)
-                    if module.name.endswith('_executed'):
-                        module_name = module.name.replace('_executed', '')
-                        temp_hash['total'] = number
-                    elif module.name.endswith('_passed'):
-                        module_name = module.name.replace('_passed', '')
-                        temp_hash['pass'] = number
-                    elif module.name.endswith('_failed'):
-                        module_name = module.name.replace('_failed', '')
-                        temp_hash['fail'] = number
-                    else:
-                        # there should be no such case
-                        pass
-                else:
-                    # No need to deal with _done result here
-                    module_name = module.name.replace('_done', '')
-                    temp_hash['done'] = module.result
-                    pass
+    (cts_res, cts_job_ids) = get_cts_vts_res(cts_vts=cts,
+                              total_tests_res=total_tests_res,
+                              successful_job_ids=successful_job_ids,
+                              lava_nick=lava_nick,
+                              base_build_name=base_build_name,
+                              base_build_no=base_build_no,
+                              bugs_total=bugs_total,
+                              build_name=build_name,
+                              build_no=build_no)
 
-                # modules should not be None here
-                if cts_one_job_hash.get(module_name) is None:
-                    cts_one_job_hash[module_name] = temp_hash
-                else:
-                    cts_one_job_hash[module_name].update(temp_hash)
-
-            for module_name in sorted(cts_one_job_hash.keys()):
-                module_res = cts_one_job_hash[module_name]
-                number_pass = module_res.get('pass')
-                number_fail = module_res.get('fail')
-                number_total = module_res.get('total')
-                module_done = module_res.get('done', 'pass')
-                if number_total == 0:
-                    number_passrate = 0
-                else:
-                    number_passrate = float(number_pass * 100 / number_total )
-
-                try:
-                    base = BaseResults.objects.get(build_name=base_build_name, build_no=base_build_no, plan_suite=job_name, module_testcase=module_name)
-                except BaseResults.DoesNotExist:
-                    base = None
-
-                bugs = []
-                for bug in bugs_total:
-                    if bug.summary.find('%s' % (module_name.split('.')[1])) >= 0:
-                        bugs.append(bug)
-
-                comments = list(Comment.objects.filter(build_name=build_name, plan_suite=job_name, module_testcase=module_name))
-                comments_old = list(Comment.objects.filter(build_name=build_name, plan_suite=job_name.replace('-armeabi', '').replace('-arm64',''), module_testcase=module_name))
-                comments = comments + comments_old
-
-                cts_res.append({'job_name': job_name,
-                                'job_id': job_id,
-                                'module_name': module_name,
-                                'module_abi': module_name.split('.')[0],
-                                'module_name_noabi': module_name.split('.')[1],
-                                'number_pass': number_pass,
-                                'number_fail': number_fail,
-                                'number_total': number_total,
-                                'number_passrate': number_passrate,
-                                'module_done': module_done,
-                                'base': base,
-                                'bugs': bugs,
-                                'comments': comments,
-                               })
-                if job_id and str(job_id) not in cts_job_ids:
-                    cts_job_ids.append(str(job_id))
-                if cache_to_base:
-                    BaseResults.objects.create(build_name=build_name, build_no=build_no, job_name=job_name, job_id=job_id, lava_nick=lava_nick,
-                                               number_pass=number_pass, number_fail=number_fail, number_total=number_total, number_passrate=number_passrate,
-                                               plan_suite=job_name, module_testcase=module_name)
-
-                summary['pass'] = summary['pass'] + number_pass
-                summary['fail'] = summary['fail'] + number_fail
-                summary['total'] = summary['total'] + number_total
-
-
-    pass_rate = 0
-    if  summary['total'] != 0:
-        pass_rate = float(summary['pass'] * 100 / summary['total'])
-    cts_res.append({'job_name': "Summary",
-                    'job_id': None,
-                    'module_name': 'Total',
-                    'number_pass': summary['pass'],
-                    'number_fail': summary['fail'],
-                    'number_total': summary['total'],
-                    'number_passrate': pass_rate,
-                   })
+    (vts_res, vts_job_ids) = get_cts_vts_res(cts_vts=vts,
+                              total_tests_res=total_tests_res,
+                              successful_job_ids=successful_job_ids,
+                              lava_nick=lava_nick,
+                              base_build_name=base_build_name,
+                              base_build_no=base_build_no,
+                              bugs_total=bugs_total,
+                              build_name=build_name,
+                              build_no=build_no)
+    logger.info("len(vts_res)=%d" % len(vts_res))
     ##############################################################
     ## get job duration information from JobCache
     ##############################################################
@@ -1656,7 +1610,7 @@ def get_result_file_path(job_id=None, build_name=None, build_no=None):
 
 def get_attachment_url(job_id=None, lava_server=None, build_name=None):
     attachment_case_name = 'test-attachment'
-    cts_vts = [] + cts_v7a + cts_v7a + vts
+    cts_vts = [] + cts_v7a + cts_v8a + vts
 
     suite_list =  yaml.load(lava_server.results.get_testjob_suites_list_yaml(job_id))
     for test_suite in suite_list:
@@ -1834,13 +1788,18 @@ def show_cts_vts_failures(request):
     job_attachments_url = {}
     for job_id in job_ids:
         result_file_path = get_result_file_path(build_name=build_name, build_no=build_no, job_id=job_id)
+        logger.info('result_file_path: %s' % (result_file_path))
         if os.path.exists(result_file_path):
             continue
-        job_attachments_url[job_id] = get_attachment_url(job_id=job_id, lava_server=lava_server, build_name=build_name)
+        attachment_url = get_attachment_url(job_id=job_id, lava_server=lava_server, build_name=build_name)
+        if attachment_url is not None:
+            job_attachments_url[job_id] = attachment_url
+            logger.info('The attachment url for job(%s) is:  %s' % (str(job_id), job_attachments_url[job_id]))
 
     logger.info('Start to download result file for jobs: %s' % (str(job_ids)))
     for job_id in job_ids:
         if not job_attachments_url.get(job_id):
+            logger.warn('No attachment_url for job: %s' % (str(job_id)))
             continue
         (temp_fd, temp_path) = tempfile.mkstemp(suffix='.tar.xz', text=False)
         download_urllib(job_attachments_url.get(job_id), temp_path)
@@ -1855,10 +1814,12 @@ def show_cts_vts_failures(request):
         result_file_path = get_result_file_path(build_name=build_name, build_no=build_no, job_id=job_id)
         if not os.path.exists(result_file_path):
             download_failures.append(job_id)
+            logger.warn('No result file saved for job: %s' % (str(job_id)))
 
     logger.info('Start to extract failures for jobs: %s' % (str(job_ids)))
     failures = {}
     if download_failures:
+        logger.warn('Jobs that failed to find result files: %s' % (str(download_failures)))
         # process for download failures
         pass
     else:
