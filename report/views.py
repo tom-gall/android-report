@@ -38,7 +38,7 @@ basic_weekly = { # job_name: ['test_suite', ],
                      }
 
 optee = { # job_name: ['test_suite', ],
-          "optee": [ "optee-xtest"],
+          "optee-xtest": [ "optee-xtest"],
         }
 
 benchmarks_common = {  # job_name: {'test_suite':['test_case',]},
@@ -128,7 +128,7 @@ cts_v8a = [ 'cts-focused1-arm64-v8a',
           ]
 
 jobs_to_be_checked_array = [
-    "basic", "boottime", "optee", "weekly", 'monkey',
+    "basic", "boottime", "optee-xtest", "weekly", 'monkey',
     "antutu6", "andebenchpro2015", "benchmarkpi", "caffeinemark", "cf-bench", "gearses2eclair", "geekbench4", "glbenchmark25", "javawhetstone", "jbench", "linpack", "quadrantpro", "rl-sqlite", "scimark", "vellamo3",
     ]
 jobs_to_be_checked_array = jobs_to_be_checked_array + cts_v8a + cts_v7a + vts
@@ -603,9 +603,8 @@ def get_build_config_value(build_config_url, key="MANIFEST_BRANCH"):
 def get_commit_from_pinned_manifest(snapshot_url, path):
     response = urllib2.urlopen(snapshot_url)
     html = response.read()
-
     # <project groups="device,ti" name="android/kernel.git" path="kernel/ti/x15" remote="git-ti-com" revision="1f7e74a78f44783eeab13c9f39f9fda6ded0a593" upstream="p-ti-android-linux-4.4.y"/>
-    pat = re.compile('path="%s" remote=".+" revision="(?P<commit_id>[\da-z]+)" ' % path)
+    pat = re.compile('path="%s".* revision="(?P<commit_id>[\da-z]+)" ' % path)
     matches = pat.findall(html)
     if len(matches) > 0:
         return matches[0]
@@ -1201,7 +1200,6 @@ def test_report(request):
                                })
             else:
                 job_id = job_res['result_job_id_status'][0]
-                logger.info("%s %s" % ( job_id, job_name))
                 if job_id not in successful_job_ids:
                     successful_job_ids.append(job_id)
 
@@ -1295,7 +1293,6 @@ def test_report(request):
                               bugs_total=bugs_total,
                               build_name=build_name,
                               build_no=build_no)
-    logger.info("len(vts_res)=%d" % len(vts_res))
     ##############################################################
     ## get job duration information from JobCache
     ##############################################################
@@ -1328,6 +1325,10 @@ def test_report(request):
         if build_name.find('x15') >= 0:
             kernel_commit = get_commit_from_pinned_manifest(pinned_manifest_url, 'kernel/ti/x15')
             kernel_url = "http://git.ti.com/ti-linux-kernel/ti-linux-kernel/blobs/raw/%s/Makefile" % kernel_commit
+            kernel_version = read_kernel_version(kernel_url)
+        elif build_name.find('hikey') >= 0:
+            kernel_commit = get_commit_from_pinned_manifest(pinned_manifest_url, 'kernel/linaro/hisilicon-4.14')
+            kernel_url = "https://android-git.linaro.org/kernel/hikey-linaro.git/plain/Makefile?id=%s" % kernel_commit
             kernel_version = read_kernel_version(kernel_url)
         else:
             kernel_url = '--'
@@ -1387,7 +1388,7 @@ def test_report(request):
                    'vts_job_ids': ','.join(vts_job_ids),
                    'cts_res': cts_res,
                    'cts_job_ids': ','.join(cts_job_ids),
-                   'build_bugs': build_bugs,
+                   'build_bugs': bugs_total,
                    'jobs_failed': jobs_failed,
                    'jobs_duration': jobs_duration,
                    'total_duration': total_duration,

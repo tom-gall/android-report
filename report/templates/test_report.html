@@ -339,9 +339,7 @@ No result for benchmark test jobs.
     <th rowspan=2>Module</th>
     <th colspan=4>Base({{ build_info.base_build_no }})</th>
     <th colspan=5>Current</th>
-    <th rowspan=2>Bugs</th>
     <th rowspan=2>Comments</th>
-    <th rowspan=2>Operations</th>
 </tr>
 
 <tr>
@@ -410,14 +408,6 @@ No result for benchmark test jobs.
     {% else  %}
     <td align='right'  > {{ test_info.number_passrate|floatformat:2 }}</td>
     {% endif %}
-    <td align='left'>
-        {% with test_info.bugs as bugs %}
-        {% for bug in bugs %}
-            {% if not forloop.first %}<br/>{% endif %}
-            <a target="_blank" href="{{build_info.bugzilla_show_bug_prefix}}{{bug.id}}">{{ bug.id }}</a>
-        {% endfor%}
-        {% endwith%}
-    </td>
     <td>
         <ul>
         {% with test_info.comments as comments %}
@@ -442,15 +432,6 @@ No result for benchmark test jobs.
         </ul>
         {% ifnotequal test_info.number_passrate 100 %}
         <a target='_blank' href="/report/add-comment/?build_name={{ build_info.build_name }}&build_no={{ build_info.build_no }}&plan_suite={{ test_info.job_name }}&&module_testcase={{ test_info.module_name }}">Add Comment</a><br/>
-        {% endifnotequal %}
-    </td>
-    <td align='left'>
-        {% ifnotequal test_info.number_passrate 100 %}
-        <a target='_blank' href="/report/add-bug/?build_name={{ build_info.build_name }}&build_no={{ build_info.build_no }}&plan_suite={{ test_info.job_name }}&&module_testcase={{ test_info.module_name }}">Add Bug</a><br/>
-        <a target='_blank' href="{{ build_info.new_bug_url_prefix }}{{ test_info.module_name }}">Report Android Bug</a>&nbsp;
-        <!--
-        <a target='_blank' href="https://bugs.linaro.org/enter_bug.cgi?product=LAVA%20Framework">Report LAVA Bug</a>&nbsp;
-        -->
         {% endifnotequal %}
     </td>
 </tr>
@@ -484,9 +465,7 @@ No result for cts test jobs.
     <th rowspan=2>Module</th>
     <th colspan=4>Base({{ build_info.base_build_no }})</th>
     <th colspan=5>Current</th>
-    <th rowspan=2>Bugs</th>
     <th rowspan=2>Comments</th>
-    <th rowspan=2>Operations</th>
 </tr>
 
 <tr>
@@ -543,14 +522,6 @@ No result for cts test jobs.
     {% else  %}
     <td align='right'  > {{ test_info.number_passrate|floatformat:2 }}</td>
     {% endif %}
-    <td align='left'>
-        {% with test_info.bugs as bugs %}
-        {% for bug in bugs %}
-            {% if not forloop.first %}<br/>{% endif %}
-            <a target="_blank" href="{{build_info.bugzilla_show_bug_prefix}}{{bug.id}}">{{ bug.id }}</a>
-        {% endfor%}
-        {% endwith%}
-    </td>
     <td>
         <ul>
         {% with test_info.comments as comments %}
@@ -577,15 +548,6 @@ No result for cts test jobs.
         <a target='_blank' href="/report/add-comment/?build_name={{ build_info.build_name }}&build_no={{ build_info.build_no }}&plan_suite={{ test_info.job_name }}&&module_testcase={{ test_info.module_name }}">Add Comment</a><br/>
         {% endifnotequal %}
     </td>
-    <td align='left'>
-        {% ifnotequal test_info.number_passrate 100 %}
-        <a target='_blank' href="/report/add-bug/?build_name={{ build_info.build_name }}&build_no={{ build_info.build_no }}&plan_suite={{ test_info.job_name }}&&module_testcase={{ test_info.module_name }}">Add Bug</a><br/>
-        <a target='_blank' href="{{ build_info.new_bug_url_prefix }}{{ test_info.module_name }}">Report Android Bug</a>&nbsp;
-        <!--
-        <a target='_blank' href="https://bugs.linaro.org/enter_bug.cgi?product=LAVA%20Framework">Report LAVA Bug</a>&nbsp;
-        -->
-        {% endifnotequal %}
-    </td>
 </tr>
 {% endfor %}
 </table>
@@ -600,60 +562,18 @@ No result for vts test jobs.
 <tr>
     <th>Index</th>
     <th>Bug Id</th>
-    <th>Plan/TestSuite</th>
-    <th>Module/TestCase</th>
-    <th>Subject</th>
+    <th>Summary</th>
     <th>Status</th>
-    <th>Comments</th>
 </tr>
 {% for bug in build_bugs %}
-    {% if bug.build_no_fixed and bug.build_no_fixed.strip and bug.build_no and bug.build_no.strip %}
-        {% if build_info.build_no|add:"0" >= bug.build_no|add:"0" and build_info.build_no|add:"0" < bug.build_no_fixed|add:"0" %}
-            <tr>
-                <td>{{ forloop.counter }}</td>
-                <td><a href="{{ bug.link }}">{{ bug.bug_id }}</a></td>
-                <td>{{ bug.plan_suite }}</td>
-                <td>{{ bug.module_testcase }}</td>
-                <td>{{ bug.subject }}</td>
-                <td>{{ bug.status }}</td>
-                <td> -- </td>
-            </tr>
-        {% endif %}
-    {% elif bug.build_no_fixed and bug.build_no_fixed.strip and not bug.build_no %}
-        {% if build_info.build_no|add:"0" < bug.build_no_fixed|add:"0" %}
-            <tr>
-                <td>{{ forloop.counter }}</td>
-                <td><a href="{{ bug.link }}">{{ bug.bug_id }}</a></td>
-                <td>{{ bug.plan_suite }}</td>
-                <td>{{ bug.module_testcase }}</td>
-                <td>{{ bug.subject }}</td>
-                <td>{{ bug.status }}</td>
-                <td> -- </td>
-            </tr>
-        {% endif %}
-    {% elif not bug.build_no_fixed and not bug.build_no %}
-            <tr>
-                <td>{{ forloop.counter }}</td>
-                <td><a href="{{ bug.link }}">{{ bug.bug_id }}</a></td>
-                <td>{{ bug.plan_suite }}</td>
-                <td>{{ bug.module_testcase }}</td>
-                <td>{{ bug.subject }}</td>
-                <td>{{ bug.status }}</td>
-                <td> -- </td>
-            </tr>
-    {% elif not bug.build_no_fixed and bug.build_no and bug.build_no.strip%}
-        {% if build_info.build_no|add:"0" >= bug.build_no|add:"0" %}
-            <tr>
-                <td>{{ forloop.counter }}</td>
-                <td><a href="{{ bug.link }}">{{ bug.bug_id }}</a></td>
-                <td>{{ bug.plan_suite }}</td>
-                <td>{{ bug.module_testcase }}</td>
-                <td>{{ bug.subject }}</td>
-                <td>{{ bug.status }}</td>
-                <td> -- </td>
-            </tr>
-        {% endif %}
-    {% endif %}
+    {% ifnotequal  bug.status 'RESOLVED' %}
+    <tr>
+        <td>{{ forloop.counter }}</td>
+        <td><a href="https://bugs.linaro.org/show_bug.cgi?id={{ bug.id }}">{{ bug.id }}</a></td>
+        <td>{{ bug.summary }}</td>
+        <td>{{ bug.status }}</td>
+    </tr>
+    {% endifnotequal %}
 {% endfor %}
 </table>
 {% else %}
