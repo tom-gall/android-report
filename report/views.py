@@ -1242,8 +1242,6 @@ def test_report(request):
                             bugs.append(bug)
 
                     comments = list(Comment.objects.filter(build_name=build_name, plan_suite=job_name, module_testcase=module_name))
-                    comments_old = list(Comment.objects.filter(build_name=build_name, plan_suite=job_name.replace('-armeabi', '').replace('-arm64',''), module_testcase=module_name))
-                    comments = comments + comments_old
 
                     cts_vts_res.append({'job_name': job_name,
                                     'job_id': job_id,
