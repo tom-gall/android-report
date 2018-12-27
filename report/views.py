@@ -1051,7 +1051,13 @@ def test_report(request):
             except BaseResults.DoesNotExist:
                 base = None
 
-            bugs = Bug.objects.filter(build_name=build_name, plan_suite=test_suite, module_testcase=test_suite)
+            bugs = []
+            for bug in bugs_total:
+                if bug.status == 'RESOLVED':
+                    continue
+                if bug.summary.find(test_suite) >= 0:
+                    bugs.append(bug)
+
             comments = Comment.objects.filter(build_name=build_name, plan_suite=test_suite, module_testcase=test_suite)
 
             number_total = number_pass + number_fail + number_skip
@@ -1114,7 +1120,15 @@ def test_report(request):
                 except BaseResults.DoesNotExist:
                     base = None
 
-                bugs = Bug.objects.filter(build_name=build_name, plan_suite=test_suite, module_testcase=test_case)
+                bugs = []
+                for bug in bugs_total:
+                    if bug.status == 'RESOLVED':
+                        continue
+                    if bug.summary.find(test_case) >= 0:
+                        bugs.append(bug)
+                    elif bug.summary.find(test_suite) >= 0:
+                        bugs.append(bug)
+
                 comments = Comment.objects.filter(build_name=build_name, plan_suite=test_suite, module_testcase=test_case)
 
                 if measurement == '--':
@@ -1222,6 +1236,8 @@ def test_report(request):
 
                     bugs = []
                     for bug in bugs_total:
+                        if bug.status == 'RESOLVED':
+                            continue
                         if bug.summary.find('%s' % (module_name.split('.')[1])) >= 0:
                             bugs.append(bug)
 
@@ -1342,13 +1358,14 @@ def test_report(request):
 
     ## bugzilla related information
     build_bugzilla = BuildBugzilla.objects.get(build_name=build_name.replace('-premerge-ci', ''))
-    build_new_bug_url_prefix = '%s?product=%s&op_sys=%s&bug_severity=%s&component=%s&keywords=%s&rep_platform=%s&short_desc=%s: ' % ( build_bugzilla.new_bug_url,
+    build_new_bug_url_prefix = '%s?product=%s&op_sys=%s&bug_severity=%s&component=%s&keywords=%s&rep_platform=%s&version=%s&short_desc=%s: ' % ( build_bugzilla.new_bug_url,
                                                                                                                                       build_bugzilla.product,
                                                                                                                                       build_bugzilla.op_sys,
                                                                                                                                       build_bugzilla.bug_severity,
                                                                                                                                       build_bugzilla.component,
                                                                                                                                       build_bugzilla.keywords,
                                                                                                                                       build_bugzilla.rep_platform,
+                                                                                                                                      get_bug_version_from_build_name(build_name.replace('-premerge-ci', '')),
                                                                                                                                       build_bugzilla.short_desc_prefix,
                                                                                                                                      )
 
@@ -1719,6 +1736,8 @@ def show_cts_vts_failures(request):
                     },
             }
         '''
+        # no affect for cts result and non vts-hal test result
+        vts_abi_suffix_pat = re.compile(r"_32bit$|_64bit$")
         with zipfile.ZipFile(result_zip_path, 'r') as f_zip_fd:
             try:
                 root = ET.fromstring(f_zip_fd.read(TEST_RESULT_XML_NAME))
@@ -1736,21 +1755,20 @@ def show_cts_vts_failures(request):
                     for test_case in test_cases:
                         failed_tests = test_case.findall('.//Test[@result="fail"]')
                         for failed_test in failed_tests:
-                            test_name = '%s#%s' % (test_case.get("name"), failed_test.get("name"))
+                            test_name = '%s#%s' % (test_case.get("name"), vts_abi_suffix_pat.sub('', failed_test.get("name")))
                             stacktrace = failed_test.find('.//Failure/StackTrace').text
                             ## ignore duplicate cases as the jobs are for different modules
                             failed_testcase = failed_tests_module.get(test_name)
                             if failed_testcase:
-                                if not abi in failed_testcase.get('abis'):
-                                    failed_testcase.get('abis').append(abi)
+                                if failed_testcase.get('abi_stacktrace').get(abi) is None:
+                                    failed_testcase.get('abi_stacktrace')[abi] = stacktrace
                                 job_id = metadata.get('job_id')
                                 if not job_id in failed_testcase.get('job_ids'):
                                     failed_testcase.get('job_ids').append(job_id)
                             else:
                                 failed_tests_module[test_name]= {
                                                                     'test_name': test_name,
-                                                                    'stacktrace': stacktrace,
-                                                                    'abis': [abi],
+                                                                    'abi_stacktrace': {abi: stacktrace},
                                                                     'job_ids': [metadata.get('job_id')],
                                                                 }
             except ET.ParseError as e:
@@ -1849,8 +1867,22 @@ def show_cts_vts_failures(request):
     bugs = get_bugs_for_build(build_name=build_name)
     for module_name, failures_in_module in failures.items():
         for test_name, failure in failures_in_module.items():
+            abi_stacktrace = failure.get('abi_stacktrace')
+            abis = sorted(abi_stacktrace.keys())
+
+            stacktrace_msg = ''
+            if (len(abis) == 2) and (abi_stacktrace.get(abis[0]) != abi_stacktrace.get(abis[1])):
+                for abi in abis:
+                    stacktrace_msg = '%s\n\n%s:\n%s' % (stacktrace_msg, abi, abi_stacktrace.get(abi))
+            else:
+                stacktrace_msg = abi_stacktrace.get(abis[0])
+
+            failure['abis'] = abis
+            failure['stacktrace'] = stacktrace_msg.strip()
+
             for bug in bugs:
                 if test_name.find(module_name) >=0:
+                    # vts test, module name is the same as the test name.
                     search_key = test_name
                 else:
                     search_key = '%s %s' % (module_name, test_name)
@@ -1978,23 +2010,29 @@ def file_bug(request):
             description = '%s %s' % (module_name, test_name)
 
         def extract_abi_stacktrace(result_zip_path, module_name='', test_name=''):
-            abis = []
-            stacktrace = ''
+            failures = {}
             class_method = test_name.split('#')
             with zipfile.ZipFile(result_zip_path, 'r') as f_zip_fd:
                 try:
                     root = ET.fromstring(f_zip_fd.read(TEST_RESULT_XML_NAME))
                     for elem in root.findall('.//Module[@name="%s"]' %(module_name)):
                         abi = elem.attrib['abi']
-                        for stacktrace_node in root.findall('.//TestCase[@name="%s"]/Test[@name="%s"]/Failure/StackTrace' %(class_method[0], class_method[1])):
-                            if not stacktrace:
-                                stacktrace = stacktrace_node.text
-                            if not abi in abis:
-                                abis.append(abi)
+                        stacktrace_node = root.find('.//TestCase[@name="%s"]/Test[@name="%s"]/Failure/StackTrace' %(class_method[0], class_method[1]))
+                        if not stacktrace_node:
+                            # Try for VtsHal test cases
+                            if abi == 'arm64-v8a':
+                                stacktrace_node = root.find('.//TestCase[@name="%s"]/Test[@name="%s_64bit"]/Failure/StackTrace' %(class_method[0], class_method[1]))
+                            elif abi == 'armeabi-v7a':
+                                stacktrace_node = root.find('.//TestCase[@name="%s"]/Test[@name="%s_32bit"]/Failure/StackTrace' %(class_method[0], class_method[1]))
+                        if stacktrace_node is not None:
+                            failures[abi] = stacktrace_node.text
+                        else:
+                            logger.warn('failure StackTrace Node not found for module_name=%s, test_name=%s, abi=%s in file:%s' % (module_name, test_name, abi, result_zip_path))
+
                 except ET.ParseError as e:
                     logger.error('xml.etree.ElementTree.ParseError: %s' % e)
                     logger.info('Please Check %s manually' % result_zip_path)
-            return (abis, stacktrace)
+            return failures
 
         abis = []
         stacktrace_msg = None
@@ -2008,15 +2046,18 @@ def file_bug(request):
                             'build_no': build_no,
                             'build_name': build_name,
                             }
-                (abis_sub, stacktrace) = extract_abi_stacktrace(result_file_path, module_name=module_name, test_name=test_name)
-                for abi in abis_sub:
-                    if not abi in abis:
-                        abis.append(abi)
-                if not stacktrace_msg:
-                    stacktrace_msg = stacktrace
+                failures = extract_abi_stacktrace(result_file_path, module_name=module_name, test_name=test_name)
+                abis = sorted(failures.keys())
+
+                stacktrace_msg = ''
+                if (len(abis) == 2) and (failures.get(abis[0]) != failures.get(abis[1])):
+                    for abi in abis:
+                        stacktrace_msg = '%s\n\n%s:\n%s' % (stacktrace_msg, abi, failures.get(abi))
+                else:
+                    stacktrace_msg = failures.get(abis[0])
 
         description += '\n\nABIs:\n%s' % (' '.join(abis))
-        description += '\n\nStackTrace: %s' % (stacktrace_msg)
+        description += '\n\nStackTrace: \n%s' % (stacktrace_msg.strip())
         description += '\n\nLava Job:'
         for job_id in job_ids:
             description += '\n%s/%s' % (lava.job_url_prefix, job_id)

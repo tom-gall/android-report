@@ -193,31 +193,14 @@
     <td align='left'>
         {% with test_info.bugs as bugs %}
         {% for bug in bugs %}
-            {% if bug.build_no_fixed and bug.build_no %}
-                {% if build_info.build_no|add:"0" >= bug.build_no|add:"0" and build_info.build_no|add:"0" < bug.build_no_fixed|add:"0" %}
-                    <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
-                {% endif %}
-            {% elif bug.build_no_fixed and not bug.build_no %}
-                {% if build_info.build_no|add:"0" < bug.build_no_fixed|add:"0" %}
-                    <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
-                {% endif %}
-            {% elif not bug.build_no_fixed and not bug.build_no %}
-                <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
-            {% elif not bug.build_no_fixed and bug.build_no %}
-                {% if build_info.build_no|add:"0" >= bug.build_no|add:"0" %}
-                    <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
-                {% endif %}
-            {% endif %}
+            {% if not forloop.first %}<br/>{% endif %}
+            <a href="{{build_info.bugzilla_show_bug_prefix}}{{ bug.id }}">{{ bug.id }}</a>
         {% endfor%}
         {% endwith%}
     </td>
     <td align='left'>
         {% ifnotequal test_info.number_passrate 100 %}
-        <a target='_blank' href="/report/add-bug/?build_name={{ build_info.build_name }}&plan_suite={{ test_info.test_suite }}&&module_testcase={{ test_info.test_suite }}">Add Bug</a><br/>
         <a target='_blank' href="{{ build_info.new_bug_url_prefix }}{{ test_info.test_suite }}">Report Android Bug</a>&nbsp;
-        <!--
-        <a target='_blank' href="https://bugs.linaro.org/enter_bug.cgi?product=LAVA%20Framework">Report LAVA Bug</a>&nbsp;
-        -->
         {% endifnotequal %}
     </td>
 </tr>
@@ -279,31 +262,14 @@ No result for basic test, or optee test, or weekly test jobs
     <td align='left'>
         {% with test_info.bugs as bugs %}
         {% for bug in bugs %}
-            {% if bug.build_no_fixed and bug.build_no %}
-                {% if build_info.build_no|add:"0" >= bug.build_no|add:"0" and build_info.build_no|add:"0" < bug.build_no_fixed|add:"0" %}
-                    <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
-                {% endif %}
-            {% elif bug.build_no_fixed and not bug.build_no %}
-                {% if build_info.build_no|add:"0" < bug.build_no_fixed|add:"0" %}
-                    <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
-                {% endif %}
-            {% elif not bug.build_no_fixed and not bug.build_no %}
-                <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
-            {% elif not bug.build_no_fixed and bug.build_no %}
-                {% if build_info.build_no|add:"0" >= bug.build_no|add:"0" %}
-                    <a target='_blank' href="{{ bug.link }}">{{ bug.bug_id }} </a><br/>
-                {% endif %}
-            {% endif %}
+            {% if not forloop.first %}<br/>{% endif %}
+            <a href="{{build_info.bugzilla_show_bug_prefix}}{{ bug.id }}">{{ bug.id }}</a>
         {% endfor%}
         {% endwith%}
     </td>
     <td align='left'>
         {% if test_info.difference <= -50 %}
-        <a target='_blank' href="/report/add-bug/?build_name={{ build_info.build_name }}&plan_suite={{ test_info.test_suite }}&&module_testcase={{ test_info.test_case }}">Add Bug</a><br/>
         <a target='_blank' href="{{ build_info.new_bug_url_prefix }}{{ test_info.test_case }}">Report Android Bug</a>&nbsp;
-        <!--
-        <a target='_blank' href="https://bugs.linaro.org/enter_bug.cgi?product=LAVA%20Framework">Report LAVA Bug</a>&nbsp;
-        -->
         {% endif %}
     </td>
 </tr>
@@ -339,6 +305,7 @@ No result for benchmark test jobs.
     <th rowspan=2>Module</th>
     <th colspan=4>Base({{ build_info.base_build_no }})</th>
     <th colspan=5>Current</th>
+    <th rowspan=2>Bugs</th>
     <th rowspan=2>Comments</th>
 </tr>
 
@@ -408,6 +375,14 @@ No result for benchmark test jobs.
     {% else  %}
     <td align='right'  > {{ test_info.number_passrate|floatformat:2 }}</td>
     {% endif %}
+    <td align='left'>
+        {% with test_info.bugs as bugs %}
+        {% for bug in bugs %}
+            {% if not forloop.first %}<br/>{% endif %}
+            <a target="_blank" href="{{build_info.bugzilla_show_bug_prefix}}{{bug.id}}">{{ bug.id }}</a>
+        {% endfor%}
+        {% endwith%}
+    </td>
     <td>
         <ul>
         {% with test_info.comments as comments %}
@@ -465,6 +440,7 @@ No result for cts test jobs.
     <th rowspan=2>Module</th>
     <th colspan=4>Base({{ build_info.base_build_no }})</th>
     <th colspan=5>Current</th>
+    <th rowspan=2>Bugs</th>
     <th rowspan=2>Comments</th>
 </tr>
 
@@ -516,12 +492,24 @@ No result for cts test jobs.
     <td align='right'> {{ test_info.number_total }}</td>
     <td align='right'> {{ test_info.module_done }}</td>
     {% if test_info.number_passrate == 0 %}
+    {% if test_info.number_total == 0 and test_info.module_done == 'pass' %}
+    <td align='right'  > {{ test_info.number_passrate|floatformat:2 }}</td>
+    {% else  %}
     <td align='right' style="background-color:red" > {{ test_info.number_passrate|floatformat:2 }}</td>
+    {% endif %}
     {% elif test_info.number_passrate == 100 %}
     <td align='right' style="background-color:green" > {{ test_info.number_passrate|floatformat:2 }}</td>
     {% else  %}
     <td align='right'  > {{ test_info.number_passrate|floatformat:2 }}</td>
     {% endif %}
+    <td align='left'>
+        {% with test_info.bugs as bugs %}
+        {% for bug in bugs %}
+            {% if not forloop.first %}<br/>{% endif %}
+            <a target="_blank" href="{{build_info.bugzilla_show_bug_prefix}}{{bug.id}}">{{ bug.id }}</a>
+        {% endfor%}
+        {% endwith%}
+    </td>
     <td>
         <ul>
         {% with test_info.comments as comments %}

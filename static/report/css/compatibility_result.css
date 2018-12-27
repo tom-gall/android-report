@@ -19,7 +19,7 @@ table.testdetails {
   border-color: #a5c639;
   border-width: 1;
   margin-bottom: 2em;
-  margin-left: auto;
+  /*margin-left: auto;*/
   margin-right: auto;
   vertical-align: top;
   /* width: 95%; */
@@ -53,7 +53,8 @@ td.testname {
 }
 div.details {
   overflow: hidden;
-  white-space: pre;
+  /*https://www.w3schools.com/cssref/pr_text_white-space.asp */
+  white-space: pre-wrap;
   /*white-space: pre-wrap;*/       /* css-3 */
   white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
   white-space: -pre-wrap;      /* Opera 4-6 */
