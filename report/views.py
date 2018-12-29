@@ -1321,8 +1321,6 @@ def test_report(request):
            pass
 
     ##############################################################
-    build_bugs = Bug.objects.filter(build_name=build_name)
-    ##############################################################
     try:
         build_summary = BuildSummary.objects.get(build_name=build_name, build_no=build_no)
         build_config_url = "%s/%s?id=%s" % (android_build_config_url_base, build_summary.build_config, build_summary.build_commit)
@@ -1673,7 +1671,12 @@ def get_bugs_for_build(build_name=None):
     for bug in bugzilla_instance.search_bugs(terms).bugs:
         bugs.append(bugzilla.DotDict(bug))
 
-    return bugs
+
+    def get_bug_summary(item):
+        return item.get('summary')
+
+    sorted_bugs = sorted(bugs, key=get_bug_summary)
+    return sorted_bugs
 
 
 @login_required
