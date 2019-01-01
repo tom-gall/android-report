@@ -47,7 +47,13 @@
         {% with failure.bugs as bugs %}
         {% for bug in bugs %}
         {% if not forloop.first %}<br/>{% endif %}
-        <a target="_blank" href="{{build_info.bugzilla_show_bug_prefix}}{{bug.id}}">{{ bug.id }}</a>
+        <a target="_blank" href="{{build_info.bugzilla_show_bug_prefix}}{{bug.id}}">
+        {% if bug.status == 'RESOLVED' %}
+        <del> {{ bug.id }} </del>
+        {% else %}
+        {{ bug.id }}
+        {% endif %}
+        </a>
         {% empty %}
         <a target='_blank' href="/report/file-bug?build_name={{ build_info.build_name}}&build_no={{build_info.build_no}}&module_name={{module_name}}&test_name={{failure.test_name|escapesharp}}&job_ids={{failure.job_ids|join:','}}">Report Android Bug</a>&nbsp;
         {% endfor %}

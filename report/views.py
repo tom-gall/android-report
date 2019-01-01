@@ -1053,7 +1053,7 @@ def test_report(request):
 
             bugs = []
             for bug in bugs_total:
-                if bug.status == 'RESOLVED':
+                if bug.status == 'RESOLVED' and bug.resolution != 'WONTFIX':
                     continue
                 if bug.summary.find(test_suite) >= 0:
                     bugs.append(bug)
@@ -1122,7 +1122,7 @@ def test_report(request):
 
                 bugs = []
                 for bug in bugs_total:
-                    if bug.status == 'RESOLVED':
+                    if bug.status == 'RESOLVED' and bug.resolution != 'WONTFIX':
                         continue
                     if bug.summary.find(test_case) >= 0:
                         bugs.append(bug)
@@ -1236,7 +1236,7 @@ def test_report(request):
 
                     bugs = []
                     for bug in bugs_total:
-                        if bug.status == 'RESOLVED':
+                        if bug.status == 'RESOLVED' and bug.resolution != 'WONTFIX':
                             continue
                         if bug.summary.find('%s' % (module_name.split('.')[1])) >= 0:
                             bugs.append(bug)

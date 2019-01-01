@@ -194,7 +194,13 @@
         {% with test_info.bugs as bugs %}
         {% for bug in bugs %}
             {% if not forloop.first %}<br/>{% endif %}
-            <a href="{{build_info.bugzilla_show_bug_prefix}}{{ bug.id }}">{{ bug.id }}</a>
+            <a href="{{build_info.bugzilla_show_bug_prefix}}{{ bug.id }}">
+            {% if bug.resolution == 'WONTFIX' %}
+            <del> {{ bug.id }} </del>
+            {% else %}
+            {{ bug.id }}
+            {% endif %}
+            </a>
         {% endfor%}
         {% endwith%}
     </td>
@@ -263,7 +269,13 @@ No result for basic test, or optee test, or weekly test jobs
         {% with test_info.bugs as bugs %}
         {% for bug in bugs %}
             {% if not forloop.first %}<br/>{% endif %}
-            <a href="{{build_info.bugzilla_show_bug_prefix}}{{ bug.id }}">{{ bug.id }}</a>
+            <a href="{{build_info.bugzilla_show_bug_prefix}}{{ bug.id }}">
+            {% if bug.resolution == 'WONTFIX' %}
+            <del> {{ bug.id }} </del>
+            {% else %}
+            {{ bug.id }}
+            {% endif %}
+            </a>
         {% endfor%}
         {% endwith%}
     </td>
@@ -379,7 +391,13 @@ No result for benchmark test jobs.
         {% with test_info.bugs as bugs %}
         {% for bug in bugs %}
             {% if not forloop.first %}<br/>{% endif %}
-            <a target="_blank" href="{{build_info.bugzilla_show_bug_prefix}}{{bug.id}}">{{ bug.id }}</a>
+            <a target="_blank" href="{{build_info.bugzilla_show_bug_prefix}}{{bug.id}}">
+            {% if bug.resolution == 'WONTFIX' %}
+            <del> {{ bug.id }} </del>
+            {% else %}
+            {{ bug.id }}
+            {% endif %}
+            </a>
         {% endfor%}
         {% endwith%}
     </td>
@@ -506,7 +524,13 @@ No result for cts test jobs.
         {% with test_info.bugs as bugs %}
         {% for bug in bugs %}
             {% if not forloop.first %}<br/>{% endif %}
-            <a target="_blank" href="{{build_info.bugzilla_show_bug_prefix}}{{bug.id}}">{{ bug.id }}</a>
+            <a target="_blank" href="{{build_info.bugzilla_show_bug_prefix}}{{bug.id}}">
+            {% if bug.resolution == 'WONTFIX' %}
+            <del> {{ bug.id }} </del>
+            {% else %}
+            {{ bug.id }}
+            {% endif %}
+            </a>
         {% endfor%}
         {% endwith%}
     </td>
