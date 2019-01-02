@@ -2019,7 +2019,7 @@ def file_bug(request):
                     for elem in root.findall('.//Module[@name="%s"]' %(module_name)):
                         abi = elem.attrib['abi']
                         stacktrace_node = root.find('.//TestCase[@name="%s"]/Test[@name="%s"]/Failure/StackTrace' %(class_method[0], class_method[1]))
-                        if not stacktrace_node:
+                        if stacktrace_node is None:
                             # Try for VtsHal test cases
                             if abi == 'arm64-v8a':
                                 stacktrace_node = root.find('.//TestCase[@name="%s"]/Test[@name="%s_64bit"]/Failure/StackTrace' %(class_method[0], class_method[1]))
@@ -2051,7 +2051,9 @@ def file_bug(request):
                 abis = sorted(failures.keys())
 
                 stacktrace_msg = ''
-                if (len(abis) == 2) and (failures.get(abis[0]) != failures.get(abis[1])):
+                if len(abis) == 0:
+                    continue
+                elif (len(abis) == 2) and (failures.get(abis[0]) != failures.get(abis[1])):
                     for abi in abis:
                         stacktrace_msg = '%s\n\n%s:\n%s' % (stacktrace_msg, abi, failures.get(abi))
                 else:
