@@ -196,7 +196,7 @@
             {% if not forloop.first %}<br/>{% endif %}
             <a href="{{build_info.bugzilla_show_bug_prefix}}{{ bug.id }}">
             {% if bug.resolution == 'WONTFIX' %}
-            <del> {{ bug.id }} </del>
+            <del style="background-color:lightgrey; color:white"> {{ bug.id }} </del>
             {% else %}
             {{ bug.id }}
             {% endif %}
@@ -271,7 +271,7 @@ No result for basic test, or optee test, or weekly test jobs
             {% if not forloop.first %}<br/>{% endif %}
             <a href="{{build_info.bugzilla_show_bug_prefix}}{{ bug.id }}">
             {% if bug.resolution == 'WONTFIX' %}
-            <del> {{ bug.id }} </del>
+            <del style="background-color:lightgrey; color:white"> {{ bug.id }} </del>
             {% else %}
             {{ bug.id }}
             {% endif %}
@@ -393,7 +393,7 @@ No result for benchmark test jobs.
             {% if not forloop.first %}<br/>{% endif %}
             <a target="_blank" href="{{build_info.bugzilla_show_bug_prefix}}{{bug.id}}">
             {% if bug.resolution == 'WONTFIX' %}
-            <del> {{ bug.id }} </del>
+            <del style="background-color:lightgrey; color:white"> {{ bug.id }} </del>
             {% else %}
             {{ bug.id }}
             {% endif %}
@@ -526,7 +526,7 @@ No result for cts test jobs.
             {% if not forloop.first %}<br/>{% endif %}
             <a target="_blank" href="{{build_info.bugzilla_show_bug_prefix}}{{bug.id}}">
             {% if bug.resolution == 'WONTFIX' %}
-            <del> {{ bug.id }} </del>
+            <del style="background-color:lightgrey; color:white"> {{ bug.id }} </del>
             {% else %}
             {{ bug.id }}
             {% endif %}
