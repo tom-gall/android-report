@@ -2037,7 +2037,7 @@ def file_bug(request):
 
         abis = []
         stacktrace_msg = None
-        
+        failures = {}
         for job_id in job_ids:
             result_file_path = get_result_file_path(build_name=build_name, build_no=build_no, job_id=job_id)
             if os.path.exists(result_file_path):
@@ -2047,17 +2047,17 @@ def file_bug(request):
                             'build_no': build_no,
                             'build_name': build_name,
                             }
-                failures = extract_abi_stacktrace(result_file_path, module_name=module_name, test_name=test_name)
-                abis = sorted(failures.keys())
+                failures.update(extract_abi_stacktrace(result_file_path, module_name=module_name, test_name=test_name))
 
-                stacktrace_msg = ''
-                if len(abis) == 0:
-                    continue
-                elif (len(abis) == 2) and (failures.get(abis[0]) != failures.get(abis[1])):
-                    for abi in abis:
-                        stacktrace_msg = '%s\n\n%s:\n%s' % (stacktrace_msg, abi, failures.get(abi))
-                else:
-                    stacktrace_msg = failures.get(abis[0])
+        abis = sorted(failures.keys())
+        stacktrace_msg = ''
+        if len(abis) == 0:
+            logger.error('Failed to get stacktrace information for %s %s form jobs: '% (module_name, test_name, str(job_ids)))
+        elif (len(abis) == 2) and (failures.get(abis[0]) != failures.get(abis[1])):
+            for abi in abis:
+                stacktrace_msg = '%s\n\n%s:\n%s' % (stacktrace_msg, abi, failures.get(abi))
+        else:
+            stacktrace_msg = failures.get(abis[0])
 
         description += '\n\nABIs:\n%s' % (' '.join(abis))
         description += '\n\nStackTrace: \n%s' % (stacktrace_msg.strip())
