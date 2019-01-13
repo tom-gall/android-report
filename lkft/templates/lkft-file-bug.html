@@ -7,11 +7,11 @@
 {% block content %}
 <div align="center">
 {% if not from.errors and submit_result %}
-<div>Bug created successfully <a href="{{build_info.bugzilla_show_bug_prefix}}{{build_info.bug_id}}">{{build_info.bug_id}}</a></div>
+<div>Bug created successfully <a href="{{bug_info.bugzilla_show_bug_prefix}}{{bug_info.bug_id}}">{{bug_info.bug_id}}</a></div>
 
 {% else %}
 <div>{{ form.errors }}</div>
-<form action="/report/file-bug/" method="post">
+<form action="/lkft/file-bug/" method="post">
     {% csrf_token %}
     <table border="2" >
     {{ form.as_table }}

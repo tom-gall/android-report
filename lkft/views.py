@@ -190,6 +190,8 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
                             failed_tests_module[test_name]= {
                                                                 'test_name': test_name,
                                                                 'module_name': module_name,
+                                                                'test_class': test_case.get("name"),
+                                                                'test_method': failed_test.get("name"),
                                                                 'abi_stacktrace': {abi: stacktrace},
                                                                 'qa_job_ids': [ qa_job_id ],
                                                                 'kernel_versions': [ kernel_version ],
@@ -260,7 +262,6 @@ def get_lkft_bugs():
                 {u'component': 'General'},
                 {u'platform': 'HiKey'},
                 {u'op_sys': 'Android'},
-                #{u'version': get_bug_version_from_build_name(build_name)},
                 {u'keywords': 'LKFT'}
             ]
 
@@ -320,8 +321,10 @@ def list_jobs(request):
 
     bugs = get_lkft_bugs()
     failures_list = []
-    for module_name, failures_in_module in failures.items():
-        for test_name, failure in failures_in_module.items():
+    for module_name in sorted(failures.keys()):
+        failures_in_module = failures.get(module_name)
+        for test_name in sorted(failures_in_module.keys()):
+            failure = failures_in_module.get(test_name)
             abi_stacktrace = failure.get('abi_stacktrace')
             abis = sorted(abi_stacktrace.keys())
 
@@ -350,13 +353,17 @@ def list_jobs(request):
                     else:
                         failure['bugs'] = [bug]
 
-
+    android_version = get_bug_android_version_from_project_name(project_name=project.get('name'))
     open_bugs = []
     for bug in bugs:
-        if bug.status== 'VERIFIED' or bug.status== 'RESOLVED':
+        if bug.status == 'VERIFIED' or bug.status == 'RESOLVED':
             continue
-        else:
-            open_bugs.append(bug)
+
+        if bug.version != android_version:
+            continue
+
+        open_bugs.append(bug)
+
 
     # sort failures
     for module_name, failures_in_module in failures.items():
@@ -427,14 +434,16 @@ def file_bug(request):
             bug.keywords = cd['keywords']
 
             bug_id = bugzilla_instance.post_bug(bug).id
-
+            bug_info = {
+                           'bugzilla_show_bug_prefix': bugzilla_show_bug_prefix,
+                           'bug_id': bug_id,
+                        }
             submit_result = True
             return render(request, 'lkft-file-bug.html',
                           {
                             "submit_result": submit_result,
-                            'bugzilla_show_bug_prefix': bugzilla_show_bug_prefix,
-                            'bug_id': bug_id,
-                            'form': 'form'
+                            'bug_info': bug_info,
+                            'form': form,
                           })
 
         else:
@@ -475,6 +484,7 @@ def file_bug(request):
 
         project_api_url = qa_jobs[0].get('target')
         project = qa_report_get_with_full_api(request_url=project_api_url)
+
         build_api_url = qa_jobs[0].get('target_build')
         build = qa_report_get_with_full_api(request_url=build_api_url)
 
@@ -499,12 +509,6 @@ def file_bug(request):
                         'version': get_bug_android_version_from_project_name(project.get('name')),
                         }
 
-        if test_name.find(module_name) >=0:
-            form_initial['summary'] = '%s' % (test_name)
-            description = '%s' % (test_name)
-        else:
-            form_initial['summary'] = '%s %s' % (module_name, test_name)
-            description = '%s %s' % (module_name, test_name)
 
         def extract_abi_stacktrace(result_zip_path, module_name='', test_name=''):
             failures = {}
@@ -531,33 +535,66 @@ def file_bug(request):
                     logger.info('Please Check %s manually' % result_zip_path)
             return failures
 
+        project_kernel_version = None
+        if project.get('name').startswith('android-hikey-linaro-') or project.get('name').startswith('android-x15-linux-'):
+            project_kernel_version = project.get('name').split('-')[3]
+        else:
+            # aosp-master-tracking and aosp-8.1-tracking
+            pass
+
         abis = []
         stacktrace_msg = None
         failures = {}
+        failed_kernels = []
         for qa_job in qa_jobs:
             lava_job_id = qa_job.get('job_id')
             lava_url = qa_job.get('external_url')
             lava_config = find_lava_config(lava_url)
             result_file_path = get_result_file_path(qa_job)
-            failures.update(extract_abi_stacktrace(result_file_path, module_name=module_name, test_name=test_name))
+
+            if project_kernel_version is None:
+                environment = qa_job.get('environment')
+                if environment.startswith('hi6220-hikey_'):
+                    kernel_version = environment.replace('hi6220-hikey_', '')
+                else:
+                    # impossible path for hikey
+                    pass
+            else:
+                kernel_version = project_kernel_version
+
+            qa_job['kernel_version'] = kernel_version
+            job_failures = extract_abi_stacktrace(result_file_path, module_name=module_name, test_name=test_name)
+            failures.update(job_failures)
+            if not kernel_version in failed_kernels:
+                # assuming the job specified mush have the failure for the module and test
+                failed_kernels.append(kernel_version)
 
         abis = sorted(failures.keys())
         stacktrace_msg = ''
         if len(abis) == 0:
-            logger.error('Failed to get stacktrace information for %s %s form jobs: '% (module_name, test_name, str(job_ids)))
+            logger.error('Failed to get stacktrace information for %s %s form jobs: '% (module_name, test_name, str(qa_job_ids_str)))
         elif (len(abis) == 2) and (failures.get(abis[0]) != failures.get(abis[1])):
             for abi in abis:
                 stacktrace_msg = '%s\n\n%s:\n%s' % (stacktrace_msg, abi, failures.get(abi))
         else:
             stacktrace_msg = failures.get(abis[0])
 
+        if test_name.find(module_name) >=0:
+            form_initial['summary'] = '%s %s' % (' '.join(sorted(failed_kernels)), test_name)
+            description = '%s' % (test_name)
+        else:
+            form_initial['summary'] = '%s %s %s' % (' '.join(sorted(failed_kernels)), module_name, test_name)
+            description = '%s %s' % ( module_name, test_name)
+
+
         description += '\n\nABIs:\n%s' % (' '.join(abis))
+        description += '\n\nKernels:\n%s' % (' '.join(sorted(failed_kernels)))
         description += '\n\nStackTrace: \n%s' % (stacktrace_msg.strip())
-        description += '\n\nLava Job:'
+        description += '\n\nLava Jobs:'
         for qa_job in qa_jobs:
             description += '\n%s' % (qa_job.get('external_url'))
 
-        description += '\n\nResult File Url:'
+        description += '\n\nResult File Urls:'
         for qa_job in qa_jobs:
             description += '\n%s' % qa_job.get('attachment_url')
 

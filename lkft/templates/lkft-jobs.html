@@ -1,6 +1,9 @@
 {% extends '_layouts/base.html' %}
+
 {% load static%}
 {% load escapesharp %}
+{% load startswith %}
+
 {% block title %} Jobs for {{ project.name }} {{ build.version }} {% endblock %}
 
 {% block headline %}<h1>Jobs for {{ project.name }} {{ build.version }}</h1>{% endblock %}
@@ -11,12 +14,13 @@
 
 {% block content %}
 <div>
+<h2>Job List:</h2>
 <table border="1">
 <tr> 
-    <td> Index</td>
-    <td> Job Id(Job Link)</a> </td>
-    <td> Job Name(Result Attachment Link) </a></td>
-    <td> Job Status </td>
+    <th> Index</th>
+    <th> Job Id(Job Link)</a> </th>
+    <th> Job Name(Result Attachment Link) </a></th>
+    <th> Job Status </th>
 </tr>
 {% for job in jobs %}
 <tr>
@@ -34,6 +38,7 @@
 </div>
 <hr/>
 
+<div>
 <h2>Bug Status:</h2>
 {% if open_bugs %}
 <table border=2>
@@ -57,10 +62,11 @@
 {% else %}
 Excellent build, no open bugs on it at the moment.
 {% endif %}
-
+</div>
 
 <hr/>
 <div align="left">
+<h2>Summary of Failures</h2>
 <table class="testdetails">
 <tbody>
 <tr>
@@ -80,7 +86,13 @@ Excellent build, no open bugs on it at the moment.
         {% with failure.abis as abis %}
         {% for abi in abis %}
         {% if not forloop.first %}<br/>{% endif %}
-        {{ abi }}
+        {% if failure.module_name|startswith:'Vts' %}
+        <a href="https://qa-reports.linaro.org/android-lkft/{{ project.name }}/tests/vts-test/{{abi}}.{{failure.module_name}}/{{failure.test_class}}.{{failure.test_method}}">{{ abi }}</a>
+        {% elif failure.module_name == "CtsOnGsiTrebleFrameworkVintfTest" %}
+        <a href="https://qa-reports.linaro.org/android-lkft/{{ project.name }}/tests/vts-test/{{abi}}.{{failure.module_name}}/{{failure.test_class}}.{{failure.test_method}}">{{ abi }}</a>
+        {% else %}
+        <a href="https://qa-reports.linaro.org/android-lkft/{{ project.name }}/tests/cts-lkft-{{abi}}/{{abi}}.{{failure.module_name}}/{{failure.test_class}}.{{failure.test_method}}">{{ abi }}</a>
+        {% endif %}
         {% endfor %}
         {% endwith %}
     </td>
@@ -96,9 +108,9 @@ Excellent build, no open bugs on it at the moment.
         {% with failure.bugs as bugs %}
         {% for bug in bugs %}
         {% if not forloop.first %}<br/>{% endif %}
-        <a target="_blank" href="{{build_info.bugzilla_show_bug_prefix}}{{bug.id}}">
+        <a target="_blank" href="{{bugzilla_show_bug_prefix}}{{bug.id}}">
         {% if bug.status == 'RESOLVED' %}
-        <del> {{ bug.id }} </del>
+        <del style="background-color:lightgrey; color:white"> {{ bug.id }} </del>
         {% else %}
         {{ bug.id }}
         {% endif %}
@@ -116,12 +128,13 @@ Excellent build, no open bugs on it at the moment.
 <hr/>
 <hr/>
 <div align="left">
+<h2>Details of Failures</h2>
 {% for module_name, module_failures in failures.items %}
 {% if module_failures|length > 0 %}
 <table class="testdetails">
 <tbody>
 <tr>
-    <td class="module" colspan="8">
+    <td class="module" colspan="9">
         <a name="{{module_name}}">{{module_name}} has {{ module_failures|length }} failures</a>
     </td>
 </tr>
@@ -144,7 +157,13 @@ Excellent build, no open bugs on it at the moment.
         {% with failure.abis as abis %}
         {% for abi in abis %}
         {% if not forloop.first %}<br/>{% endif %}
-        {{ abi }}
+        {% if failure.module_name|startswith:'Vts' %}
+        <a href="https://qa-reports.linaro.org/android-lkft/{{ project.name }}/tests/vts-test/{{abi}}.{{failure.module_name}}/{{failure.test_class}}.{{failure.test_method}}">{{ abi }}</a>
+        {% elif failure.module_name == "CtsOnGsiTrebleFrameworkVintfTest" %}
+        <a href="https://qa-reports.linaro.org/android-lkft/{{ project.name }}/tests/vts-test/{{abi}}.{{failure.module_name}}/{{failure.test_class}}.{{failure.test_method}}">{{ abi }}</a>
+        {% else %}
+        <a href="https://qa-reports.linaro.org/android-lkft/{{ project.name }}/tests/cts-lkft-{{abi}}/{{abi}}.{{failure.module_name}}/{{failure.test_class}}.{{failure.test_method}}">{{ abi }}</a>
+        {% endif %}
         {% endfor %}
         {% endwith %}
     </td>
@@ -163,13 +182,13 @@ Excellent build, no open bugs on it at the moment.
         {% if not forloop.first %}<br/>{% endif %}
         <a target="_blank" href="{{bugzilla_show_bug_prefix}}{{bug.id}}">
         {% if bug.status == 'RESOLVED' %}
-        <del> {{ bug.id }} </del>
+        <del style="background-color:lightgrey; color:white"> {{ bug.id }} </del>
         {% else %}
         {{ bug.id }}
         {% endif %}
         </a>
         {% empty %}
-        <a target='_blank' href="/lkft/file-bug?build_name={{ build_info.build_name}}&build_no={{build_info.build_no}}&module_name={{module_name}}&test_name={{failure.test_name|escapesharp}}&qa_job_ids={{failure.qa_job_ids|join:','}}">Report Android Bug</a>&nbsp;
+        <a target='_blank' href="/lkft/file-bug?module_name={{module_name}}&test_name={{failure.test_name|escapesharp}}&qa_job_ids={{failure.qa_job_ids|join:','}}">Report Android Bug</a>&nbsp;
         {% endfor %}
         {% endwith %}
     </td>
