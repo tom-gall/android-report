@@ -25,11 +25,28 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FILES_DIR = os.path.join(BASE_DIR, "files/cts-vts")
 
 
+LAVA_SERVERS = {
+    'lkft': {
+                'nick':'lkft',
+                'hostname': 'lkft.validation.linaro.org',
+                'username': '',
+                'token': '',
+            },
+    'production': {
+                'nick': 'production',
+                'hostname': 'validation.linaro.org',
+                'username': '',
+                'token': '',
+                },
+}
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.11/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'dr663lyqjd_b-a*0ttwcycp5wfm7&$0-#l6odw#^==ewq!s51s'
+
+BUGZILLA_API_KEY = ''
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -50,6 +67,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'report',
+    'lkft',
     'crispy_forms',
 ]
 
@@ -203,6 +221,11 @@ LOGGING = {
         #    'propagate': False,
         #},
         'report': {
+            'handlers': ['console', 'logfile'],
+            'level': 'INFO',
+            #'level': 'DEBUG',
+        },
+        'lkft': {
             'handlers': ['console', 'logfile'],
             'level': 'INFO',
             #'level': 'DEBUG',

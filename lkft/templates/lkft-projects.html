@@ -1,0 +1,49 @@
+{% extends '_layouts/base.html' %}
+
+{% block title %} LKFT Projects {% endblock %}
+
+{% block headline %}<h1>LKFT Projects</h1>{% endblock %}
+
+{% block content %}
+<div>
+<table border="1">
+	<tr>
+		<td>Index</td>
+		<td>Project</td>
+	</tr>
+{% for project in projects %}
+<tr>
+	<td> {{ forloop.counter }}</td>
+    <td>
+        <a href="/lkft/builds?project_id={{project.id}}">{{project.name}}</a>
+    </td>
+</tr>
+{% endfor %}
+</table>
+</div>
+<div>
+{% if open_bugs %}
+<h2>Open Bugs</h2>
+<table border=2>
+<tr>
+    <th>Index</th>
+    <th>Bug Id</th>
+    <th>Summary</th>
+    <th>Status</th>
+</tr>
+{% for bug in open_bugs %}
+    {% ifnotequal  bug.status 'RESOLVED' %}
+    <tr>
+        <td>{{ forloop.counter }}</td>
+        <td><a href="https://bugs.linaro.org/show_bug.cgi?id={{ bug.id }}">{{ bug.id }}</a></td>
+        <td>{{ bug.summary }}</td>
+        <td>{{ bug.status }}</td>
+    </tr>
+    {% endifnotequal %}
+{% endfor %}
+</table>
+{% else %}
+Excellent build, no open bugs on it at the moment.
+{% endif %}
+</div>
+{% endblock %}

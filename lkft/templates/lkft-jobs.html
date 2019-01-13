@@ -1,0 +1,178 @@
+{% extends '_layouts/base.html' %}
+{% load static%}
+{% load escapesharp %}
+{% block title %} Jobs for {{ project.name }} {{ build.version }} {% endblock %}
+
+{% block headline %}<h1>Jobs for {{ project.name }} {{ build.version }}</h1>{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static "report/css/compatibility_result.css" %}">
+{% endblock %}
+
+{% block content %}
+<div>
+<table border="1">
+<tr> 
+    <td> Index</td>
+    <td> Job Id(Job Link)</a> </td>
+    <td> Job Name(Result Attachment Link) </a></td>
+    <td> Job Status </td>
+</tr>
+{% for job in jobs %}
+<tr>
+	<td> {{ forloop.counter }}</td>
+    <td> <a href="{{job.external_url}}">{{job.job_id}}</a> </td>
+    {% if job.attachment_url %}
+    <td> <a href="{{job.attachment_url}}">{{job.name}} </a></td>
+    {% else %}
+    <td> {{job.name}}</td>
+    {% endif %}
+    <td>{{job.job_status}} </td>
+</tr>
+{% endfor %}
+</table>
+</div>
+<hr/>
+
+<h2>Bug Status:</h2>
+{% if open_bugs %}
+<table border=2>
+<tr>
+    <th>Index</th>
+    <th>Bug Id</th>
+    <th>Summary</th>
+    <th>Status</th>
+</tr>
+{% for bug in open_bugs %}
+    {% ifnotequal  bug.status 'RESOLVED' %}
+    <tr>
+        <td>{{ forloop.counter }}</td>
+        <td><a href="{{bugzilla_show_bug_prefix}}{{ bug.id }}">{{ bug.id }}</a></td>
+        <td>{{ bug.summary }}</td>
+        <td>{{ bug.status }}</td>
+    </tr>
+    {% endifnotequal %}
+{% endfor %}
+</table>
+{% else %}
+Excellent build, no open bugs on it at the moment.
+{% endif %}
+
+
+<hr/>
+<div align="left">
+<table class="testdetails">
+<tbody>
+<tr>
+    <th>Index</th>
+    <th>Module</th>
+    <th>Test</th>
+    <th>Abis</th>
+    <th>Bugs</th>
+</tr>
+{% for failure in failures_list %}
+<tr>
+	<td>{{forloop.counter}}</td>
+	<td class="testname">{{failure.module_name}}</td>
+    <td class="testname">{{failure.test_name}}</td>
+    <td nowrap>
+        {% with failure.abis as abis %}
+        {% for abi in abis %}
+        {% if not forloop.first %}<br/>{% endif %}
+        {{ abi }}
+        {% endfor %}
+        {% endwith %}
+    </td>
+    <td>
+        {% with failure.bugs as bugs %}
+        {% for bug in bugs %}
+        {% if not forloop.first %}<br/>{% endif %}
+        <a target="_blank" href="{{build_info.bugzilla_show_bug_prefix}}{{bug.id}}">
+        {% if bug.status == 'RESOLVED' %}
+        <del> {{ bug.id }} </del>
+        {% else %}
+        {{ bug.id }}
+        {% endif %}
+        </a>
+        {% empty %}
+        {% endfor %}
+        {% endwith %}
+    </td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+<hr/>
+<hr/>
+<div align="left">
+{% for module_name, module_failures in failures.items %}
+{% if module_failures|length > 0 %}
+<table class="testdetails">
+<tbody>
+<tr>
+    <td class="module" colspan="8">
+        <a name="{{module_name}}">{{module_name}} has {{ module_failures|length }} failures</a>
+    </td>
+</tr>
+<tr>
+    <th>Index</th>
+    <th>Test</th>
+    <th>Abis</th>
+    <th>Kernels</th>
+    <th>Details</th>
+    <th>Bugs</th>
+    <th>Last Work</th>
+    <th>First Fail</th>
+    <th>Changes</th>
+</tr>
+{% for testcase_name, failure in module_failures.items %}
+<tr>
+	<td> {{ forloop.counter }}</td>
+    <td class="testname">{{failure.test_name}}</td>
+    <td class="testname" nowrap>
+        {% with failure.abis as abis %}
+        {% for abi in abis %}
+        {% if not forloop.first %}<br/>{% endif %}
+        {{ abi }}
+        {% endfor %}
+        {% endwith %}
+    </td>
+    <td class="testname" nowrap>
+        {% with failure.kernel_versions as kernel_versions %}
+        {% for kernel_version in kernel_versions %}
+        {% if not forloop.first %}<br/>{% endif %}
+        {{ kernel_version }}
+        {% endfor %}
+        {% endwith %}
+    </td>
+    <td class="failuredetails"><div class="details" nowrap>{{failure.stacktrace}}</div></td>
+    <td>
+        {% with failure.bugs as bugs %}
+        {% for bug in bugs %}
+        {% if not forloop.first %}<br/>{% endif %}
+        <a target="_blank" href="{{bugzilla_show_bug_prefix}}{{bug.id}}">
+        {% if bug.status == 'RESOLVED' %}
+        <del> {{ bug.id }} </del>
+        {% else %}
+        {{ bug.id }}
+        {% endif %}
+        </a>
+        {% empty %}
+        <a target='_blank' href="/lkft/file-bug?build_name={{ build_info.build_name}}&build_no={{build_info.build_no}}&module_name={{module_name}}&test_name={{failure.test_name|escapesharp}}&qa_job_ids={{failure.qa_job_ids|join:','}}">Report Android Bug</a>&nbsp;
+        {% endfor %}
+        {% endwith %}
+    </td>
+    <td>&nbsp;</td>
+    <td>&nbsp;</td>
+    <td>&nbsp;</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+<hr/>
+{% endif %}
+{% endfor %}
+</div>
+{% endblock %}

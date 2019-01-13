@@ -1,0 +1,20 @@
+{% extends '_layouts/base.html' %}
+
+{% block title %} Builds for {{ project.name }} {% endblock %}
+
+{% block headline %}<h1>Builds for {{ project.name }}</h1>{% endblock %}
+
+{% block content %}
+<div>
+<table border="1">
+{% for build in builds %}
+<tr>
+	<td> {{ forloop.counter }}</td>
+    <td>
+        <a href="/lkft/jobs?build_id={{build.id}}">{{build.version}}</a>
+    </td>
+</tr>
+{% endfor %}
+</table>
+</div>
+{% endblock %}
