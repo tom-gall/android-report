@@ -301,7 +301,7 @@ def list_jobs(request):
         if kernel_version is None:
             environment = job.get('environment')
             if environment.startswith('hi6220-hikey_'):
-                kernel_version = environment.replace('hi6220-hikey_')
+                kernel_version = environment.replace('hi6220-hikey_', '')
             else:
                 # impossible path
                 pass
