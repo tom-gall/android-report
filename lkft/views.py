@@ -285,9 +285,9 @@ def list_jobs(request):
     api_url = "api/builds/%s/testjobs" % build_id
     jobs = qa_report_get(api_url=api_url).get('results')
 
-    kernel_version = None
+    project_kernel_version = None
     if project.get('name').startswith('android-hikey-linaro-') or project.get('name').startswith('android-x15-linux-'):
-        kernel_version = project.get('name').split('-')[3]
+        project_kernel_version = project.get('name').split('-')[3]
     else:
         # aosp-master-tracking and aosp-8.1-tracking
         pass
@@ -298,13 +298,16 @@ def list_jobs(request):
         result_file_path = get_result_file_path(job=job)
         if not os.path.exists(result_file_path):
             continue
-        if kernel_version is None:
+        if project_kernel_version is None:
             environment = job.get('environment')
             if environment.startswith('hi6220-hikey_'):
                 kernel_version = environment.replace('hi6220-hikey_', '')
             else:
-                # impossible path
+                # impossible path for hikey
                 pass
+        else:
+            kernel_version = project_kernel_version
+
         metadata = {
             'job_id': job.get('job_id'),
             'qa_job_id': job.get('url').replace('/?format=json', '').split('/')[-1],

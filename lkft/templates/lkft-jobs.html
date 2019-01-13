@@ -68,6 +68,7 @@ Excellent build, no open bugs on it at the moment.
     <th>Module</th>
     <th>Test</th>
     <th>Abis</th>
+    <th>Kernels</th>
     <th>Bugs</th>
 </tr>
 {% for failure in failures_list %}
@@ -80,6 +81,14 @@ Excellent build, no open bugs on it at the moment.
         {% for abi in abis %}
         {% if not forloop.first %}<br/>{% endif %}
         {{ abi }}
+        {% endfor %}
+        {% endwith %}
+    </td>
+    <td class="testname" nowrap>
+        {% with failure.kernel_versions as kernel_versions %}
+        {% for kernel_version in kernel_versions %}
+        {% if not forloop.first %}<br/>{% endif %}
+        {{ kernel_version }}
         {% endfor %}
         {% endwith %}
     </td>
