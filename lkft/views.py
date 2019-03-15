@@ -141,6 +141,10 @@ def download_attachments_save_result(jobs=[]):
                 logger.info("No attachment for job: %s" % job_url)
                 continue
 
+            if job.get('job_status') != 'Complete':
+                logger.info("Skip to get the attachment as the job is not Complete: %s" % job_url)
+                continue
+
             (temp_fd, temp_path) = tempfile.mkstemp(suffix='.tar.xz', text=False)
             logger.info("Start downloading result file for job %s: %s" % (job_url, temp_path))
             download_urllib(attachment_url, temp_path)
@@ -153,6 +157,9 @@ def download_attachments_save_result(jobs=[]):
 def extract(result_zip_path, failed_testcases_all={}, metadata={}):
     kernel_version = metadata.get('kernel_version')
     qa_job_id = metadata.get('qa_job_id')
+    total_number = 0
+    passed_number = 0
+    failed_number = 0
 
     # no affect for cts result and non vts-hal test result
     vts_abi_suffix_pat = re.compile(r"_32bit$|_64bit$")
@@ -171,7 +178,10 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
                 # test classes
                 test_cases = elem.findall('.//TestCase')
                 for test_case in test_cases:
+                    total_number = total_number + len(test_case.findall('.//Test'))
+                    passed_number = passed_number + len(test_case.findall('.//Test[@result="pass"]'))
                     failed_tests = test_case.findall('.//Test[@result="fail"]')
+                    failed_number = failed_number + len(failed_tests)
                     for failed_test in failed_tests:
                         test_name = '%s#%s' % (test_case.get("name"), vts_abi_suffix_pat.sub('', failed_test.get("name")))
                         stacktrace = failed_test.find('.//Failure/StackTrace').text
@@ -199,7 +209,11 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
         except ET.ParseError as e:
             logger.error('xml.etree.ElementTree.ParseError: %s' % e)
             logger.info('Please Check %s manually' % result_zip_path)
-
+    return {
+                'total_number': total_number,
+                'passed_number': passed_number,
+                'failed_number': failed_number
+            }
 
 qa_report_api_url = 'https://qa-reports.linaro.org/'
 def qa_report_get(api_url=''):
@@ -295,7 +309,13 @@ def list_jobs(request):
 
     download_attachments_save_result(jobs=jobs)
     failures = {}
+    resubmitted_job_urls = []
     for job in jobs:
+        if job.get('failure'):
+            failure_dict = yaml.load(job.get('failure'))
+            job['failure'] = failure_dict
+        if job.get('parent_job'):
+            resubmitted_job_urls.append(job.get('parent_job'))
         result_file_path = get_result_file_path(job=job)
         if not os.path.exists(result_file_path):
             continue
@@ -303,6 +323,8 @@ def list_jobs(request):
             environment = job.get('environment')
             if environment.startswith('hi6220-hikey_'):
                 kernel_version = environment.replace('hi6220-hikey_', '')
+            elif environment.startswith('x15_'):
+                kernel_version = environment.replace('x15_', '')
             else:
                 # impossible path for hikey
                 pass
@@ -316,8 +338,8 @@ def list_jobs(request):
             'lava_nick': job.get('lava_config').get('nick'),
             'kernel_version': kernel_version,
             }
-        extract(result_file_path, failed_testcases_all=failures, metadata=metadata)
-
+        numbers = extract(result_file_path, failed_testcases_all=failures, metadata=metadata)
+        job['numbers'] = numbers
 
     bugs = get_lkft_bugs()
     failures_list = []
@@ -370,9 +392,23 @@ def list_jobs(request):
         failures[module_name] = collections.OrderedDict(sorted(failures_in_module.items()))
     failures = collections.OrderedDict(sorted(failures.items()))
 
+
+    def get_job_name(item):
+        return item.get('name')
+
+    sorted_jobs = sorted(jobs, key=get_job_name)
+    final_jobs = []
+    failed_jobs = []
+    for job in sorted_jobs:
+        if job.get('url') in resubmitted_job_urls:
+            failed_jobs.append(job)
+        else:
+            final_jobs.append(job)
+
     return render(request, 'lkft-jobs.html',
                            {
-                                "jobs": jobs,
+                                'final_jobs': final_jobs,
+                                'failed_jobs': failed_jobs,
                                 'build': build,
                                 'failures': failures,
                                 'failures_list': failures_list,

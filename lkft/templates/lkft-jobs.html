@@ -14,24 +14,73 @@
 
 {% block content %}
 <div>
-<h2>Job List:</h2>
+<h2>Final Job List:</h2>
 <table border="1">
 <tr> 
     <th> Index</th>
     <th> Job Id(Job Link)</a> </th>
     <th> Job Name(Result Attachment Link) </a></th>
     <th> Job Status </th>
+    <th> FailureMsg </th>
+    <th> Passed </th>
+    <th> Failed </th>
+    <th> Total </th>
 </tr>
-{% for job in jobs %}
+{% for job in final_jobs %}
 <tr>
-	<td> {{ forloop.counter }}</td>
+    <td> {{ forloop.counter }}</td>
     <td> <a href="{{job.external_url}}">{{job.job_id}}</a> </td>
     {% if job.attachment_url %}
-    <td> <a href="{{job.attachment_url}}">{{job.name}} </a></td>
+    <td nowrap> <a href="{{job.attachment_url}}">{{job.name}} </a></td>
     {% else %}
-    <td> {{job.name}}</td>
+    <td nowrap> {{job.name}}</td>
     {% endif %}
     <td>{{job.job_status}} </td>
+    {% if job.failure %}
+    {% with job.failure as job_failure %}
+    <td>{{job_failure.error_msg}} </td>
+    {% endwith %}
+    {% else %}
+    <td> &nbsp;</td>
+    {% endif %}
+    {% if job.numbers %}
+    <td>{{job.numbers.passed_number}}</td>
+    <td>{{job.numbers.failed_number}}</td>
+    <td>{{job.numbers.total_number}}</td>
+    {% else %}
+    <td> - </td>
+    <td> - </td>
+    <td> - </td>
+    {% endif %}
+</tr>
+{% endfor %}
+</table>
+<h2>Resubmitted Job List:</h2>
+<table border="1">
+<tr>
+    <th> Index</th>
+    <th> Job Id(Job Link)</a> </th>
+    <th> Job Name(Result Attachment Link) </a></th>
+    <th> Job Status </th>
+    <th> FailureMsg </th>
+</tr>
+{% for job in failed_jobs %}
+<tr>
+    <td> {{ forloop.counter }}</td>
+    <td> <a href="{{job.external_url}}">{{job.job_id}}</a> </td>
+    {% if job.attachment_url %}
+    <td nowrap> <a href="{{job.attachment_url}}">{{job.name}} </a></td>
+    {% else %}
+    <td nowrap> {{job.name}}</td>
+    {% endif %}
+    <td>{{job.job_status}} </td>
+    {% if job.failure %}
+    {% with job.failure as job_failure %}
+    <td>{{job_failure.error_msg}} </td>
+    {% endwith %}
+    {% else %}
+    <td> &nbsp;</td>
+    {% endif %}
 </tr>
 {% endfor %}
 </table>
@@ -141,7 +190,7 @@ Excellent build, no open bugs on it at the moment.
 <tr>
     <th>Index</th>
     <th>Test</th>
-    <th>Abis</th>
+    <th>Abis(Trend)</th>
     <th>Kernels</th>
     <th>Details</th>
     <th>Bugs</th>
