@@ -112,7 +112,7 @@ def get_attachment_urls(jobs=[]):
             if attachment_url:
                 job['attachment_url'] = attachment_url
             else:
-                logger.info("No attachment for job: %s" % (job_url))
+                logger.info("No attachment for job: %s" % (job.get('external_url')))
 
 def extract_save_result(tar_path, result_zip_path):
     # https://pymotw.com/2/zipfile/
