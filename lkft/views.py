@@ -260,7 +260,7 @@ def list_projects(request):
                 )
 
 def list_builds(request):
-    BUILD_WITH_JOBS_NUMBER = 5
+    BUILD_WITH_JOBS_NUMBER = 50
     project_id = request.GET.get('project_id', None)
     project_api_url = 'api/projects/%s' % project_id
     project =  qa_report_get(api_url=project_api_url)
@@ -284,6 +284,10 @@ def list_builds(request):
             jobs = get_jobs_for_build(build)
             download_attachments_save_result(jobs=jobs)
             for job in jobs:
+                if job.get('parent_job'):
+                    # ignore jobs which were resubmitted
+                    continue
+
                 def get_testcases_number_for_job(job):
                     job_number_passed = 0
                     job_number_failed = 0
