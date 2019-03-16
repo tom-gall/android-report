@@ -83,6 +83,12 @@ def get_attachment_urls(jobs=[]):
                 return None
             else:
                 job['lava_config'] = lava_config
+
+        if not job.get('job_status') or job.get('job_status') == 'Submitted' \
+                or job.get('job_status') == 'Running' :
+            # the job is still in queue, so it should not have attachment yet
+            continue
+
         lava_server = lava_config.get('server')
         job_id = job.get('job_id')
 
@@ -254,13 +260,76 @@ def list_projects(request):
                 )
 
 def list_builds(request):
+    BUILD_WITH_JOBS_NUMBER = 5
     project_id = request.GET.get('project_id', None)
     project_api_url = 'api/projects/%s' % project_id
     project =  qa_report_get(api_url=project_api_url)
-    
 
     builds_api_url = "api/projects/%s/builds" % project_id
     builds = qa_report_get(api_url=builds_api_url).get('results')
+    number_of_build_with_jobs = 0
+    for build in builds:
+        build_number_passed = 0
+        build_number_failed = 0
+        build_number_total = 0
+        build_modules_total = 0
+        build_modules_done = 0
+
+        def get_jobs_for_build(build):
+                api_url = build.get('testjobs')
+                jobs = qa_report_get_with_full_api(request_url=api_url).get('results')
+                return jobs
+
+        if number_of_build_with_jobs < BUILD_WITH_JOBS_NUMBER:
+            jobs = get_jobs_for_build(build)
+            download_attachments_save_result(jobs=jobs)
+            for job in jobs:
+                def get_testcases_number_for_job(job):
+                    job_number_passed = 0
+                    job_number_failed = 0
+                    job_number_total = 0
+                    modules_total = 0
+                    modules_done = 0
+
+                    result_file_path = get_result_file_path(job=job)
+                    if os.path.exists(result_file_path):
+                        with zipfile.ZipFile(result_file_path, 'r') as f_zip_fd:
+                            try:
+                                root = ET.fromstring(f_zip_fd.read(TEST_RESULT_XML_NAME))
+                                summary_node = root.find('Summary')
+                                job_number_passed = summary_node.attrib['pass']
+                                job_number_failed = summary_node.attrib['failed']
+                                modules_total = summary_node.attrib['modules_total']
+                                modules_done = summary_node.attrib['modules_done']
+                            except ET.ParseError as e:
+                                logger.error('xml.etree.ElementTree.ParseError: %s' % e)
+                                logger.info('Please Check %s manually' % result_zip_path)
+                    return {
+                            'number_passed': int(job_number_passed),
+                            'number_failed': int(job_number_failed),
+                            'number_total': int(job_number_passed) + int(job_number_failed),
+                            'modules_total': int(modules_total),
+                            'modules_done': int(modules_done)
+                            }
+
+                numbers = get_testcases_number_for_job(job)
+                build_number_passed = build_number_passed + numbers.get('number_passed')
+                build_number_failed = build_number_failed + numbers.get('number_failed')
+                build_number_total = build_number_total + numbers.get('number_total')
+                build_modules_total = build_modules_total + numbers.get('modules_total')
+                build_modules_done = build_modules_done + numbers.get('modules_done')
+                job['numbers'] = numbers
+            number_of_build_with_jobs = number_of_build_with_jobs + 1
+
+        build['numbers'] = {
+                            'number_passed': build_number_passed,
+                            'number_failed': build_number_failed,
+                            'number_total': build_number_total,
+                            'modules_done': build_modules_done,
+                            'modules_total': build_modules_total,
+                            }
+        build['jobs'] = jobs
+
     return render(request, 'lkft-builds.html',
                            {
                                 "builds": builds,

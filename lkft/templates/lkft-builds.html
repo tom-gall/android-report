@@ -7,12 +7,27 @@
 {% block content %}
 <div>
 <table border="1">
+	<tr>
+		<th>Index</th>
+		<th>Build No.</th>
+		<th>Pass</th>
+		<th>Fail</th>
+		<th>Total</th>
+		<th>ModulesDone</th>
+		<th>ModulesTotal</th>
 {% for build in builds %}
 <tr>
 	<td> {{ forloop.counter }}</td>
     <td>
         <a href="/lkft/jobs?build_id={{build.id}}">{{build.version}}</a>
     </td>
+    {% with build.numbers as numbers %}
+    <td align="right">{{numbers.number_passed}}</td>
+    <td align="right">{{numbers.number_failed}}</td>
+    <td align="right">{{numbers.number_total}}</td>
+    <td align="right">{{numbers.modules_done}}</td>
+    <td align="right">{{numbers.modules_total}}</td>
+    {% endwith %}
 </tr>
 {% endfor %}
 </table>
