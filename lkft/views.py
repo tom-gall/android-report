@@ -74,6 +74,11 @@ def download_urllib(url, path):
 
 
 def get_attachment_urls(jobs=[]):
+    first_job = jobs[0]
+    target_build_api_url = first_job.get('target_build')
+    target_build = qa_report_get_with_full_api(request_url=target_build_api_url)
+    target_build_metadata_api_url = target_build.get('metadata')
+    target_build_metadata = qa_report_get_with_full_api(request_url=target_build_metadata_api_url)
     for job in jobs:
         lava_config = job.get('lava_config')
         if not lava_config :
@@ -89,30 +94,10 @@ def get_attachment_urls(jobs=[]):
             # the job is still in queue, so it should not have attachment yet
             continue
 
-        lava_server = lava_config.get('server')
-        job_id = job.get('job_id')
+        attachment_url_key = 'tradefed_results_url_%s' % job.get('job_id')
+        attachment_url = target_build_metadata.get(attachment_url_key)
+        job['attachment_url'] = attachment_url
 
-        # something need to be cached here when the attachment already there
-        res = lava_server.results.get_testjob_suites_list_yaml(job_id)
-        for test_suite in yaml.load(res):
-            if test_suite['name'] == "lava":
-                continue
-            if test_suite['name'].find("install-android-platform-tools") >= 0:
-                continue
-            if test_suite['name'].find("android-boot") >= 0:
-                continue
-            if test_suite['name'].find("boottime") >= 0:
-                continue
-
-            # suite_name = '1_cts-f ocused1-arm64-v8a'
-            suite_name = test_suite['name']
-            case_name = 'test-attachment'
-            res = yaml.load(lava_server.results.get_testcase_results_yaml(job_id, suite_name, case_name))
-            attachment_url = res[0].get('metadata').get('reference')
-            if attachment_url:
-                job['attachment_url'] = attachment_url
-            else:
-                logger.info("No attachment for job: %s" % (job.get('external_url')))
 
 def extract_save_result(tar_path, result_zip_path):
     # https://pymotw.com/2/zipfile/
@@ -323,7 +308,7 @@ def list_builds(request):
                 build_modules_done = build_modules_done + numbers.get('modules_done')
                 job['numbers'] = numbers
             number_of_build_with_jobs = number_of_build_with_jobs + 1
-
+        logger.info('build No. %s  %s' % (number_of_build_with_jobs, build.get('version')) )
         build['numbers'] = {
                             'number_passed': build_number_passed,
                             'number_failed': build_number_failed,
