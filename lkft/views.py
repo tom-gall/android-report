@@ -20,7 +20,7 @@ import xml.etree.ElementTree as ET
 import yaml
 import zipfile
 
-from lcr.settings import FILES_DIR, LAVA_SERVERS, BUGZILLA_API_KEY
+from lcr.settings import FILES_DIR, LAVA_SERVERS, BUGZILLA_API_KEY, BUILD_WITH_JOBS_NUMBER
 
 DIR_ATTACHMENTS = os.path.join(FILES_DIR, 'lkft')
 logger = logging.getLogger(__name__)
@@ -260,7 +260,6 @@ def list_projects(request):
                 )
 
 def list_builds(request):
-    BUILD_WITH_JOBS_NUMBER = 50
     project_id = request.GET.get('project_id', None)
     project_api_url = 'api/projects/%s' % project_id
     project =  qa_report_get(api_url=project_api_url)
