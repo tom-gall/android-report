@@ -53,6 +53,7 @@ class DotDict(dict):
 
 
 def download_urllib(url, path):
+    check_dict = {'file_not_exist': False}
     import urllib
     def Schedule(a,b,c):
         '''
@@ -60,6 +61,11 @@ def download_urllib(url, path):
         b: the size of the block
         c: the size of the file
         '''
+        if c == -1:
+            #global file_not_exist
+            check_dict['file_not_exist'] = True
+            return
+
         per = 100.0 * a * b / c
         if per > 100 :
             per = 100
@@ -70,7 +76,9 @@ def download_urllib(url, path):
             sys.stdout.write("\r %.2f%%" % per)
             sys.stdout.flush()
     urllib.urlretrieve(url, path, Schedule)
-    logger.info("File is saved to %s" % path)
+    if not check_dict['file_not_exist']:
+        logger.info("File is saved to %s" % path)
+    return check_dict['file_not_exist']
 
 
 def get_attachment_urls(jobs=[]):
@@ -138,11 +146,18 @@ def download_attachments_save_result(jobs=[]):
 
             (temp_fd, temp_path) = tempfile.mkstemp(suffix='.tar.xz', text=False)
             logger.info("Start downloading result file for job %s: %s" % (job_url, temp_path))
-            download_urllib(attachment_url, temp_path)
-            tar_f = temp_path.replace(".xz", '')
-            os.system("xz -d %s" % temp_path)
-            extract_save_result(tar_f, result_file_path)
-            os.unlink(tar_f)
+            ret_err = download_urllib(attachment_url, temp_path)
+            if ret_err:
+                logger.info("There is a problem with the size of the file: %s" % attachment_url)
+                continue
+            else:
+                tar_f = temp_path.replace(".xz", '')
+                ret = os.system("xz -d %s" % temp_path)
+                if ret == 0 :
+                    extract_save_result(tar_f, result_file_path)
+                    os.unlink(tar_f)
+                else:
+                    logger.info("Failed to decompress %s with xz -d command for job: %s " % (temp_path, job_url))
 
 
 def extract(result_zip_path, failed_testcases_all={}, metadata={}):
