@@ -1019,6 +1019,16 @@ def test_report(request):
     bugs_total = get_bugs_for_build(build_name=build_name)
     (jobs_failed, total_tests_res) = get_test_results_for_build(build_name, build_no)
 
+    for failed_job in jobs_failed:
+        job_name = failed_job.get('name')
+        bugs = []
+        for bug in bugs_total:
+            if bug.status == 'RESOLVED' and bug.resolution != 'WONTFIX':
+                continue
+            if bug.summary.find(' %s ' % job_name) >= 0:
+                bugs.append(bug)
+        failed_job['bugs'] = bugs
+
     lava_nick = get_all_build_configs()[build_name]['lava_server'].nick
     successful_job_ids = []
     #######################################################

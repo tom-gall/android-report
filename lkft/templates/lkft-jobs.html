@@ -55,6 +55,7 @@
 </tr>
 {% endfor %}
 </table>
+{% if failed_jobs %}
 <h2>Resubmitted Job List:</h2>
 <table border="1">
 <tr>
@@ -84,6 +85,7 @@
 </tr>
 {% endfor %}
 </table>
+{% endif %}
 </div>
 <hr/>
 
