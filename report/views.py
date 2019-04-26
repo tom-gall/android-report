@@ -1891,14 +1891,16 @@ def show_cts_vts_failures(request):
             failure['abis'] = abis
             failure['stacktrace'] = stacktrace_msg.strip()
 
-            for bug in bugs:
-                if test_name.find(module_name) >=0:
-                    # vts test, module name is the same as the test name.
-                    search_key = test_name
-                else:
-                    search_key = '%s %s' % (module_name, test_name)
+            if test_name.find(module_name) >=0:
+                # vts test, module name is the same as the test name.
+                search_key = test_name
+            else:
+                search_key = '%s %s' % (module_name, test_name)
 
+            for bug in bugs:
                 if bug.summary.find(search_key) >= 0:
+                    if not bug.summary.endswith(search_key) and bug.summary.find('%s ' % search_key) < 0:
+                            continue
                     if failure.get('bugs'):
                         failure['bugs'].append(bug)
                     else:

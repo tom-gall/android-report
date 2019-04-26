@@ -437,9 +437,9 @@ No result for benchmark test jobs.
         {% endfor %}
         {% endwith %}
         </ul>
-        {% ifnotequal test_info.number_passrate 100 %}
+        {% if test_info.number_passrate != 100 or test_info.module_done == "fail" %}
         <a target='_blank' href="/report/add-comment/?build_name={{ build_info.build_name }}&build_no={{ build_info.build_no }}&plan_suite={{ test_info.job_name }}&&module_testcase={{ test_info.module_name }}">Add Comment</a><br/>
-        {% endifnotequal %}
+        {% endif %}
     </td>
 </tr>
 {% endfor %}
@@ -570,9 +570,9 @@ No result for cts test jobs.
         {% endfor %}
         {% endwith %}
         </ul>
-        {% ifnotequal test_info.number_passrate 100 %}
+        {% if test_info.number_passrate != 100 or test_info.module_done == "fail" %}
         <a target='_blank' href="/report/add-comment/?build_name={{ build_info.build_name }}&build_no={{ build_info.build_no }}&plan_suite={{ test_info.job_name }}&&module_testcase={{ test_info.module_name }}">Add Comment</a><br/>
-        {% endifnotequal %}
+        {% endif %}
     </td>
 </tr>
 {% endfor %}
