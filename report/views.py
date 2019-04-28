@@ -1139,6 +1139,16 @@ def test_report(request):
                     elif bug.summary.find(test_suite) >= 0:
                         bugs.append(bug)
 
+                if len(bugs) == 0:
+                    # if no bugs on the test suite/test cases,
+                    # then check if there is any bug related to the job name
+                    for bug in bugs_total:
+                        if bug.status == 'RESOLVED' and bug.resolution != 'WONTFIX':
+                            continue
+                        if bug.summary.find(job_name) >= 0:
+                            if bug.summary.endswith(' %s' % job_name) or bug.summary.find(' %s ' % job_name) >=0 :
+                                bugs.append(bug)
+
                 comments = Comment.objects.filter(build_name=build_name, plan_suite=test_suite, module_testcase=test_case)
 
                 if measurement == '--':

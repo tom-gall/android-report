@@ -403,17 +403,25 @@ No result for benchmark test jobs.
     {% endif %}
     <td align='left'>
         {% with test_info.bugs as bugs %}
+        {% if bugs %}
+        <ol>
         {% for bug in bugs %}
             {% if not forloop.first %}<br/>{% endif %}
-            <a target="_blank" href="{{build_info.bugzilla_show_bug_prefix}}{{bug.id}}">
+            <li><a target="_blank" href="{{build_info.bugzilla_show_bug_prefix}}{{bug.id}}">
             {% if bug.resolution == 'WONTFIX' %}
             <del style="background-color:lightgrey; color:white"> {{ bug.id }} </del>
             {% else %}
             {{ bug.id }}
             {% endif %}
-            </a>
+            </a></li>
         {% endfor%}
-        {% endwith%}
+        </ol>
+        {% endif %}
+        {% endwith %}
+
+        {% if test_info.module_done == 'fail' %}
+        <br/><br/><a target='_blank' href="{{ build_info.new_bug_url_prefix }}{{ test_info.module_name }} failed to run to complete">Bug Report</a>&nbsp;
+        {% endif %}
     </td>
     <td>
         <ul>
@@ -536,17 +544,25 @@ No result for cts test jobs.
     {% endif %}
     <td align='left'>
         {% with test_info.bugs as bugs %}
+        {% if bugs %}
+        <ol>
         {% for bug in bugs %}
             {% if not forloop.first %}<br/>{% endif %}
-            <a target="_blank" href="{{build_info.bugzilla_show_bug_prefix}}{{bug.id}}">
+            <li><a target="_blank" href="{{build_info.bugzilla_show_bug_prefix}}{{bug.id}}">
             {% if bug.resolution == 'WONTFIX' %}
             <del style="background-color:lightgrey; color:white"> {{ bug.id }} </del>
             {% else %}
             {{ bug.id }}
             {% endif %}
-            </a>
+            </a></li>
         {% endfor%}
+        </ol>
+        {% endif %}
         {% endwith%}
+
+        {% if test_info.module_done == 'fail' %}
+        <br/><br/><a target='_blank' href="{{ build_info.new_bug_url_prefix }}{{ test_info.module_name }} failed to run to complete">Bug Report</a>&nbsp;
+        {% endif %}
     </td>
     <td>
         <ul>
