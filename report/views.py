@@ -1258,8 +1258,21 @@ def test_report(request):
                     for bug in bugs_total:
                         if bug.status == 'RESOLVED' and bug.resolution != 'WONTFIX':
                             continue
-                        if bug.summary.find('%s' % (module_name.split('.')[1])) >= 0:
-                            bugs.append(bug)
+                        ## vts module_name=armeabi-v7a.BinderPerformanceTest
+                        if bug.summary.endswith('%s' % module_name.split('.')[1]) \
+                            or bug.summary.find('%s ' % module_name.split('.')[1]) >=0 \
+                            or bug.summary.find(' %s#' % module_name.split('.')[1]) >=0:
+                                bugs.append(bug)
+
+                    if len(bugs) == 0:
+                        # if no bugs on the test suite/test cases,
+                        # then check if there is any bug related to the job name
+                        for bug in bugs_total:
+                            if bug.status == 'RESOLVED' and bug.resolution != 'WONTFIX':
+                                continue
+                            if bug.summary.find('#') < 0:
+                                if bug.summary.endswith(' %s' % job_name) or bug.summary.find(' %s ' % job_name) >=0 :
+                                    bugs.append(bug)
 
                     comments = list(Comment.objects.filter(build_name=build_name, plan_suite=job_name, module_testcase=module_name))
 
@@ -1411,6 +1424,12 @@ def test_report(request):
                     'cached_in_base': cached_in_base,
                  }
 
+    no_resolved_bugs = []
+    for bug in bugs_total:
+        if bug.status == 'RESOLVED':
+            continue
+        no_resolved_bugs.append(bug)
+
     return render(request, 'test_report.html',
                   {
                    'lava_server_job_prefix': get_all_build_configs()[build_name]['lava_server'].job_url_prefix,
@@ -1421,7 +1440,7 @@ def test_report(request):
                    'vts_job_ids': ','.join(vts_job_ids),
                    'cts_res': cts_res,
                    'cts_job_ids': ','.join(cts_job_ids),
-                   'build_bugs': bugs_total,
+                   'build_bugs': no_resolved_bugs,
                    'jobs_failed': jobs_failed,
                    'jobs_duration': jobs_duration,
                    'total_duration': total_duration,
@@ -1907,15 +1926,24 @@ def show_cts_vts_failures(request):
             else:
                 search_key = '%s %s' % (module_name, test_name)
 
+            module_bugs = []
             for bug in bugs:
                 if bug.summary.find(search_key) >= 0:
                     if not bug.summary.endswith(search_key) and bug.summary.find('%s ' % search_key) < 0:
-                            continue
+                         continue
+
                     if failure.get('bugs'):
                         failure['bugs'].append(bug)
                     else:
                         failure['bugs'] = [bug]
+                elif bug.summary.find('#') < 0 and bug.summary.find(module_name) >= 0:
+                    if bug.summary.endswith(' %s' % module_name) or bug.summary.find(' %s ' % module_name) >=0 :
+                        module_bugs.append(bug)
 
+            if not failure.get('bugs'):
+                # if no bugs on the test suite/test cases,
+                # then check if there is any bug related to the job name
+                failure['module_bugs'] = module_bugs
 
     # sort failures
     for module_name, failures_in_module in failures.items():
