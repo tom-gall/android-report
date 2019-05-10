@@ -1172,8 +1172,12 @@ def test_report(request):
                                        'difference': difference,
                                       })
                 if cache_to_base and job_id is not None:
+                    if measurement == '--':
+                        cache_measurement = -1
+                    else:
+                        cache_measurement = measurement
                     BaseResults.objects.create(build_name=build_name, build_no=build_no, job_name=job_name, job_id=job_id, lava_nick=lava_nick,
-                                               unit=unit, measurement=measurement,
+                                               unit=unit, measurement=cache_measurement,
                                                plan_suite=test_suite, module_testcase=test_case)
 
 
