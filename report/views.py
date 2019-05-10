@@ -1319,7 +1319,7 @@ def test_report(request):
     ########### result for cts ##############################
     #########################################################
     cts = cts_v7a + []
-    if build_name.find("hikey") >= 0:
+    if build_name.find("x15") < 0:
         cts = cts_v7a + cts_v8a
     (cts_res, cts_job_ids) = get_cts_vts_res(cts_vts=cts,
                               total_tests_res=total_tests_res,
