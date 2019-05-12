@@ -124,8 +124,9 @@ Excellent build, no open bugs on it at the moment.
     <th>Index</th>
     <th>Module</th>
     <th>Test</th>
-    <th>Abis(Trend)</th>
+    <th>Platforms</th>
     <th>Kernels</th>
+    <th>Abis(Trend)</th>
     <th>Bugs</th>
 </tr>
 {% for failure in failures_list %}
@@ -133,6 +134,22 @@ Excellent build, no open bugs on it at the moment.
 	<td>{{forloop.counter}}</td>
 	<td class="testname">{{failure.module_name}}</td>
     <td class="testname">{{failure.test_name}}</td>
+    <td class="testname" nowrap>
+        {% with failure.platforms as platforms %}
+        {% for platform in platforms %}
+        {% if not forloop.first %}<br/>{% endif %}
+        {{ platform }}
+        {% endfor %}
+        {% endwith %}
+    </td>
+    <td class="testname" nowrap>
+        {% with failure.kernel_versions as kernel_versions %}
+        {% for kernel_version in kernel_versions %}
+        {% if not forloop.first %}<br/>{% endif %}
+        {{ kernel_version }}
+        {% endfor %}
+        {% endwith %}
+    </td>
     <td nowrap>
         {% with failure.abis as abis %}
         {% for abi in abis %}
@@ -144,14 +161,6 @@ Excellent build, no open bugs on it at the moment.
         {% else %}
         <a href="https://qa-reports.linaro.org/android-lkft/{{ project.name }}/tests/cts-lkft-{{abi}}/{{abi}}.{{failure.module_name}}/{{failure.test_class}}.{{failure.test_method}}">{{ abi }}</a>
         {% endif %}
-        {% endfor %}
-        {% endwith %}
-    </td>
-    <td class="testname" nowrap>
-        {% with failure.kernel_versions as kernel_versions %}
-        {% for kernel_version in kernel_versions %}
-        {% if not forloop.first %}<br/>{% endif %}
-        {{ kernel_version }}
         {% endfor %}
         {% endwith %}
     </td>
@@ -192,8 +201,9 @@ Excellent build, no open bugs on it at the moment.
 <tr>
     <th>Index</th>
     <th>Test</th>
-    <th>Abis(Trend)</th>
+    <th>Platforms</th>
     <th>Kernels</th>
+    <th>Abis(Trend)</th>
     <th>Details</th>
     <th>Bugs</th>
     <th>Last Work</th>
@@ -205,6 +215,22 @@ Excellent build, no open bugs on it at the moment.
 	<td> {{ forloop.counter }}</td>
     <td class="testname">{{failure.test_name}}</td>
     <td class="testname" nowrap>
+        {% with failure.platforms as platforms %}
+        {% for platform in platforms %}
+        {% if not forloop.first %}<br/>{% endif %}
+        {{ platform }}
+        {% endfor %}
+        {% endwith %}
+    </td>
+    <td class="testname" nowrap>
+        {% with failure.kernel_versions as kernel_versions %}
+        {% for kernel_version in kernel_versions %}
+        {% if not forloop.first %}<br/>{% endif %}
+        {{ kernel_version }}
+        {% endfor %}
+        {% endwith %}
+    </td>
+    <td class="testname" nowrap>
         {% with failure.abis as abis %}
         {% for abi in abis %}
         {% if not forloop.first %}<br/>{% endif %}
@@ -215,14 +241,6 @@ Excellent build, no open bugs on it at the moment.
         {% else %}
         <a href="https://qa-reports.linaro.org/android-lkft/{{ project.name }}/tests/cts-lkft-{{abi}}/{{abi}}.{{failure.module_name}}/{{failure.test_class}}.{{failure.test_method}}">{{ abi }}</a>
         {% endif %}
-        {% endfor %}
-        {% endwith %}
-    </td>
-    <td class="testname" nowrap>
-        {% with failure.kernel_versions as kernel_versions %}
-        {% for kernel_version in kernel_versions %}
-        {% if not forloop.first %}<br/>{% endif %}
-        {{ kernel_version }}
         {% endfor %}
         {% endwith %}
     </td>

@@ -162,6 +162,7 @@ def download_attachments_save_result(jobs=[]):
 
 def extract(result_zip_path, failed_testcases_all={}, metadata={}):
     kernel_version = metadata.get('kernel_version')
+    platform = metadata.get('platform')
     qa_job_id = metadata.get('qa_job_id')
     total_number = 0
     passed_number = 0
@@ -202,6 +203,9 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
 
                             if not kernel_version in failed_testcase.get('kernel_versions'):
                                 failed_testcase.get('kernel_versions').append(kernel_version)
+
+                            if not platform in failed_testcase.get('platforms'):
+                                failed_testcase.get('platforms').append(platform)
                         else:
                             failed_tests_module[test_name]= {
                                                                 'test_name': test_name,
@@ -211,6 +215,7 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
                                                                 'abi_stacktrace': {abi: stacktrace},
                                                                 'qa_job_ids': [ qa_job_id ],
                                                                 'kernel_versions': [ kernel_version ],
+                                                                'platforms': [ platform ],
                                                             }
         except ET.ParseError as e:
             logger.error('xml.etree.ElementTree.ParseError: %s' % e)
@@ -373,7 +378,10 @@ def list_jobs(request):
     jobs = qa_report_get(api_url=api_url).get('results')
 
     project_kernel_version = None
-    if project.get('name').startswith('android-hikey-linaro-') or project.get('name').startswith('android-x15-linux-'):
+    if project.get('name').startswith('android-hikey-linaro-') \
+        or project.get('name').startswith('android-x15-linux-') \
+        or project.get('name').startswith('android-x15-ti-') \
+        or project.get('name').startswith('android-am65x-ti-') :
         project_kernel_version = project.get('name').split('-')[3]
     else:
         # aosp-master-tracking and aosp-8.1-tracking
@@ -403,12 +411,15 @@ def list_jobs(request):
         else:
             kernel_version = project_kernel_version
 
+        platform = job.get('environment').split('_')[0]
+
         metadata = {
             'job_id': job.get('job_id'),
             'qa_job_id': job.get('url').replace('/?format=json', '').split('/')[-1],
             'result_url': job.get('attachment_url'),
             'lava_nick': job.get('lava_config').get('nick'),
             'kernel_version': kernel_version,
+            'platform': platform,
             }
         numbers = extract(result_file_path, failed_testcases_all=failures, metadata=metadata)
         job['numbers'] = numbers
