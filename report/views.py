@@ -1262,15 +1262,18 @@ def test_report(request):
                     for bug in bugs_total:
                         if bug.status == 'RESOLVED' and bug.resolution != 'WONTFIX':
                             continue
+                        if bug.summary.find('arm64-v8a') >= 0 or bug.summary.find('armeabi-v7a') >=0:
+                            if bug.summary.find(module_name.split('.')[0]) < 0:
+                                continue
                         ## vts module_name=armeabi-v7a.BinderPerformanceTest
                         if bug.summary.endswith('%s' % module_name.split('.')[1]) \
                             or bug.summary.find('%s ' % module_name.split('.')[1]) >=0 \
                             or bug.summary.find(' %s#' % module_name.split('.')[1]) >=0:
                                 bugs.append(bug)
 
-                    if len(bugs) == 0:
-                        # if no bugs on the test suite/test cases,
-                        # then check if there is any bug related to the job name
+                    if len(bugs) == 0 and (module_done == 'fail' or number_passrate < 100):
+                        # if no bugs on the test suite/test cases reported,
+                        # then check if there is any bug related to the job name if there is any failures with this
                         for bug in bugs_total:
                             if bug.status == 'RESOLVED' and bug.resolution != 'WONTFIX':
                                 continue
@@ -2058,11 +2061,12 @@ def file_bug(request):
         form_initial['version'] = get_bug_version_from_build_name(build_name=build_name)
         if test_name.find(module_name) >=0:
             job_name = JobCache.objects.get(job_id=job_ids[0], lava_nick=lava.nick).job_name
-            form_initial['summary'] = '%s: %s %s' % (build_bugzilla.short_desc_prefix, job_name, test_name)
+            bug_summary = '%s: %s %s' % (build_bugzilla.short_desc_prefix, job_name, test_name)
             description = '%s %s' % (job_name, test_name)
         else:
-            form_initial['summary'] = '%s: %s %s' % (build_bugzilla.short_desc_prefix, module_name, test_name)
+            bug_summary = '%s: %s %s' % (build_bugzilla.short_desc_prefix, module_name, test_name)
             description = '%s %s' % (module_name, test_name)
+
 
         def extract_abi_stacktrace(result_zip_path, module_name='', test_name=''):
             failures = {}
@@ -2112,6 +2116,7 @@ def file_bug(request):
                 stacktrace_msg = '%s\n\n%s:\n%s' % (stacktrace_msg, abi, failures.get(abi))
         else:
             stacktrace_msg = failures.get(abis[0])
+            bug_summary = "%s failed only with %s" % (bug_summary, abis[0])
 
         description += '\n\nABIs:\n%s' % (' '.join(abis))
         description += '\n\nStackTrace: \n%s' % (stacktrace_msg.strip())
@@ -2125,6 +2130,7 @@ def file_bug(request):
 
         description += '\n\nImages Url:\n%s/%s/%s' % (android_snapshot_url_base, build_name, build_no)
 
+        form_initial['summary'] = bug_summary
         form_initial['description'] = description
         form = BugCreationForm(initial=form_initial)
 

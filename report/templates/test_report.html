@@ -420,7 +420,7 @@ No result for benchmark test jobs.
         {% endwith %}
 
         {% if test_info.module_done == 'fail' %}
-        <br/><br/><a target='_blank' href="{{ build_info.new_bug_url_prefix }}{{ test_info.module_name }} failed to run to complete">Bug Report</a>&nbsp;
+        <br/><br/><a target='_blank' href="{{ build_info.new_bug_url_prefix }}{{ test_info.module_name }} failed to run to complete&description=job:{{ lava_server_job_prefix }}/{{ test_info.job_id }}">Bug Report</a>&nbsp;
         {% endif %}
     </td>
     <td>
