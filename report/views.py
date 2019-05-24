@@ -247,8 +247,14 @@ def get_possible_builds(build_name=DEFAULT_BUILD_NAME):
 
 def read_kernel_version(makefile_url):
     try:
-        response = urllib2.urlopen(makefile_url)
-    except urllib2.HTTPError:
+        hdr = {
+                'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:67.0) Gecko/20100101 Firefox/67.0',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                }
+        req = urllib2.Request(makefile_url, headers=hdr)
+        response = urllib2.urlopen(req)
+    except urllib2.HTTPError as e:
+        logger.info("makefile_url:%s error:%s" % (makefile_url, e))
         return "--"
 
     content = response.read()
@@ -604,11 +610,17 @@ def get_commit_from_pinned_manifest(snapshot_url, path):
     response = urllib2.urlopen(snapshot_url)
     html = response.read()
     # <project groups="device,ti" name="android/kernel.git" path="kernel/ti/x15" remote="git-ti-com" revision="1f7e74a78f44783eeab13c9f39f9fda6ded0a593" upstream="p-ti-android-linux-4.4.y"/>
-    pat = re.compile('path="%s".* revision="(?P<commit_id>[\da-z]+)" ' % path)
-    matches = pat.findall(html)
+    # <project name="android-build-configs" remote="linaro-android" revision="aa9fdabaaf151224c63ed9110e1e32d474e6aaba" upstream="master"/>
+    pat_path = re.compile('path="%s".* revision="(?P<commit_id>[\da-z]+)" ' % path)
+    pat_name = re.compile('name="%s".* revision="(?P<commit_id>[\da-z]+)" ' % path)
+
+    matches = pat_path.findall(html)
     if len(matches) > 0:
         return matches[0]
     else:
+        matches = pat_name.findall(html)
+        if len(matches) > 0:
+            return matches[0]
         return None
 
 
@@ -1374,10 +1386,11 @@ def test_report(request):
     except BuildSummary.DoesNotExist:
         images_url = '%s/%s/%s' % (android_snapshot_url_base, build_name, build_no)
         pinned_manifest_url = '%s/pinned-manifest.xml' % images_url
-        if build_name.find('x15') >= 0:
-            kernel_commit = get_commit_from_pinned_manifest(pinned_manifest_url, 'kernel/ti/x15')
+        if build_name.find('x15') >= 0 or build_name.find('am65x') >= 0 :
+            kernel_commit = get_commit_from_pinned_manifest(pinned_manifest_url, 'kernel/ti/4.19')
             kernel_url = "http://git.ti.com/ti-linux-kernel/ti-linux-kernel/blobs/raw/%s/Makefile" % kernel_commit
             kernel_version = read_kernel_version(kernel_url)
+            logger.info("kernel_url=%s kernel_version=%s" % (kernel_url, kernel_version))
         elif build_name.find('hikey') >= 0:
             kernel_commit = get_commit_from_pinned_manifest(pinned_manifest_url, 'kernel/linaro/hisilicon-4.14')
             kernel_url = "https://android-git.linaro.org/kernel/hikey-linaro.git/plain/Makefile?id=%s" % kernel_commit
@@ -1386,7 +1399,8 @@ def test_report(request):
             kernel_url = '--'
             kernel_version = '--'
 
-        build_config_url = "%s/%s" % (android_build_config_url_base, build_name.replace("android-", "").replace('-premerge-ci', ''))
+        android_build_config_commit = get_commit_from_pinned_manifest(pinned_manifest_url, 'android-build-configs')
+        build_config_url = "%s/%s?id=%s" % (android_build_config_url_base, build_name.replace("android-", "").replace('-premerge-ci', ''), android_build_config_commit)
         build_android_tag = get_build_config_value(build_config_url, key="MANIFEST_BRANCH")
         toolchain_info = '--'
         firmware_version = '--'
