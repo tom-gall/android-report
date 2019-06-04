@@ -48,6 +48,15 @@ SECRET_KEY = 'dr663lyqjd_b-a*0ttwcycp5wfm7&$0-#l6odw#^==ewq!s51s'
 
 BUGZILLA_API_KEY = ''
 
+QA_REPORT = {
+    'production': {
+                    'nick': 'production',
+                    'domain': 'qa-reports.linaro.org',
+                    'token': '',
+                    },
+    }
+QA_REPORT_DEFAULT = 'production'
+
 # old file might be removed from archive.validation.linaro.org already
 # so only list numbers for the recent 20 builds
 BUILD_WITH_JOBS_NUMBER = 20

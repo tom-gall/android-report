@@ -76,43 +76,41 @@
                 Cache Into Base
             </button>
         {% endif %}
+         <button name="generate_pdf" onclick="window.location='/report/test-report/?build_name={{ build_info.build_name }}&build_no={{ build_info.build_no }}&generate_pdf=true'">
+                Generate PDF
+            </button>
         </td>
     <tr/>
 </table>
 <hr/>
 {% if jobs_failed %}
+<h2>Jobs Without Test Result Generated</h2>
 <form action="/report/resubmit-job/" method="post">
 <table border="2">
 <tr>
+    <th>Index</th>
     <th>Job Name</th>
-    <th>Job Ids</th>
-    <th>Resubmit latest</th>
+    <th>Job Status</th>
+    <th>ErrorMsg</th>
+    <th>Resubmit</th>
     <th>Bugs</th>
     <th>Operation</th>
 </tr>
 {% for job in jobs_failed %}
 <tr>
-    <td>{{ job.name }}</td>
+    <td> {{ forloop.counter }}</td>
+    <td><a href="{{ lava_server_job_prefix }}/{{ job.job_id }}"> {{ job.name }} </a></td>
+    <td>{{ job.job_status }}</td>
+    <td>{{ job.error_msg|default:"&nbsp" }}</td>
     <td>
-        {% for id_status in job.id_status_list %}
-        <a href="{{ lava_server_job_prefix }}/{{ id_status.0 }}"> {{ id_status.0 }}</a>: {{ id_status.1 }} <br>
-        {% endfor %}
-    </td>
-    <td>
-        {% with job.id_status_list|first as first_id_status %}
-            {% if first_id_status.1 == 'Submitted' or  first_id_status.1 == 'Running' %}
-            <button name="resubmit_latest" disabled="true" onclick="this.disabled=true; window.location='/report/resubmit-job/?build_name={{ build_info.build_name }}&&job_id={% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}'">
-                Resubmit {% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}
-            </button>
-            <input type="checkbox" name="job_ids" value="{% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}" selected="false" disabled="false"/>
-            {% else %}
-            <button name="resubmit_latest" onclick="this.disabled=true; window.location='/report/resubmit-job/?build_name={{ build_info.build_name }}&&job_id={% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}'">
-                Resubmit {% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}
-            </button>
-            <input type="checkbox" name="job_ids" value="{% with job.id_status_list|first as first_id_status %}{{ first_id_status.0 }}{% endwith %}" checked="true"/>
-
-            {% endif %}
-        {% endwith %}
+        {% if job.job_status == 'Submitted' or  job.job_status == 'Running' %}
+            <a href="https://qa-reports.linaro.org/api/testjobs/{{ job.qa_job_id }}">{{ job.qa_job_id }} </a>
+        {% else %}
+        <button name="resubmit_latest" onclick="this.disabled=true; window.location='/report/resubmit-job/?qa_job_id={{ job.qa_job_id }}'">
+            Resubmit {{ job.qa_job_id }}
+        </button>
+        <input type="checkbox" name="qa_job_ids" value="{{ job.qa_job_id }}" checked="true"/>
+        {% endif %}
     </td>
     <td align='left'>
         {% with job.bugs as bugs %}
@@ -129,7 +127,12 @@
         {% endwith%}
     </td>
     <td>
+        {% if job.job_status == 'Submitted' or  job.job_status == 'Running' %}
+        &nbsp;
+        {% else %}
         <a target='_blank' href="{{ build_info.new_bug_url_prefix }}Failed to run {{ job.name }} to complete">Report Bug</a><br/>
+        {% endif %}
+
     </td>
 </tr>
 {% endfor %}
@@ -137,10 +140,34 @@
 {% csrf_token %}
 <input type="hidden" name="build_name" value="{{ build_info.build_name }}"/>
 <input type="submit" value="Resubmit All Possible Failed Jobs"/>
-&nbsp;&nbsp;<a href="/report/submit-jobs/?build_name={{ build_info.build_name }}"> Job Submission </a>
 </form>
 <hr/>
 {% endif %}
+{% if jobs_resubmitted %}
+<h2>Jobs Had been Resubmitted</h2>
+<table border="2">
+<tr>
+    <th>Index</th>
+    <th>Job Name</th>
+    <th>Job Status</th>
+    <th>ErrorMsg</th>
+    <th>Operation</th>
+</tr>
+{% for job in jobs_resubmitted %}
+<tr>
+    <td> {{ forloop.counter }}</td>
+    <td><a href="{{ lava_server_job_prefix }}/{{ job.job_id }}"> {{ job.name }} </a></td>
+    <td>{{ job.job_status }}</td>
+    <td>{{ job.error_msg|default:"&nbsp" }}</td>
+    <td>
+        <a target='_blank' href="{{ build_info.new_bug_url_prefix }}Failed to run {{ job.name }} to complete">Report Bug</a><br/>
+    </td>
+</tr>
+{% endfor %}
+</table>
+<hr/>
+{% endif %}
+
 
 <h2>Basic Weekly</h2>
 {% if basic_optee_weekly_res %}

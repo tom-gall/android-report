@@ -24,152 +24,24 @@ import bugzilla
 
 logger = logging.getLogger(__name__)
 
-from lava_tool.authtoken import AuthenticatingServerProxy, KeyringAuthBackend
-
 # Create your views here.
 from models import TestCase, JobCache, BaseResults, Bug, BuildSummary, LAVA, LAVAUser, BuildBugzilla, BuildConfig, Comment
 
-from lcr.settings import FILES_DIR, BUGZILLA_API_KEY
+import qa_report
 
-basic_weekly = { # job_name: ['test_suite', ],
-                        #"basic": [ "meminfo", 'meminfo-first', 'meminfo-second', "busybox", "ping", "linaro-android-kernel-tests", "tjbench"],
-                        "basic": [ "busybox", "ping", "linaro-android-kernel-tests", "tjbench"],
-                        "weekly": [ 'media-codecs', 'piglit-gles2', 'piglit-gles3', 'piglit-glslparser', 'piglit-shader-runner', 'stringbench', 'libc-bench'],
-                     }
+from lcr.settings import FILES_DIR, BUGZILLA_API_KEY, QA_REPORT, QA_REPORT_DEFAULT
 
-optee = { # job_name: ['test_suite', ],
-          "optee-xtest": [ "optee-xtest"],
-        }
+from lcr_config import DEFAULT_LCR_BUILD_NAME, DEFAULT_LAVA_USER, TEST_RESULT_XML_NAME
+from lcr_config import job_priority_list, job_status_string_int, job_status_dict
+from lcr_config import pat_ignore, names_ignore
+from lcr_config import android_snapshot_url_base, ci_job_url_base, android_build_config_url_base, template_url_prefix
+from lcr_config import benchmarks_common, vts
+from lcr_config import get_basic_optee_weekly_tests, get_cts_tests
+from lcr_config import less_is_better_measurement
+from lcr_config import kernel_info_config
 
-benchmarks_common = {  # job_name: {'test_suite':['test_case',]},
-                "boottime": {
-                              #'boottime-analyze': ['KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg' ],
-                              'boottime-first-analyze': ['KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg' ],
-                              'boottime-second-analyze': ['KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg' ],
-                            },
-                "basic": {
-                            "meminfo-first": [ 'MemTotal', 'MemFree', 'MemAvailable'],
-                            #"meminfo": [ 'MemTotal', 'MemFree', 'MemAvailable'],
-                            "meminfo-second": [ 'MemTotal', 'MemFree', 'MemAvailable'],
-                         },
-
-                'monkey': { 'monkey': ['monkey-network-stats'] },
-                #'andebenchpro2015': {'andebenchpro2015':[] },
-                'antutu6': { 'antutu6': ['antutu6-sum-mean'] },
-                #'applications': {},
-                'benchmarkpi': {'benchmarkpi': ['benchmarkpi-mean',]},
-                'caffeinemark': {'caffeinemark': ['Caffeinemark-Collect-score-mean', 'Caffeinemark-Float-score-mean', 'Caffeinemark-Loop-score-mean',
-                                      'Caffeinemark-Method-score-mean', 'Caffeinemark-score-mean', 'Caffeinemark-Sieve-score-mean', 'Caffeinemark-String-score-mean']},
-                'cf-bench': {'cf-bench': ['cfbench-Overall-Score-mean', 'cfbench-Java-Score-mean', 'cfbench-Native-Score-mean']},
-                'gearses2eclair': {'gearses2eclair': ['gearses2eclair-mean',]},
-                'geekbench4': {'geekbench4': ['Geekbench4-Multi-Core-mean', 'Geekbench4-Single-Core-mean']},
-                #'geekbench3': {'geekbench3': ['geekbench-multi-core-mean', 'geekbench-single-core-mean']},
-                'javawhetstone': {'javawhetstone': ['javawhetstone-MWIPS-mean', 'javawhetstone-N1-float-mean', 'javawhetstone-N2-float-mean', 'javawhetstone-N3-if-mean', 'javawhetstone-N4-fixpt-mean',
-                                       'javawhetstone-N5-cos-mean', 'javawhetstone-N6-float-mean', 'javawhetstone-N7-equal-mean', 'javawhetstone-N8-exp-mean',]},
-                'jbench': {'jbench': ['jbench-mean',]},
-                'linpack': {'linpack': ['Linpack-MFLOPSSingleScore-mean', 'Linpack-MFLOPSMultiScore-mean', 'Linpack-TimeSingleScore-mean', 'Linpack-TimeMultiScore-mean']},
-                'quadrantpro': {'quadrantpro': ['quadrandpro-benchmark-memory-mean', 'quadrandpro-benchmark-mean', 'quadrandpro-benchmark-g2d-mean', 'quadrandpro-benchmark-io-mean',
-                                     'quadrandpro-benchmark-cpu-mean', 'quadrandpro-benchmark-g3d-mean',]},
-                'rl-sqlite': {'rl-sqlite': ['RL-sqlite-Overall-mean',]},
-                'scimark': {'scimark': ['scimark-FFT-1024-mean', 'scimark-LU-100x100-mean', 'scimark-SOR-100x100-mean', 'scimark-Monte-Carlo-mean', 'scimark-Composite-Score-mean',]},
-                'vellamo3': {'vellamo3': ['vellamo3-Browser-total-mean', 'vellamo3-Metal-total-mean', 'vellamo3-Multi-total-mean', 'vellamo3-total-score-mean',]},
-             }
-less_is_better_measurement = [
-                              'KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg',
-                              'benchmarkpi-mean',
-                              'Linpack-TimeSingleScore-mean', 'Linpack-TimeMultiScore-mean', 'RL-sqlite-Overall-mean'
-                             ]
-
-glbenchmark25 = {
-                'glbenchmark25': {'glbenchmark25': ['Fill-rate-C24Z16-mean', 'Fill-rate-C24Z16-Offscreen-mean',
-                                                    'GLBenchmark-2.1-Egypt-Classic-C16Z16-mean', 'GLBenchmark-2.1-Egypt-Classic-C16Z16-Offscreen-mean',
-                                                    'GLBenchmark-2.5-Egypt-HD-C24Z16-Fixed-timestep-mean', 'GLBenchmark-2.5-Egypt-HD-C24Z16-Fixed-timestep-Offscreen-mean',
-                                                    'GLBenchmark-2.5-Egypt-HD-C24Z16-mean', 'GLBenchmark-2.5-Egypt-HD-C24Z16-Offscreen-mean',
-                                                    'Triangle-throughput-Textured-C24Z16-Fragment-lit-mean', 'Triangle-throughput-Textured-C24Z16-Offscreen-Fragment-lit-mean',
-                                                    'Triangle-throughput-Textured-C24Z16-mean', 'Triangle-throughput-Textured-C24Z16-Offscreen-mean',
-                                                    'Triangle-throughput-Textured-C24Z16-Vertex-lit-mean', 'Triangle-throughput-Textured-C24Z16-Offscreen-Vertex-lit-mean',
-                                                   ],},
-              }
-
-# test_suite is "vts-test"
-vts = [
-        'vts-hal',
-        'vts-kernel-kselftest',
-        'vts-kernel-ltp',
-        'vts-kernel-part1',
-        'vts-library',
-        'vts-performance',
-      ]
-
-# test_suite is the same as job name
-cts_v7a = [ 'cts-focused1-armeabi-v7a',
-            'cts-focused2-armeabi-v7a',
-            'cts-media-armeabi-v7a',
-            'cts-media2-armeabi-v7a',
-            'cts-opengl-armeabi-v7a',
-            'cts-part1-armeabi-v7a',
-            'cts-part2-armeabi-v7a',
-            'cts-part3-armeabi-v7a',
-            'cts-part4-armeabi-v7a',
-            'cts-part5-armeabi-v7a',
-          ]
-
-# test_suite is the same as job name
-cts_v8a = [ 'cts-focused1-arm64-v8a',
-            'cts-focused2-arm64-v8a',
-            'cts-media-arm64-v8a',
-            'cts-media2-arm64-v8a',
-            'cts-opengl-arm64-v8a',
-            'cts-part1-arm64-v8a',
-            'cts-part2-arm64-v8a',
-            'cts-part3-arm64-v8a',
-            'cts-part4-arm64-v8a',
-            'cts-part5-arm64-v8a',
-          ]
-
-jobs_to_be_checked_array = [
-    "basic", "boottime", "optee-xtest", "weekly", 'monkey',
-    "antutu6", "andebenchpro2015", "benchmarkpi", "caffeinemark", "cf-bench", "gearses2eclair", "geekbench4", "glbenchmark25", "javawhetstone", "jbench", "linpack", "quadrantpro", "rl-sqlite", "scimark", "vellamo3",
-    ]
-jobs_to_be_checked_array = jobs_to_be_checked_array + cts_v8a + cts_v7a + vts
-
-android_snapshot_url_base = "https://snapshots.linaro.org/android"
-ci_job_url_base = 'https://ci.linaro.org/job'
-android_build_config_url_base = "https://android-git.linaro.org/android-build-configs.git/plain"
-template_url_prefix = "https://git.linaro.org/qa/test-plans.git/plain/android/"
-
-TEST_RESULT_XML_NAME = 'test_result.xml'
-
-pat_ignore = re.compile(".*("
-                        "-stderr"
-                        "|-sigma"
-                        "|-max"
-                        "|-min"
-                        "|-itr\d+"
-                        ")$")
-
-                        #"|regression_\d+"
-
-names_ignore = ["test-attachment",
-                "test-skipped",
-                'install-fastboot', 'install-adb',
-                "subtests-fail-rate", 'test-cases-fail-rate', # "regression_4003_XTS", "regression_4003_NO_XTS",
-                "tradefed-test-run", "check-adb-connectivity",
-                "3D-mean","Overall_Score-mean", "Memory_Bandwidth_Add_Multi_Core-mean", "Platform-mean", "Memory_Bandwidth-mean", "Memory_Bandwidth_Copy_Single_Core-mean", "Memory_Latency_64M_range-mean", "Memory_Bandwidth_Scale_Single_Core-mean", "Memory_Bandwidth_Copy_Multi_Core-mean", "Storage-mean", "Memory_Bandwidth_Triad_Single_Core-mean", "CoreMark-PRO_Base-mean", "Memory_Bandwidth_Add_Single_Core-mean", "CoreMark-PRO_Peak-mean", "Memory_Bandwidth_Scale_Multi_Core-mean", "Memory_Latency-mean", "Memory_Bandwidth_Triad_Multi_Core-mean",
-                "BOOTTIME_LOGCAT_ALL_COLLECT", "BOOTTIME_LOGCAT_EVENTS_COLLECT", "SERVICE_STARTED_ONCE", "BOOTTIME_ANALYZE", "BOOTTIME_DMESG_COLLECT", 'BOOTANIM_TIME', 'FS_MOUNT_DURATION', 'FS_MOUNT_TIME', 'KERNEL_BOOT_TIME', 'TOTAL_BOOT_TIME', 'ANDROID_SERVICE_START_TIME', 'ANDROID_BOOT_TIME', 'ANDROID_UI_SHOWN', 'SURFACEFLINGER_BOOT_TIME', 'INIT_TO_SURFACEFLINGER_START_TIME',
-                "start_bootchart", "enabled_bootchart", "stop_bootchart", "rm_start_file", "generate-bootchart-graphic",
-               ]
-
-job_status_dict = {0: "Submitted",
-                   1: "Running",
-                   2: "Complete",
-                   3: "Incomplete",
-                   4: "Canceled",
-                   5: "NoPermission",
-                  }
-
-job_status_string_int = dict((v,k) for k,v in job_status_dict.iteritems())
-job_priority_list = ['high', 'medium', 'low']
+qa_report_def = QA_REPORT[QA_REPORT_DEFAULT]
+qa_report_api = qa_report.QAReportApi(qa_report_def.get('domain'), qa_report_def.get('token'))
 
 class LavaInstance(object):
     def __init__(self, nick=None, user=None):
@@ -179,19 +51,25 @@ class LavaInstance(object):
         self.lava_user = LAVAUser.objects.get(lava=self.lava, user_name=user)
         self.url = "https://%s:%s@%s/RPC2/" % (self.lava_user.user_name, self.lava_user.token, self.domain)
         self.job_url_prefix = "https://%s/scheduler/job" % self.domain
-        self.server = AuthenticatingServerProxy(self.url, auth_backend=KeyringAuthBackend())
+        self.server = xmlrpclib.ServerProxy(self.url)
+        self.lava_api = qa_report.LAVAApi(self.domain, self.lava_user.token)
 
     def __str__(self):
         return self.url
 
-DEFAULT_USER = "yongqin.liu"
 LAVAS = {}
 def initialize_all_lavas():
     global LAVAS
     if len(LAVAS) > 0:
         return LAVAS
     for lava in LAVA.objects.all():
-        LAVAS[lava.nick] = LavaInstance(nick=lava.nick, user=DEFAULT_USER)
+        LAVAS[lava.nick] = LavaInstance(nick=lava.nick, user=DEFAULT_LAVA_USER)
+
+def find_lava_config(job_url):
+    for nick, config in LAVAS.items():
+        if job_url.find('://%s/' % config.domain) >= 0:
+            return config
+    return None
 
 
 BUILD_CONFIGS = {}
@@ -234,16 +112,18 @@ def get_all_build_names():
     return BUILD_NAMES
 
 
-DEFAULT_BUILD_NAME = "android-lcr-reference-hikey-o"
-def get_possible_builds(build_name=DEFAULT_BUILD_NAME):
-    url = '%s/%s/' % (android_snapshot_url_base, build_name)
-    response = urllib2.urlopen(url)
-    html = response.read()
+def get_qa_project_name_with_lcr_build_name(build_name):
+    return 'lcr/%s' % build_name.replace('android-', '')
 
-    pat = re.compile('<a href="/android/%s/(?P<build_no>\d+)/"' % build_name)
-    all_builds = pat.findall(html)
-    all_builds.reverse()
-    return all_builds
+
+def get_possible_builds(build_name=DEFAULT_LCR_BUILD_NAME):
+    all_builds_no = []
+    for build in qa_report_api.get_builds_with_project_name(get_qa_project_name_with_lcr_build_name(build_name)):
+        all_builds_no.append(build.get('version'))
+
+    all_builds_no.reverse()
+    return all_builds_no
+
 
 def read_kernel_version(makefile_url):
     try:
@@ -285,7 +165,7 @@ def read_kernel_version(makefile_url):
     return "%s.%s.%s" % (version_val, patchlevel_val, sublevel_val)
 
 
-def get_possible_templates(build_name=DEFAULT_BUILD_NAME):
+def get_possible_templates(build_name=DEFAULT_LCR_BUILD_NAME):
     url = 'https://git.linaro.org/qa/test-plans.git/tree/android/%s' % get_all_build_configs()[build_name]['template_dir']
     try:
         response = urllib2.urlopen(url)
@@ -300,7 +180,7 @@ def get_possible_templates(build_name=DEFAULT_BUILD_NAME):
         template_names = pat.findall(html)
     return sorted(template_names)
 
-def get_possible_job_names(build_name=DEFAULT_BUILD_NAME):
+def get_possible_job_names(build_name=DEFAULT_LCR_BUILD_NAME):
     templates = get_possible_templates(build_name)
     pat = re.compile('job_name: "%%JOB_NAME%%-%%ANDROID_META_BUILD%%-(\S+)"')
     pat_json = re.compile('"job_name": "%%JOB_NAME%%-%%ANDROID_META_BUILD%%-(\S+)"')
@@ -317,102 +197,6 @@ def get_possible_job_names(build_name=DEFAULT_BUILD_NAME):
 
     sorted(job_name_template_name_hash.items())
     return job_name_template_name_hash
-
-
-def get_jobs(build_name, build_no, lava, job_name_list=[]):
-    ## TODO: have the same build tested on 2 different lava instances, and saved as base
-    count_in_base = BaseResults.objects.filter(build_name=build_name, build_no=build_no).count()
-    if count_in_base > 0:
-        cached_in_base = True
-    else:
-        cached_in_base = False
-
-    if not cached_in_base:
-        ##jobs_to_be_checked = get_possible_job_names(build_name=build_name).keys()
-        jobs_to_be_checked = jobs_to_be_checked_array
-        if job_name_list is None or len(job_name_list) == 0 or len(job_name_list) > 1:
-            search_condition = "description__icontains__%s-%s" % (build_name, build_no)
-        elif len(job_name_list) == 1:
-            search_condition = "description__icontains__%s-%s-%s" % (build_name, build_no, job_name_list[0])
-        jobs_raw = lava.server.results.make_custom_query("testjob", search_condition)
-    else:
-        jobs_raw = JobCache.objects.filter(build_name=build_name, build_no=build_no, lava_nick=lava.nick)
-        ## TODO include the lava_nick information in the result?
-        #jobs_raw = JobCache.objects.filter(build_name=build_name, build_no=build_no)
-
-    jobs = { }
-    for job in jobs_raw:
-        if not cached_in_base:
-            logger.debug("%s %s", job.get("id"), job.get("description"))
-            job_id = job.get("id")
-            job_status = job.get("status")
-            if job_status is None:
-                ## https://staging.validation.linaro.org/static/docs/v2/scheduler.html
-                job_state = job.get('state')
-                job_health = job.get('health')
-                if job_state == 0 or job_state ==1 or job_state == 2:
-                    job_status = 0
-                elif job_state == 3 or job_state == 4:
-                    job_status = 1
-                elif job_state == 5:
-                    if job_health == 0 or job_health == 2:
-                        job_status = 3
-                    elif job_health == 1:
-                        job_status = 2
-                    elif job_health == 3:
-                        job_status = 4
-                    else:
-                        ## not possible
-                        pass
-                else:
-                    ## not possible
-                    pass
-
-            if job['start_time'] is None or job['end_time'] is None:
-                job_duration = datetime.timedelta(seconds=0)
-            else:
-                job_start_time = datetime.datetime.strptime(str(job['start_time']), '%Y%m%dT%H:%M:%S')
-                job_end_time =  datetime.datetime.strptime(str(job['end_time']), '%Y%m%dT%H:%M:%S')
-                job_duration = job_end_time - job_start_time
-
-            job_description = job.get("description")
-            if job_name_list is None or len(job_name_list) == 0 or len(job_name_list) > 1:
-                local_job_name = job_description.replace("%s-%s-" % (build_name, build_no), "")
-
-                if local_job_name not in jobs_to_be_checked:
-                    continue
-                if len(job_name_list) > 1 and local_job_name not in job_name_list:
-                    continue
-            else:
-                local_job_name = job_name_list[0]
-
-            try:
-                if not JobCache.objects.get(job_id=job_id, lava_nick=lava.nick).cached:
-                    JobCache.objects.filter(lava_nick=lava.nick, job_id=job_id).update(
-                                        build_name=build_name, build_no=build_no,
-                                        lava_nick=lava.nick, job_id=job_id, job_name=local_job_name, status=job_status,
-                                        duration=job_duration, cached=False)
-            except JobCache.DoesNotExist:
-                JobCache.objects.create(
-                                        build_name=build_name, build_no=build_no,
-                                        lava_nick=lava.nick, job_id=job_id, job_name=local_job_name, status=job_status,
-                                        duration=job_duration, cached=False)
-
-        else:
-            job_id = job.job_id
-            job_status = job.status
-            local_job_name = job.job_name
-            job_duration = job.duration
-
-        job_exist = jobs.get(local_job_name)
-        if job_exist is not None:
-            job_exist.get("id_status_list").append((job_id, job_status_dict[job_status]))
-        else:
-            jobs[local_job_name] = {
-                                'name': local_job_name,
-                                "id_status_list": [(job_id, job_status_dict[job_status])],
-                             }
-    return jobs
 
 
 def get_job_name(job_dict):
@@ -490,18 +274,14 @@ def cache_job_result_to_db(job_id, lava, job_status):
                                         lava_nick=lava.nick,
                                         job_id=job_id)
 
-        JobCache.objects.filter(lava_nick=lava.nick, job_id=job_id).update(cached=True,
-                                                                           status=job_status_string_int[job_status])
     except xmlrpclib.ProtocolError as e:
         logger.info("Got error in cache_job_result_to_db for job_id=%s, lava_nick=%s: %s" % (job_id, lava.nick, str(e)))
         # for cases that no permission to check result submitted by others
-        JobCache.objects.filter(lava_nick=lava.nick, job_id=job_id).update(cached=False,
-                                                                           status=5)
-
     except xmlrpclib.Fault as e:
         raise e
     except:
         raise
+
 
 @login_required
 def resubmit_job(request):
@@ -550,50 +330,83 @@ def get_default_build_no(all_build_numbers=[], defaut_build_no=None):
 
 
 def is_job_cached(job_id, lava):
-    try:
-        JobCache.objects.get(job_id=job_id, lava_nick=lava.nick, cached=True)
-    except JobCache.DoesNotExist:
+    job_caches = list(JobCache.objects.filter(lava_nick=lava.nick, job_id=job_id))
+    if len(job_caches) != 1:
         return False
+    else:
+        return job_caches[0].cached
 
-    return True
 
 def get_test_results_for_build(build_name, build_no, job_name_list=[]):
     jobs_failed = []
     total_tests_res = {}
-    lava = get_all_build_configs()[build_name]['lava_server']
 
-    jobs = get_jobs(build_name, build_no, lava, job_name_list=job_name_list)
-    for job_name, job_details in jobs.items():
-        id_status_list = job_details.get("id_status_list")
-        id_status_list.sort(reverse=True)
-        job_total_res = {}
-        result_job_id_status = None
-        for job_id, job_status in id_status_list:
-            if job_status != job_status_dict[2]:
-                continue
-            if not is_job_cached(job_id, lava):
-                cache_job_result_to_db(job_id, lava, job_status)
+    jobs_raw = qa_report_api.get_jobs_with_project_name_build_version(get_qa_project_name_with_lcr_build_name(build_name), build_no)
 
-            tests_res = get_yaml_result(job_id=job_id, lava=lava)
-            if len(tests_res) != 0:
-                # use the last to replace the first
-                # might be better to change to use the better one
-                # compare the 2 results
-                job_total_res.update(tests_res)
-                result_job_id_status = (job_id, job_status)
-                break
+    resubmitted_jobs = []
+    for job in jobs_raw:
+        job_id = job.get("job_id")
+        lava_config = find_lava_config(job.get('external_url'))
 
-        if len(job_total_res) == 0:
-            jobs_failed.append(job_details)
-        else:
-            total_tests_res[job_name] = {
-                                     "job_name": job_name,
-                                     "id_status_list": id_status_list,
-                                     "result_job_id_status": result_job_id_status,
+        job_status_str = job.get("job_status")
+        if not job_status_str and job.get('submitted'):
+            job_status_str = 'Submitted'
+        job["job_status"] = job_status_str
+
+        local_job_name = job.get("name").replace("%s-%s-" % (build_name, build_no), "")
+        job["name"] = local_job_name
+
+        if job.get('parent_job'):
+            resubmitted_jobs.append(job.get('parent_job'))
+
+        if job.get('failure'):
+            failure_dict = yaml.load(job.get('failure'))
+            job['failure'] = failure_dict
+
+        if job_status_str != job_status_dict[2]:
+            jobs_failed.append(job)
+            continue
+        job_status_int = job_status_string_int[job_status_str]
+
+        lava = find_lava_config(job.get('external_url'))
+        job_cached = is_job_cached(job_id, lava)
+        if not job_cached:
+            cache_job_result_to_db(job_id, lava, job_status_int)
+
+        tests_res = get_yaml_result(job_id=job_id, lava=lava)
+        if len(tests_res) == 0:
+            jobs_failed.append(job)
+            continue
+
+        total_tests_res[local_job_name] = {
+                                     "job_name": local_job_name,
                                      "build_no": build_no,
-                                     "results": job_total_res}
+                                     'job_id': job_id,
+                                     'lava_nick': lava.nick,
+                                     'build_name': build_name,
+                                     "results": tests_res}
 
-    return (jobs_failed, total_tests_res)
+        if not job_cached:
+            job_lava_info = lava.lava_api.get_job(job_id=job_id)
+            job_start_time = datetime.datetime.strptime(str(job_lava_info['start_time']), '%Y-%m-%dT%H:%M:%S.%fZ')
+            job_end_time =  datetime.datetime.strptime(str(job_lava_info['end_time']), '%Y-%m-%dT%H:%M:%S.%fZ')
+            job_duration = job_end_time - job_start_time
+            job_cache_count = JobCache.objects.filter(lava_nick=lava.nick, job_id=job_id).count()
+            if job_cache_count == 0:
+                JobCache.objects.create(build_name=build_name, build_no=build_no,
+                                    lava_nick=lava.nick, job_id=job_id, job_name=local_job_name, status=job_status_int,
+                                    duration=job_duration, cached=True)
+            elif job_cache_count == 1:
+                JobCache.objects.get(lava_nick=lava.nick, job_id=job_id).update(cbuild_name=build_name, build_no=build_no,
+                                    lava_nick=lava.nick, job_id=job_id, job_name=local_job_name, status=job_status_int,
+                                   duration=job_duration, cached=True)
+            else:
+                JobCache.objects.filter(lava_nick=lava.nick, job_id=job_id).delete()
+                JobCache.objects.create(build_name=build_name, build_no=build_no,
+                                    lava_nick=lava.nick, job_id=job_id, job_name=local_job_name, status=job_status_int,
+                                    duration=job_duration, cached=True)
+
+    return (jobs_failed, total_tests_res, resubmitted_jobs)
 
 def get_build_config_value(build_config_url, key="MANIFEST_BRANCH"):
     response = urllib2.urlopen(build_config_url)
@@ -627,7 +440,7 @@ def get_commit_from_pinned_manifest(snapshot_url, path):
 @login_required
 @permission_required('report.add_testcase', login_url='/report/accounts/no_permission/')
 def jobs(request):
-    build_name = request.GET.get("build_name", DEFAULT_BUILD_NAME)
+    build_name = request.GET.get("build_name", DEFAULT_LCR_BUILD_NAME)
 
     all_build_numbers = get_possible_builds(build_name)
     build_no = request.GET.get("build_no", get_default_build_no(all_build_numbers))
@@ -643,7 +456,7 @@ def jobs(request):
                     "snapshot_url_base": android_snapshot_url_base,
                     "android_tag": build_android_tag,
                     "build_config_url": build_config_url,
-                    "build_numbers": get_possible_builds(build_name),
+                    "build_numbers": all_build_numbers,
                  }
 
     return render(request, 'jobs.html',
@@ -766,7 +579,7 @@ def compare_results_func(tests_result_1, tests_result_2):
 def compare(request):
     compare_results = {}
     if request.method == 'POST':
-        build_name = request.POST.get("build_name", DEFAULT_BUILD_NAME)
+        build_name = request.POST.get("build_name", DEFAULT_LCR_BUILD_NAME)
         all_build_numbers = get_possible_builds(build_name)
         build_no_1 = request.POST.get("build_no_1", "0")
         build_no_2 = request.POST.get("build_no_2", "0")
@@ -774,7 +587,7 @@ def compare(request):
         (failed_jobs_2, tests_result_2) = get_test_results_for_build(build_name, build_no_2)
         compare_results = compare_results_func(tests_result_1, tests_result_2)
     else:
-        build_name = request.GET.get("build_name", DEFAULT_BUILD_NAME)
+        build_name = request.GET.get("build_name", DEFAULT_LCR_BUILD_NAME)
         all_build_numbers = get_possible_builds(build_name)
         build_no_1 = request.GET.get("build_no_1", "0")
         build_no_2 = request.GET.get("build_no_2", "0")
@@ -835,12 +648,12 @@ def checklist(request):
     all_build_numbers= []
     #form = CompareForm(request)
     if request.method == 'POST':
-        build_name = request.POST.get("build_name", DEFAULT_BUILD_NAME)
+        build_name = request.POST.get("build_name", DEFAULT_LCR_BUILD_NAME)
         job_name = request.POST.get("job_name", "basic")
         (all_build_numbers, checklist_results) = get_test_results_for_job(build_name, lava, jobs=[job_name])
         #(all_build_numbers, checklist_results) = get_test_results_for_job(build_name, lava_server, jobs=[])
     else:
-        build_name = request.GET.get("build_name", DEFAULT_BUILD_NAME)
+        build_name = request.GET.get("build_name", DEFAULT_LCR_BUILD_NAME)
         job_name = request.GET.get("job_name", "basic")
 
     job_template = get_possible_job_names(build_name=build_name)
@@ -953,7 +766,7 @@ def submit_lava_jobs(request):
                       })
             #pass
     else:
-        build_name = request.GET.get("build_name", DEFAULT_BUILD_NAME)
+        build_name = request.GET.get("build_name", DEFAULT_LCR_BUILD_NAME)
         jobs = get_possible_job_names(build_name=build_name).keys()
         jobs.sort()
         all_build_numbers = get_possible_builds(build_name)
@@ -1000,7 +813,9 @@ def index(request):
 @login_required
 @permission_required('report.add_testcase', login_url='/report/accounts/no_permission/')
 def test_report(request):
-    build_name = request.GET.get("build_name", DEFAULT_BUILD_NAME)
+    build_name = request.GET.get("build_name", DEFAULT_LCR_BUILD_NAME)
+    generate_pdf = request.GET.get("generate_pdf", None)
+
     all_build_numbers = get_possible_builds(build_name)
     build_no = request.GET.get("build_no", get_default_build_no(all_build_numbers))
 
@@ -1029,35 +844,51 @@ def test_report(request):
     base_build_no = get_all_build_configs()[build_name]['base_build']['build_no']
 
     bugs_total = get_bugs_for_build(build_name=build_name)
-    (jobs_failed, total_tests_res) = get_test_results_for_build(build_name, build_no)
+    (jobs_failed, total_tests_res, resubmitted_job_urls) = get_test_results_for_build(build_name, build_no)
 
-    for failed_job in jobs_failed:
-        job_name = failed_job.get('name')
+
+    jobs_failed_not_resubmitted = []
+    resubmitted_jobs = []
+
+    for job in jobs_failed:
+        job_name = job.get('name')
+
         bugs = []
         for bug in bugs_total:
             if bug.status == 'RESOLVED' and bug.resolution != 'WONTFIX':
                 continue
             if bug.summary.find(' %s ' % job_name) >= 0:
                 bugs.append(bug)
-        failed_job['bugs'] = bugs
+        job['bugs'] = bugs
+
+        job['qa_job_id'] = job.get('url').rstrip('/').split('/')[-1]
+
+        if job.get('failure'):
+            job['error_msg'] = job.get('failure').get('error_msg')
+
+        if not job.get('url') in resubmitted_job_urls:
+            jobs_failed_not_resubmitted.append(job)
+        else:
+            resubmitted_jobs.append(job)
+
 
     lava_nick = get_all_build_configs()[build_name]['lava_server'].nick
     successful_job_ids = []
     #######################################################
     ## Get result for basic/optee/weekly tests
     #######################################################
-    basic_optee_weekly = basic_weekly.copy()
-    if build_name.find("hikey") >= 0:
-        basic_optee_weekly.update(optee)
+    basic_optee_weekly = get_basic_optee_weekly_tests(build_name)
     basic_optee_weekly_res = []
     for job_name in sorted(basic_optee_weekly.keys()):
         job_res = total_tests_res.get(job_name)
         if job_res is None:
             job_id = None
         else:
-            job_id = job_res['result_job_id_status'][0]
-            if job_id not in successful_job_ids:
-                successful_job_ids.append(job_id)
+            job_id = job_res['job_id']
+            lava_nick = job_res.get('lava_nick')
+            job_id_lava_nick = '%s@%s' % (job_id, lava_nick)
+            if job_id_lava_nick not in successful_job_ids:
+                successful_job_ids.append(job_id_lava_nick)
         for test_suite in basic_optee_weekly[job_name]:
             if job_id is None:
                 number_pass = 0
@@ -1109,9 +940,6 @@ def test_report(request):
     ## Get result for benchmark tests
     #######################################################
     benchmarks = benchmarks_common.copy()
-    ## enable glbenchmark25 for both hikey and x15 builds
-    ## if build_name.find("x15") >= 0:
-    benchmarks.update(glbenchmark25)
 
     benchmarks_res = []
     for job_name in sorted(benchmarks.keys()):
@@ -1119,9 +947,11 @@ def test_report(request):
         if job_res is None:
             job_id = None
         else:
-            job_id = job_res['result_job_id_status'][0]
-            if job_id not in successful_job_ids:
-                successful_job_ids.append(job_id)
+            job_id = job_res['job_id']
+            lava_nick = job_res.get('lava_nick')
+            job_id_lava_nick = '%s@%s' % (job_id, lava_nick)
+            if job_id_lava_nick not in successful_job_ids:
+                successful_job_ids.append(job_id_lava_nick)
         for test_suite in sorted(benchmarks[job_name].keys()):
             test_cases = benchmarks[job_name][test_suite]
             for test_case in test_cases:
@@ -1230,6 +1060,8 @@ def test_report(request):
                         lava_nick=None, bugs_total=[],
                         base_build_name=None, base_build_no=None,
                         build_name=None, build_no=None):
+        ## needs all the cts/vts jobs run on the same lava instance
+        ## used for cts/vts failures display
         cts_vts_job_ids = []
         cts_vts_res = []
         summary = {
@@ -1242,6 +1074,7 @@ def test_report(request):
             if job_res is None:
                 cts_vts_res.append({'job_name': job_name,
                                 'job_id': None,
+                                'lava_nick': '',
                                 'module_name': '--',
                                 'number_pass': 0,
                                 'number_fail': 0,
@@ -1249,9 +1082,11 @@ def test_report(request):
                                 'number_passrate': 0,
                                })
             else:
-                job_id = job_res['result_job_id_status'][0]
-                if job_id not in successful_job_ids:
-                    successful_job_ids.append(job_id)
+                job_id = job_res['job_id']
+                lava_nick = job_res.get('lava_nick')
+                job_id_lava_nick = '%s@%s' % (job_id, lava_nick)
+                if job_id_lava_nick not in successful_job_ids:
+                    successful_job_ids.append(job_id_lava_nick)
 
                 cts_one_job_hash = get_modules_hash_for_one_job(job_id=job_id, lava_nick=lava_nick, suite_name=job_name)
                 for module_name in sorted(cts_one_job_hash.keys()):
@@ -1297,6 +1132,7 @@ def test_report(request):
 
                     cts_vts_res.append({'job_name': job_name,
                                     'job_id': job_id,
+                                    'lava_nick': lava_nick,
                                     'module_name': module_name,
                                     'module_abi': module_name.split('.')[0],
                                     'module_name_noabi': module_name.split('.')[1],
@@ -1326,6 +1162,7 @@ def test_report(request):
             pass_rate = float(summary['pass'] * 100 / summary['total'])
         cts_vts_res.append({'job_name': "Summary",
                         'job_id': None,
+                        'lava_nick': '-',
                         'module_name': 'Total',
                         'number_pass': summary['pass'],
                         'number_fail': summary['fail'],
@@ -1337,9 +1174,7 @@ def test_report(request):
     #########################################################
     ########### result for cts ##############################
     #########################################################
-    cts = cts_v7a + []
-    if build_name.find("x15") < 0:
-        cts = cts_v7a + cts_v8a
+    cts = get_cts_tests(build_name)
     (cts_res, cts_job_ids) = get_cts_vts_res(cts_vts=cts,
                               total_tests_res=total_tests_res,
                               successful_job_ids=successful_job_ids,
@@ -1364,8 +1199,11 @@ def test_report(request):
     ##############################################################
     jobs_duration = []
     total_duration = datetime.timedelta(seconds=0)
-    for job_id in successful_job_ids:
+    for job_id_lava_nick in successful_job_ids:
         try:
+            fields = job_id_lava_nick.split('@')
+            job_id = fields[0]
+            lava_nick = fields[1]
             job_cache_info = JobCache.objects.get(job_id=job_id, lava_nick=lava_nick)
             jobs_duration.append(job_cache_info)
             total_duration = total_duration + job_cache_info.duration
@@ -1386,14 +1224,10 @@ def test_report(request):
     except BuildSummary.DoesNotExist:
         images_url = '%s/%s/%s' % (android_snapshot_url_base, build_name, build_no)
         pinned_manifest_url = '%s/pinned-manifest.xml' % images_url
-        if build_name.find('x15') >= 0 or build_name.find('am65x') >= 0 :
-            kernel_commit = get_commit_from_pinned_manifest(pinned_manifest_url, 'kernel/ti/4.19')
-            kernel_url = "http://git.ti.com/ti-linux-kernel/ti-linux-kernel/blobs/raw/%s/Makefile" % kernel_commit
-            kernel_version = read_kernel_version(kernel_url)
-            logger.info("kernel_url=%s kernel_version=%s" % (kernel_url, kernel_version))
-        elif build_name.find('hikey') >= 0:
-            kernel_commit = get_commit_from_pinned_manifest(pinned_manifest_url, 'kernel/linaro/hisilicon-4.14')
-            kernel_url = "https://android-git.linaro.org/kernel/hikey-linaro.git/plain/Makefile?id=%s" % kernel_commit
+        kernel_info = kernel_info_config.get(build_name)
+        if kernel_info:
+            kernel_commit = get_commit_from_pinned_manifest(pinned_manifest_url, kernel_info.get('src_path'))
+            kernel_url = kernel_info.get('makefile_url_with_commitid') % kernel_commit
             kernel_version = read_kernel_version(kernel_url)
         else:
             kernel_url = '--'
@@ -1451,7 +1285,8 @@ def test_report(request):
             continue
         no_resolved_bugs.append(bug)
 
-    return render(request, 'test_report.html',
+    if not generate_pdf or generate_pdf != 'true':
+        return render(request, 'test_report.html',
                   {
                    'lava_server_job_prefix': get_all_build_configs()[build_name]['lava_server'].job_url_prefix,
                    'build_info': build_info,
@@ -1462,11 +1297,196 @@ def test_report(request):
                    'cts_res': cts_res,
                    'cts_job_ids': ','.join(cts_job_ids),
                    'build_bugs': no_resolved_bugs,
-                   'jobs_failed': jobs_failed,
+                   'jobs_failed': jobs_failed_not_resubmitted,
+                   'jobs_resubmitted': resubmitted_jobs,
                    'jobs_duration': jobs_duration,
                    'total_duration': total_duration,
                   }
         )
+    else:
+        # Create the HttpResponse object with the appropriate PDF headers.
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename="Test-Report-%s-%s.pdf"' % (build_name, build_no)
+
+        def reportlab_pdf(response):
+            from io import BytesIO
+            from reportlab.pdfgen import canvas
+
+            import time
+            from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER, TA_LEFT, TA_RIGHT
+            from reportlab.lib.pagesizes import letter
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table,TableStyle, ListFlowable
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle, ListStyle
+            from reportlab.lib import colors
+
+            Story = []
+
+            styles = getSampleStyleSheet()
+            styleHeader = styles["Normal"].clone(ParagraphStyle)
+            styleHeader.alignment = TA_CENTER
+            styleHeader.textColor = 'white'
+            styleHeader.backColor = 'black'
+
+            styleContent = styles["Normal"].clone(ParagraphStyle)
+            styleContent.fontSize = 8
+
+            styleContentRightAlign = styleContent.clone(ParagraphStyle)
+            styleContentRightAlign.alignment = TA_RIGHT
+
+            stylelist = styles["OrderedList"].clone(ListStyle)
+            stylelist.bulletFontSize = 8
+            #######################################################################
+            ##  Create the VTS table
+            #######################################################################
+            table_style = TableStyle([
+                    ("BOX", (0, 0), (-1, -1), 0.5, "black"),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.25, "black"),
+
+                    ('BACKGROUND', (0, 0), (8, 0), 'black'),  # background for the header
+
+                    ('ALIGN', (3, 1), (5, -1), 'RIGHT'),  # alignment for the pass/fail/total column
+                    ('ALIGN', (7, 1), (7, -1), 'RIGHT'),  # alignment for the pass rate column
+                ])
+            table_style.alignment = TA_LEFT
+            index = 0
+            lines = [(
+                            Paragraph('<b>Index</b>', styleHeader),
+                            Paragraph('<b>Plan</b>', styleHeader),
+                            Paragraph('<b>Module</b>', styleHeader),
+                            Paragraph('<b>Pass</b>', styleHeader),
+                            Paragraph('<b>Fail</b>', styleHeader),
+                            Paragraph('<b>Total</b>', styleHeader),
+                            Paragraph('<b>Done</b>', styleHeader),
+                            Paragraph('<b>Pass Rate</b>', styleHeader),
+                            Paragraph('<b>Bugs</b>', styleHeader),
+                        )]
+            for vts in vts_res:
+                index = index + 1
+                job_id = vts.get('job_id')
+                job_name = vts.get('job_name')
+                if not job_id:
+                    job_name_paragraph = Paragraph(str(job_name), styleContent)
+                else:
+                    job_name_paragraph = Paragraph('<link href="%s/%s" underline="true" textColor="navy">%s</link>' % (LAVAS[vts.get('lava_nick')].job_url_prefix, job_id, job_name), styleContent)
+
+                bugs_paragraph_list = []
+                if vts.get('bugs'):
+                    for bug in vts.get('bugs'):
+                        bug_id = bug.id
+                        link = 'https://bugs.linaro.org/show_bug.cgi?id=%s' % (bug_id)
+                        bugs_paragraph_list.append(Paragraph('<link href="%s" underline="true" textColor="navy">%s</link>' % (link, bug_id), styleContent))
+
+                bugs_paragraph = ListFlowable(bugs_paragraph_list, style=stylelist)
+                lines.append((
+                                    Paragraph(str(index), styleContent),
+                                    job_name_paragraph,
+                                    Paragraph(str(vts.get('module_name')), styleContent),
+                                    Paragraph(str(vts.get('number_pass')), styleContentRightAlign),
+                                    Paragraph(str(vts.get('number_fail')), styleContentRightAlign),
+                                    Paragraph(str(vts.get('number_total')), styleContentRightAlign),
+                                    Paragraph(str(vts.get('module_done')), styleContent),
+                                    Paragraph(str(vts.get('number_passrate')), styleContentRightAlign),
+                                    bugs_paragraph,
+                                ))
+
+            table = Table(lines, colWidths=[40, 70, 200, 38, 35, 40, 40, 35, 50], style=table_style)
+            Story.append(table)
+            Story.append(Spacer(1, 12))
+
+
+            #######################################################################
+            ##  Create the Bugs table
+            #######################################################################
+            bug_table_style = TableStyle([
+                    ("BOX", (0, 0), (-1, -1), 0.5, "black"),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.25, "black"),
+
+                    ('BACKGROUND', (0, 0), (3, 0), 'black'),  # background for the header
+
+                    ('ALIGN', (3, 1), (3, -1), 'RIGHT'),  # alignment for the last column of duration
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),  # 所有表格上下居中对齐
+                ])
+            bug_table_style.alignment = TA_LEFT
+            index = 0
+            bug_lines = [(
+                            Paragraph('<b>Index</b>', styleHeader),
+                            Paragraph('<b>Bug ID</b>', styleHeader),
+                            Paragraph('<b>Summary</b>', styleHeader),
+                            Paragraph('<b>Status</b>', styleHeader),
+                        )]
+            for bug in no_resolved_bugs:
+                index = index + 1
+                bug_id = bug.id
+                bug_summary = bug.summary
+                bug_status = bug.status
+                link = 'https://bugs.linaro.org/show_bug.cgi?id=%s' % (bug_id)
+                bug_lines.append((
+                                    Paragraph(str(index), styleContent),
+                                    Paragraph('<link href="%s" underline="true" textColor="navy">%s</link>' % (link, bug_id), styleContent),
+                                    Paragraph(bug_summary, styleContent),
+                                    Paragraph(bug_status, styleContent),
+                                ))
+
+            bugs_table = Table(bug_lines, colWidths=[40, 50, 400, 80], style=bug_table_style)
+            Story.append(bugs_table)
+            Story.append(Spacer(1, 12))
+
+            #######################################################################
+            ##  Create the Job Duration table
+            #######################################################################
+            job_duration_table_style = TableStyle([
+                    ("BOX", (0, 0), (-1, -1), 0.5, "black"),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.25, "black"),
+
+                    ('BACKGROUND', (0, 0), (3, 0), 'black'),  # background for the header
+
+                    ('ALIGN', (3, 1), (3, -1), 'RIGHT'),  # alignment for the last column of duration
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),  # 所有表格上下居中对齐
+                ])
+            job_duration_table_style.alignment = TA_LEFT
+
+            index = 0
+            job_lines = [(
+                            Paragraph('<b>Index</b>', styleHeader),
+                            Paragraph('<b>Job ID</b>', styleHeader),
+                            Paragraph('<b>Job Name</b>', styleHeader),
+                            Paragraph('<b>Duration</b>', styleHeader),
+                        )]
+            for job in jobs_duration:
+                index = index + 1
+                job_id = job.job_id
+                job_name = job.job_name
+                job_duration = job.duration
+                job_lines.append((
+                    Paragraph(str(index), styleContent),
+                    Paragraph('<link href="%s/%s" underline="true" textColor="navy">%s</link>' % (LAVAS[job.lava_nick].job_url_prefix, job_id, job_id), styleContent),
+                    Paragraph(job_name, styleContent),
+                    Paragraph(str(job_duration), styleContent),
+                ))
+            job_lines.append((
+                    Paragraph(str(index + 1), styleContent),
+                    Paragraph('-', styleContent),
+                    Paragraph('-', styleContent),
+                    Paragraph(str(total_duration), styleContent),
+                ))
+            job_duration_table = Table(job_lines, colWidths=[40, 50, 147, None], style=job_duration_table_style)
+            Story.append(job_duration_table)
+
+            # Create the PDF object, using the BytesIO object as its "file."
+            buffer = BytesIO()
+            doc = SimpleDocTemplate(buffer,pagesize=letter,
+                                    rightMargin=72,leftMargin=72,
+                                    topMargin=72,bottomMargin=18)
+            doc.build(Story)
+            pdf = buffer.getvalue()
+            buffer.close()
+            response.write(pdf)
+
+            #doc.build(Story)
+
+        reportlab_pdf(response)
+        return response
+
 
 class BugForm(forms.ModelForm):
     class Meta:
@@ -1488,7 +1508,7 @@ def add_bug(request):
                       'message': 'Added bug successfully',
                      }
     else: # GET
-        build_name = request.GET.get("build_name", DEFAULT_BUILD_NAME)
+        build_name = request.GET.get("build_name", DEFAULT_LCR_BUILD_NAME)
         build_no = request.GET.get("build_no", '')
         plan_suite = request.GET.get("plan_suite", '')
         module_testcase = request.GET.get("module_testcase", '')
@@ -1532,7 +1552,7 @@ def add_comment(request):
                       'message': 'Added comment successfully',
                      }
     else: # GET
-        build_name = request.GET.get("build_name", DEFAULT_BUILD_NAME)
+        build_name = request.GET.get("build_name", DEFAULT_LCR_BUILD_NAME)
         build_no = request.GET.get("build_no", '')
         plan_suite = request.GET.get("plan_suite", '')
         module_testcase = request.GET.get("module_testcase", '')
@@ -1589,9 +1609,8 @@ def show_trend(request):
         test_cases = []
     elif category == 'basic':
         test_cases = []
-        basic_optee_weekly = basic_weekly.copy()
-        if build_name.find("hikey") >= 0:
-            basic_optee_weekly.update(optee)
+        basic_optee_weekly = get_basic_optee_weekly_tests(build_name)
+
         if job_name:
             test_cases.extend(basic_optee_weekly[job_name])
         else:
@@ -1610,9 +1629,7 @@ def show_trend(request):
         if job_name:
             jobs_raw = list(JobCache.objects.filter(build_name=build_name, cached=True, job_name=job_name))
         else:
-            basic_optee_weekly = basic_weekly.copy()
-            if build_name.find("hikey") >= 0:
-                basic_optee_weekly.update(optee)
+            basic_optee_weekly = get_basic_optee_weekly_tests(build_name)
             jobs_raw = []
             for job in basic_optee_weekly:
                 jobs_raw = jobs_raw + list(JobCache.objects.filter(build_name=build_name, cached=True, job_name=job))
@@ -1684,7 +1701,7 @@ def get_result_file_path(job_id=None, build_name=None, build_no=None):
 
 def get_attachment_url(job_id=None, lava_server=None, build_name=None):
     attachment_case_name = 'test-attachment'
-    cts_vts = [] + cts_v7a + cts_v8a + vts
+    cts_vts = [] + get_cts_tests(build_name) + vts
 
     suite_list =  yaml.load(lava_server.results.get_testjob_suites_list_yaml(job_id))
     for test_suite in suite_list:
@@ -2159,7 +2176,6 @@ def file_bug(request):
                     })
 
 if __name__ == "__main__":
-    build_name = "android-lcr-reference-hikey-o"
     build_no = '20'
 #    job_template = get_possible_job_names(build_name=build_name)
 #    print str(job_template)
@@ -2167,7 +2183,7 @@ if __name__ == "__main__":
 #    for job_name, job_result in checklist_results.items():    for test_name, test_result in job_result.items():
 #    print str(checklist_results)
 
-    lava_server = get_all_build_configs()[build_name]['lava_server']
+#    lava_server = get_all_build_configs()[build_name]['lava_server']
 
-    jobs = get_jobs(build_name, build_no, lava_server, job_name_list=[])
-    print str(jobs)
+#    jobs = get_jobs(build_name, build_no, lava_server, job_name_list=[])
+#    print str(jobs)
