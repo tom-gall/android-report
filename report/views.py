@@ -1389,7 +1389,7 @@ def test_report(request):
                                     bugs_paragraph,
                                 ))
 
-            table = Table(lines, colWidths=[40, 70, 200, 38, 35, 40, 40, 35, 50], style=table_style)
+            table = Table(lines, colWidths=[40, 70, 200, 38, 35, 40, 40, 38, 50], style=table_style)
             Story.append(table)
             Story.append(Spacer(1, 12))
 
