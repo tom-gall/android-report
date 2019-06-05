@@ -1,1 +1,4 @@
 *.pyc
+files
+logfile*
+db.sqlite3

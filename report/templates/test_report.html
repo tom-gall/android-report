@@ -65,6 +65,14 @@
         <td align="left"><a href="{{ build_info.images_url }}">{{ build_info.images_url }}</a></td>
     <tr/>
     <tr>
+        <th align="left">CTS</th>
+        <td align="left"><a href="{{ build_info.cts_pkg_url }}">{{ build_info.cts_pkg_url }}</a></td>
+    <tr/>
+    <tr>
+        <th align="left">VTS</th>
+        <td align="left"><a href="{{ build_info.vts_pkg_url }}">{{ build_info.vts_pkg_url }}</a></td>
+    <tr/>
+    <tr>
         <th align="left">Cached In Base</th>
         <td align="left">
         {% if build_info.cached_in_base %}

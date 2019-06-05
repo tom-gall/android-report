@@ -144,6 +144,8 @@ class BuildSummary(models.Model):
     firmware_version = models.CharField(max_length=64)
     toolchain_info = models.CharField(max_length=256)
     images_url = models.CharField(max_length=256)
+    vts_pkg_url = models.CharField(max_length=256, default='')
+    cts_pkg_url = models.CharField(max_length=256, default='')
 
     def __str__(self):
         return "%s %s %s %s" % (self.build_name, self.build_no, self.android_version, self.kernel_version)

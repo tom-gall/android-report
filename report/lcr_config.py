@@ -97,26 +97,7 @@ cts_v8a = [ 'cts-focused1-arm64-v8a',
             'cts-part5-arm64-v8a',
           ]
 
-build_tests_support_config = {
-    'android-lcr-reference-am65x-p': {
-                                'optee_supported': False,
-                                'v8a_supported' : True,
-                                },
-    'android-lcr-reference-x15-p': {
-                                'optee_supported': False,
-                                'v8a_supported' : False,
-                                },
-    'android-lcr-reference-hikey-p': {
-                                'optee_supported': True,
-                                'v8a_supported' : True,
-                                },
-    'android-lcr-reference-hikey960-p': {
-                                'optee_supported': True,
-                                'v8a_supported' : True,
-                                },
-}
-
-android_snapshot_url_base = "https://snapshots.linaro.org/android"
+android_snapshot_url_base = "http://snapshots.linaro.org/android"
 ci_job_url_base = 'https://ci.linaro.org/job'
 android_build_config_url_base = "https://android-git.linaro.org/android-build-configs.git/plain"
 template_url_prefix = "https://git.linaro.org/qa/test-plans.git/plain/android/"
@@ -158,36 +139,69 @@ DEFAULT_LAVA_USER = "yongqin.liu"
 
 DEFAULT_LCR_BUILD_NAME = "android-lcr-reference-hikey-p"
 
-kernel_info_config = {
+build_configs = {
     'android-lcr-reference-am65x-p': {
-                                'makefile_url_with_commitid': 'http://git.ti.com/ti-linux-kernel/ti-linux-kernel/blobs/raw/%s/Makefile',
-                                'src_path': 'kernel/ti/4.19',
+                                'optee_supported': False,
+                                'v8a_supported' : True,
+                                'kernel_makefile_url_with_commitid': 'http://git.ti.com/ti-linux-kernel/ti-linux-kernel/blobs/raw/%s/Makefile',
+                                'kernel_src_path': 'kernel/ti/4.19',
+                                'platform_name': 'AM65XEVM',
                                 },
     'android-lcr-reference-x15-p': {
-                                'makefile_url_with_commitid': 'http://git.ti.com/ti-linux-kernel/ti-linux-kernel/blobs/raw/%s/Makefile',
-                                'src_path': 'kernel/ti/4.19',
+                                'optee_supported': False,
+                                'v8a_supported' : False,
+                                'kernel_makefile_url_with_commitid': 'http://git.ti.com/ti-linux-kernel/ti-linux-kernel/blobs/raw/%s/Makefile',
+                                'kernel_src_path': 'kernel/ti/4.19',
+                                'platform_name': 'AM65XEVM',
                                 },
     'android-lcr-reference-hikey-p': {
-                                'makefile_url_with_commitid': 'https://android-git.linaro.org/kernel/hikey-linaro.git/plain/Makefile?id=%s',
-                                'src_path': 'kernel/linaro/hisilicon-4.14',
+                                'optee_supported': True,
+                                'v8a_supported' : True,
+                                'kernel_makefile_url_with_commitid': 'https://android-git.linaro.org/kernel/hikey-linaro.git/plain/Makefile?id=%s',
+                                'kernel_src_path': 'kernel/linaro/hisilicon-4.14',
+                                'platform_name': 'HiKey',
                                 },
     'android-lcr-reference-hikey960-p': {
-                                'makefile_url_with_commitid': 'https://android-git.linaro.org/kernel/hikey-linaro.git/plain/Makefile?id=%s',
-                                'src_path': 'kernel/linaro/hisilicon-4.14',
+                                'optee_supported': True,
+                                'v8a_supported' : True,
+                                'kernel_makefile_url_with_commitid': 'https://android-git.linaro.org/kernel/hikey-linaro.git/plain/Makefile?id=%s',
+                                'kernel_src_path': 'kernel/linaro/hisilicon-4.14',
+                                'platform_name': 'HiKey960',
                                 },
 }
 
 def get_basic_optee_weekly_tests(build_name):
     basic_optee_weekly = basic_weekly.copy()
-    test_support_config = build_tests_support_config.get(build_name)
-    if test_support_config and test_support_config.get('optee_supported'):
+    build_config = build_configs.get(build_name)
+    if build_config and build_config.get('optee_supported'):
         basic_optee_weekly.update(optee)
     return basic_optee_weekly
 
 def get_cts_tests(build_name):
-    test_support_config = build_tests_support_config.get(build_name)
+    build_config = build_configs.get(build_name)
     basic_optee_weekly = basic_weekly.copy()
-    if test_support_config and test_support_config.get('v8a_supported'):
+    if build_config and build_config.get('v8a_supported'):
         return [] + cts_v7a + cts_v8a
     else:
         return [] + cts_v7a
+
+def get_kernel_makefile_url(build_name):
+    build_config = build_configs.get(build_name)
+    if build_config and build_config.get('kernel_makefile_url_with_commitid'):
+       return build_config.get('kernel_makefile_url_with_commitid')
+    else:
+        return None
+
+def get_kernel_src_path(build_name):
+    build_config = build_configs.get(build_name)
+    if build_config and build_config.get('kernel_src_path'):
+       return build_config.get('kernel_src_path')
+    else:
+        return None
+
+def get_platform_name(build_name):
+    build_config = build_configs.get(build_name)
+    if build_config and build_config.get('platform_name'):
+       return build_config.get('platform_name')
+    else:
+        return None

@@ -33,12 +33,9 @@ from lcr.settings import FILES_DIR, BUGZILLA_API_KEY, QA_REPORT, QA_REPORT_DEFAU
 
 from lcr_config import DEFAULT_LCR_BUILD_NAME, DEFAULT_LAVA_USER, TEST_RESULT_XML_NAME
 from lcr_config import job_priority_list, job_status_string_int, job_status_dict
-from lcr_config import pat_ignore, names_ignore
 from lcr_config import android_snapshot_url_base, ci_job_url_base, android_build_config_url_base, template_url_prefix
-from lcr_config import benchmarks_common, vts
-from lcr_config import get_basic_optee_weekly_tests, get_cts_tests
-from lcr_config import less_is_better_measurement
-from lcr_config import kernel_info_config
+from lcr_config import benchmarks_common, vts, less_is_better_measurement, pat_ignore, names_ignore
+from lcr_config import get_basic_optee_weekly_tests, get_cts_tests, get_kernel_makefile_url, get_kernel_src_path, get_platform_name
 
 qa_report_def = QA_REPORT[QA_REPORT_DEFAULT]
 qa_report_api = qa_report.QAReportApi(qa_report_def.get('domain'), qa_report_def.get('token'))
@@ -346,8 +343,7 @@ def get_test_results_for_build(build_name, build_no, job_name_list=[]):
     resubmitted_jobs = []
     for job in jobs_raw:
         job_id = job.get("job_id")
-        lava_config = find_lava_config(job.get('external_url'))
-
+        lava = find_lava_config(job.get('external_url'))
         job_status_str = job.get("job_status")
         if not job_status_str and job.get('submitted'):
             job_status_str = 'Submitted'
@@ -355,6 +351,7 @@ def get_test_results_for_build(build_name, build_no, job_name_list=[]):
 
         local_job_name = job.get("name").replace("%s-%s-" % (build_name, build_no), "")
         job["name"] = local_job_name
+        job["lava_nick"] = lava.nick
 
         if job.get('parent_job'):
             resubmitted_jobs.append(job.get('parent_job'))
@@ -367,8 +364,6 @@ def get_test_results_for_build(build_name, build_no, job_name_list=[]):
             jobs_failed.append(job)
             continue
         job_status_int = job_status_string_int[job_status_str]
-
-        lava = find_lava_config(job.get('external_url'))
         job_cached = is_job_cached(job_id, lava)
         if not job_cached:
             cache_job_result_to_db(job_id, lava, job_status_int)
@@ -883,6 +878,7 @@ def test_report(request):
         job_res = total_tests_res.get(job_name)
         if job_res is None:
             job_id = None
+            lava_nick = '-'
         else:
             job_id = job_res['job_id']
             lava_nick = job_res.get('lava_nick')
@@ -919,6 +915,7 @@ def test_report(request):
                 number_passrate = float(number_pass * 100 / number_total)
             basic_optee_weekly_res.append({'job_name': job_name,
                                            'job_id': job_id,
+                                           'lava_nick': lava_nick,
                                            'test_suite': test_suite,
                                            'number_pass': number_pass,
                                            'number_fail': number_fail,
@@ -946,12 +943,14 @@ def test_report(request):
         job_res = total_tests_res.get(job_name)
         if job_res is None:
             job_id = None
+            lava_nick = '-'
         else:
             job_id = job_res['job_id']
             lava_nick = job_res.get('lava_nick')
             job_id_lava_nick = '%s@%s' % (job_id, lava_nick)
             if job_id_lava_nick not in successful_job_ids:
                 successful_job_ids.append(job_id_lava_nick)
+
         for test_suite in sorted(benchmarks[job_name].keys()):
             test_cases = benchmarks[job_name][test_suite]
             for test_case in test_cases:
@@ -1004,6 +1003,7 @@ def test_report(request):
 
                 benchmarks_res.append({'job_name': job_name,
                                        'job_id': job_id,
+                                       'lava_nick': lava_nick,
                                        'test_case': test_case,
                                        'test_suite': test_suite,
                                        'unit': unit,
@@ -1221,13 +1221,17 @@ def test_report(request):
         firmware_version = build_summary.firmware_version
         images_url = build_summary.images_url
         toolchain_info = build_summary.toolchain_info
+        vts_pkg_url = build_summary.vts_pkg_url
+        cts_pkg_url = build_summary.cts_pkg_url
+
     except BuildSummary.DoesNotExist:
         images_url = '%s/%s/%s' % (android_snapshot_url_base, build_name, build_no)
         pinned_manifest_url = '%s/pinned-manifest.xml' % images_url
-        kernel_info = kernel_info_config.get(build_name)
-        if kernel_info:
-            kernel_commit = get_commit_from_pinned_manifest(pinned_manifest_url, kernel_info.get('src_path'))
-            kernel_url = kernel_info.get('makefile_url_with_commitid') % kernel_commit
+        kernel_src_path = get_kernel_src_path(build_name)
+        makefile_url = get_kernel_makefile_url(build_name)
+        if kernel_src_path and makefile_url:
+            kernel_commit = get_commit_from_pinned_manifest(pinned_manifest_url, kernel_src_path)
+            kernel_url = makefile_url % kernel_commit
             kernel_version = read_kernel_version(kernel_url)
         else:
             kernel_url = '--'
@@ -1239,6 +1243,8 @@ def test_report(request):
         toolchain_info = '--'
         firmware_version = '--'
         firmware_url = '--'
+        vts_pkg_url = get_build_config_value(build_config_url, key="VTS_PKG_URL")
+        cts_pkg_url = get_build_config_value(build_config_url, key="CTS_PKG_URL")
 
     ## bugzilla related information
     build_bugzilla = BuildBugzilla.objects.get(build_name=build_name.replace('-premerge-ci', ''))
@@ -1277,6 +1283,8 @@ def test_report(request):
                     'toolchain_info': toolchain_info,
                     'images_url': images_url,
                     'cached_in_base': cached_in_base,
+                    'vts_pkg_url': vts_pkg_url,
+                    'cts_pkg_url': cts_pkg_url,
                  }
 
     no_resolved_bugs = []
@@ -1314,8 +1322,8 @@ def test_report(request):
 
             import time
             from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER, TA_LEFT, TA_RIGHT
-            from reportlab.lib.pagesizes import letter
-            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table,TableStyle, ListFlowable
+            from reportlab.lib.pagesizes import A4, landscape
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table,TableStyle, ListFlowable, PageBreak
             from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle, ListStyle
             from reportlab.lib import colors
 
@@ -1327,6 +1335,10 @@ def test_report(request):
             styleHeader.textColor = 'white'
             styleHeader.backColor = 'black'
 
+            styleHeaderVertical = styleHeader.clone(ParagraphStyle)
+            styleHeaderVertical.alignment = TA_LEFT
+
+
             styleContent = styles["Normal"].clone(ParagraphStyle)
             styleContent.fontSize = 8
 
@@ -1335,29 +1347,330 @@ def test_report(request):
 
             stylelist = styles["OrderedList"].clone(ListStyle)
             stylelist.bulletFontSize = 8
+
+            styleTitle = styles["Title"]
+
+            styleHeading1 = styles["Heading1"]
+            styleHeading1.backColor = 'darkgrey'
+
             #######################################################################
-            ##  Create the VTS table
+            ##  Create the Title Page
             #######################################################################
+            Story.append(Paragraph('<b>%s Reference LCR for %s</b>' % (datetime.datetime.now().strftime('%y.%m'),
+                                                                                        get_platform_name(build_info.get('build_name'))), styleTitle))
+            Story.append(Paragraph('<b>Test Report</b>', styleTitle))
+            Story.append(PageBreak())
+
+            #######################################################################
+            ##  Create the Build Summary table
+            #######################################################################
+            Story.append(Paragraph('<b>Build Summary</b>', styleHeading1))
+            Story.append(Spacer(1, 12))
             table_style = TableStyle([
                     ("BOX", (0, 0), (-1, -1), 0.5, "black"),
                     ("INNERGRID", (0, 0), (-1, -1), 0.25, "black"),
 
-                    ('BACKGROUND', (0, 0), (8, 0), 'black'),  # background for the header
+                    ('BACKGROUND', (0, 0), (0, -1), 'black'),  # background for the header
+                ])
+            def get_link_text(url=None, text=""):
+                if not url or url == '--':
+                    return text
+                else:
+                    return '<link href="%s" underline="true" textColor="navy">%s</link>' % (url, text)
+
+            lines = []
+            lines.append((Paragraph('<b>Build Name</b>', styleHeaderVertical), Paragraph(build_info.get('build_name'), styleContent)))
+            lines.append((Paragraph('<b>Build Number</b>', styleHeaderVertical), Paragraph(build_info.get('build_no'), styleContent)))
+            lines.append((Paragraph('<b>Build Config</b>', styleHeaderVertical),
+                            Paragraph(get_link_text(url=build_info.get('build_config_url'), text=build_info.get('build_config_name')), styleContent)))
+            lines.append((Paragraph('<b>Android Version</b>', styleHeaderVertical), Paragraph(build_info.get('android_version'), styleContent)))
+            lines.append((Paragraph('<b>Kernel Version</b>', styleHeaderVertical),
+                            Paragraph(get_link_text(url=build_info.get('kernel_url'), text=build_info.get('kernel_version')), styleContent)))
+            lines.append((Paragraph('<b>Toolchain</b>', styleHeaderVertical), Paragraph(build_info.get('toolchain_info').replace(' and ', '<br/>'), styleContent)))
+            lines.append((Paragraph('<b>Firmware Info</b>', styleHeaderVertical),
+                            Paragraph(get_link_text(url=build_info.get('firmware_url'), text=build_info.get('firmware_version')), styleContent)))
+            lines.append((Paragraph('<b>Images</b>', styleHeaderVertical),
+                            Paragraph(get_link_text(url=build_info.get('images_url'), text=build_info.get('images_url')), styleContent)))
+            lines.append((Paragraph('<b>CTS</b>', styleHeaderVertical),
+                            Paragraph(get_link_text(url=build_info.get('cts_pkg_url'), text=build_info.get('cts_pkg_url')), styleContent)))
+            lines.append((Paragraph('<b>VTS</b>', styleHeaderVertical),
+                            Paragraph(get_link_text(url=build_info.get('vts_pkg_url'), text=build_info.get('vts_pkg_url')), styleContent)))
+
+            table = Table(lines, colWidths=[100, 350], style=table_style, hAlign='LEFT')
+            Story.append(table)
+            Story.append(Spacer(1, 12))
+
+            Story.append(Paragraph('<b>Pass-rate encodings</b>', styleHeading1))
+            lines = [('100%',), ('50% - 99%',), ('1 - 49%',), ('0%',)]
+            table_style = TableStyle([
+                                ("BACKGROUND", (0, 0), (-1, 0), "#94bd5e"),
+                                ("BACKGROUND", (0, 1), (-1, 1), "#ffd966"),
+                                ("BACKGROUND", (0, 2), (-1, 2), "#f6b26b"),
+                                ("BACKGROUND", (0, 3), (-1, 3), "#e06666"),
+                                ])
+            table = Table(lines, colWidths=[100], style=table_style, hAlign='LEFT')
+            Story.append(table)
+            Story.append(PageBreak())
+
+            #######################################################################
+            ##  Create the Failed Jobs table
+            #######################################################################
+            Story.append(Paragraph('<b>Jobs Without Test Result</b>', styleHeading1))
+            Story.append(Spacer(1, 12))
+            table_style = TableStyle([
+                    ("BOX", (0, 0), (-1, -1), 0.5, "black"),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.25, "black"),
+
+                    ('BACKGROUND', (0, 0), (-1, 0), 'black'),  # background for the header
+                ])
+            index = 0
+            lines = [(
+                            Paragraph('<b>No.</b>', styleHeader),
+                            Paragraph('<b>Job Name</b>', styleHeader),
+                            Paragraph('<b>Job Status</b>', styleHeader),
+                            Paragraph('<b>ErrorMsg</b>', styleHeader),
+                            Paragraph('<b>Bugs</b>', styleHeader),
+                        )]
+            for test in jobs_failed_not_resubmitted:
+                index = index + 1
+                job_id = test.get('job_id')
+                job_name = test.get('name')
+                if not job_id:
+                    job_paragraph = Paragraph(str(job_name), styleContent)
+                else:
+                    job_paragraph = Paragraph('<link href="%s/%s" underline="true" textColor="navy">%s</link>' % (LAVAS[test.get('lava_nick')].job_url_prefix, job_id, job_name), styleContent)
+
+                bugs_paragraph_list = []
+                if test.get('bugs'):
+                    for bug in test.get('bugs'):
+                        bug_id = bug.id
+                        link = 'https://bugs.linaro.org/show_bug.cgi?id=%s' % (bug_id)
+                        bugs_paragraph_list.append(Paragraph('<link href="%s" underline="true" textColor="navy">%s</link>' % (link, bug_id), styleContent))
+
+                bugs_paragraph = ListFlowable(bugs_paragraph_list, style=stylelist)
+                lines.append((
+                                    Paragraph(str(index), styleContent),
+                                    job_paragraph,
+                                    Paragraph(str(test.get('job_status')), styleContent),
+                                    Paragraph(str(test.get('error_msg')), styleContent),
+                                    bugs_paragraph,
+                                ))
+
+            table = Table(lines, colWidths=[30, 90, 90, 200, 50], style=table_style, hAlign='LEFT')
+            Story.append(table)
+            Story.append(PageBreak())
+
+            #######################################################################
+            ##  Create the Basic-OPTEE-Weekly table
+            #######################################################################
+            Story.append(Paragraph('<b>Basic And Weekly</b>', styleHeading1))
+            Story.append(Spacer(1, 12))
+            table_style_cmds = [
+                    ("BOX", (0, 0), (-1, -1), 0.5, "black"),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.25, "black"),
+
+                    ('BACKGROUND', (0, 0), (-1, 0), 'black'),  # background for the header
+
+                    ('ALIGN', (3, 1), (6, -1), 'RIGHT'),  # alignment for the pass/fail/total column
+                ]
+            index = 0
+            lines = [(
+                            Paragraph('<b>No.</b>', styleHeader),
+                            Paragraph('<b>Job Name</b>', styleHeader),
+                            Paragraph('<b>Test Name</b>', styleHeader),
+                            Paragraph('<b>Pass</b>', styleHeader),
+                            Paragraph('<b>Fail</b>', styleHeader),
+                            Paragraph('<b>Total</b>', styleHeader),
+                            Paragraph('<b>%</b>', styleHeader),
+                            Paragraph('<b>Bugs</b>', styleHeader),
+                        )]
+            for test in basic_optee_weekly_res:
+                index = index + 1
+                job_id = test.get('job_id')
+                job_name = test.get('job_name')
+                if not job_id:
+                    job_paragraph = Paragraph(str(job_name), styleContent)
+                else:
+                    job_paragraph = Paragraph('<link href="%s/%s" underline="true" textColor="navy">%s</link>' % (LAVAS[test.get('lava_nick')].job_url_prefix, job_id, job_name), styleContent)
+
+                bugs_paragraph_list = []
+                if test.get('bugs'):
+                    for bug in test.get('bugs'):
+                        bug_id = bug.id
+                        link = 'https://bugs.linaro.org/show_bug.cgi?id=%s' % (bug_id)
+                        bugs_paragraph_list.append(Paragraph('<link href="%s" underline="true" textColor="navy">%s</link>' % (link, bug_id), styleContent))
+
+                bugs_paragraph = ListFlowable(bugs_paragraph_list, style=stylelist)
+                lines.append((
+                                    Paragraph(str(index), styleContent),
+                                    job_paragraph,
+                                    Paragraph(str(test.get('test_suite')), styleContent),
+                                    Paragraph(str(test.get('number_pass')), styleContentRightAlign),
+                                    Paragraph(str(test.get('number_fail')), styleContentRightAlign),
+                                    Paragraph(str(test.get('number_total')), styleContentRightAlign),
+                                    Paragraph(str(test.get('number_passrate')), styleContentRightAlign),
+                                    bugs_paragraph,
+                                ))
+                number_passrate = test.get('number_passrate')
+                if number_passrate == 100:
+                    table_style_cmds.append(("BACKGROUND", (0, index), (-1, index), "#94bd5e"))
+                elif number_passrate >= 50:
+                    table_style_cmds.append(("BACKGROUND", (0, index), (-1, index), "#ffd966"))
+                elif number_passrate > 0:
+                    table_style_cmds.append(("BACKGROUND", (0, index), (-1, index), "#f6b26b"))
+                else:
+                    table_style_cmds.append(("BACKGROUND", (0, index), (-1, index), "#e06666"))
+
+            table = Table(lines, colWidths=[30, 70, 150, 38, 35, 40, 38, 50], style=table_style_cmds, hAlign='LEFT')
+            Story.append(table)
+            Story.append(PageBreak())
+            #######################################################################
+            ##  Create the Benchmark table
+            #######################################################################
+            Story.append(Paragraph('<b>Benchmarks</b>', styleHeading1))
+            Story.append(Spacer(1, 12))
+            table_style_cmds = [
+                    ("BOX", (0, 0), (-1, -1), 0.5, "black"),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.25, "black"),
+
+                    ('BACKGROUND', (0, 0), (-1, 0), 'black'),  # background for the header
+
+                    ('ALIGN', (5, 1), (5, -1), 'RIGHT'),  # alignment for the measurement column
+                ]
+            index = 0
+            lines = [(
+                            Paragraph('<b>No.</b>', styleHeader),
+                            Paragraph('<b>Benchmarks</b>', styleHeader),
+                            Paragraph('<b>Test Suite</b>', styleHeader),
+                            Paragraph('<b>Test Case</b>', styleHeader),
+                            Paragraph('<b>Unit</b>', styleHeader),
+                            Paragraph('<b>Value</b>', styleHeader),
+                            Paragraph('<b>Bugs</b>', styleHeader)
+                        )]
+            for test in benchmarks_res:
+                index = index + 1
+                job_id = test.get('job_id')
+                job_name = test.get('job_name')
+                if not job_id:
+                    job_paragraph = Paragraph(str(job_name), styleContent)
+                else:
+                    job_paragraph = Paragraph('<link href="%s/%s" underline="true" textColor="navy">%s</link>' % (LAVAS[test.get('lava_nick')].job_url_prefix, job_id, job_name), styleContent)
+
+                bugs_paragraph_list = []
+                if test.get('bugs'):
+                    for bug in test.get('bugs'):
+                        bug_id = bug.id
+                        link = 'https://bugs.linaro.org/show_bug.cgi?id=%s' % (bug_id)
+                        bugs_paragraph_list.append(Paragraph('<link href="%s" underline="true" textColor="navy">%s</link>' % (link, bug_id), styleContent))
+
+                bugs_paragraph = ListFlowable(bugs_paragraph_list, style=stylelist)
+                lines.append((
+                                    Paragraph(str(index), styleContent),
+                                    job_paragraph,
+                                    Paragraph(str(test.get('test_suite')), styleContent),
+                                    Paragraph(str(test.get('test_case')), styleContent),
+                                    Paragraph(str(test.get('unit')), styleContent),
+                                    Paragraph(str(test.get('measurement')), styleContentRightAlign),
+                                    bugs_paragraph,
+                                ))
+                if test.get('measurement') == '--':
+                    table_style_cmds.append(("BACKGROUND", (0, index), (-1, index), "#e06666"))
+
+            table = Table(lines, colWidths=[30, 80, 100, 150, None, 60, 50], style=table_style_cmds, hAlign='LEFT')
+            Story.append(table)
+            Story.append(PageBreak())
+            #######################################################################
+            ##  Create the CTS table
+            #######################################################################
+            Story.append(Paragraph('<b>CTS</b>', styleHeading1))
+            Story.append(Spacer(1, 12))
+            table_style_cmds = [
+                    ("BOX", (0, 0), (-1, -1), 0.5, "black"),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.25, "black"),
+
+                    ('BACKGROUND', (0, 0), (-1, 0), 'black'),  # background for the header
 
                     ('ALIGN', (3, 1), (5, -1), 'RIGHT'),  # alignment for the pass/fail/total column
                     ('ALIGN', (7, 1), (7, -1), 'RIGHT'),  # alignment for the pass rate column
-                ])
-            table_style.alignment = TA_LEFT
+                ]
             index = 0
             lines = [(
-                            Paragraph('<b>Index</b>', styleHeader),
+                            Paragraph('<b>No.</b>', styleHeader),
                             Paragraph('<b>Plan</b>', styleHeader),
                             Paragraph('<b>Module</b>', styleHeader),
                             Paragraph('<b>Pass</b>', styleHeader),
                             Paragraph('<b>Fail</b>', styleHeader),
                             Paragraph('<b>Total</b>', styleHeader),
                             Paragraph('<b>Done</b>', styleHeader),
-                            Paragraph('<b>Pass Rate</b>', styleHeader),
+                            Paragraph('<b>%</b>', styleHeader),
+                            Paragraph('<b>Bugs</b>', styleHeader),
+                        )]
+            for cts in cts_res:
+                index = index + 1
+                job_id = cts.get('job_id')
+                job_name = cts.get('job_name')
+                if not job_id:
+                    job_paragraph = Paragraph(str(job_name), styleContent)
+                else:
+                    job_paragraph = Paragraph('<link href="%s/%s" underline="true" textColor="navy">%s</link>' % (LAVAS[cts.get('lava_nick')].job_url_prefix, job_id, job_name), styleContent)
+
+                bugs_paragraph_list = []
+                if cts.get('bugs'):
+                    for bug in cts.get('bugs'):
+                        bug_id = bug.id
+                        link = 'https://bugs.linaro.org/show_bug.cgi?id=%s' % (bug_id)
+                        bugs_paragraph_list.append(Paragraph('<link href="%s" underline="true" textColor="navy">%s</link>' % (link, bug_id), styleContent))
+
+                bugs_paragraph = ListFlowable(bugs_paragraph_list, style=stylelist)
+                lines.append((
+                                    Paragraph(str(index), styleContent),
+                                    job_paragraph,
+                                    Paragraph(str(cts.get('module_name')), styleContent),
+                                    Paragraph(str(cts.get('number_pass')), styleContentRightAlign),
+                                    Paragraph(str(cts.get('number_fail')), styleContentRightAlign),
+                                    Paragraph(str(cts.get('number_total')), styleContentRightAlign),
+                                    Paragraph(str(cts.get('module_done')), styleContent),
+                                    Paragraph(str(cts.get('number_passrate')), styleContentRightAlign),
+                                    bugs_paragraph,
+                                ))
+                number_passrate = cts.get('number_passrate')
+                if number_passrate == 100:
+                    table_style_cmds.append(("BACKGROUND", (0, index), (-1, index), "#94bd5e"))
+                elif number_passrate >= 50:
+                    table_style_cmds.append(("BACKGROUND", (0, index), (-1, index), "#ffd966"))
+                elif number_passrate > 0:
+                    table_style_cmds.append(("BACKGROUND", (0, index), (-1, index), "#f6b26b"))
+                else:
+                    table_style_cmds.append(("BACKGROUND", (0, index), (-1, index), "#e06666"))
+
+            table = Table(lines, colWidths=[30, 100, 170, 38, 30, 40, 40, 35, 50], style=table_style_cmds, hAlign='LEFT')
+            Story.append(table)
+            Story.append(PageBreak())
+
+            #######################################################################
+            ##  Create the VTS table
+            #######################################################################
+            Story.append(Paragraph('<b>VTS</b>', styleHeading1))
+            Story.append(Spacer(1, 12))
+            table_style_cmds = [
+                    ("BOX", (0, 0), (-1, -1), 0.5, "black"),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.25, "black"),
+
+                    ('BACKGROUND', (0, 0), (-1, 0), 'black'),  # background for the header
+
+                    ('ALIGN', (3, 1), (5, -1), 'RIGHT'),  # alignment for the pass/fail/total column
+                    ('ALIGN', (7, 1), (7, -1), 'RIGHT'),  # alignment for the pass rate column
+                ]
+            index = 0
+            lines = [(
+                            Paragraph('<b>No.</b>', styleHeader),
+                            Paragraph('<b>Plan</b>', styleHeader),
+                            Paragraph('<b>Module</b>', styleHeader),
+                            Paragraph('<b>Pass</b>', styleHeader),
+                            Paragraph('<b>Fail</b>', styleHeader),
+                            Paragraph('<b>Total</b>', styleHeader),
+                            Paragraph('<b>Done</b>', styleHeader),
+                            Paragraph('<b>%</b>', styleHeader),
                             Paragraph('<b>Bugs</b>', styleHeader),
                         )]
             for vts in vts_res:
@@ -1388,28 +1701,37 @@ def test_report(request):
                                     Paragraph(str(vts.get('number_passrate')), styleContentRightAlign),
                                     bugs_paragraph,
                                 ))
+                number_passrate = vts.get('number_passrate')
+                if number_passrate == 100:
+                    table_style_cmds.append(("BACKGROUND", (0, index), (-1, index), "#94bd5e"))
+                elif number_passrate >= 50:
+                    table_style_cmds.append(("BACKGROUND", (0, index), (-1, index), "#ffd966"))
+                elif number_passrate > 0:
+                    table_style_cmds.append(("BACKGROUND", (0, index), (-1, index), "#f6b26b"))
+                else:
+                    table_style_cmds.append(("BACKGROUND", (0, index), (-1, index), "#e06666"))
 
-            table = Table(lines, colWidths=[40, 70, 200, 38, 35, 40, 40, 38, 50], style=table_style)
+            table = Table(lines, colWidths=[30, 70, None, 38, 30, 40, 40, 35, 50], style=table_style_cmds, hAlign='LEFT')
             Story.append(table)
-            Story.append(Spacer(1, 12))
-
+            Story.append(PageBreak())
 
             #######################################################################
             ##  Create the Bugs table
             #######################################################################
+            Story.append(Paragraph('<b>Bug Status:</b>', styleHeading1))
+            Story.append(Spacer(1, 12))
             bug_table_style = TableStyle([
                     ("BOX", (0, 0), (-1, -1), 0.5, "black"),
                     ("INNERGRID", (0, 0), (-1, -1), 0.25, "black"),
 
-                    ('BACKGROUND', (0, 0), (3, 0), 'black'),  # background for the header
+                    ('BACKGROUND', (0, 0), (-1, 0), 'black'),  # background for the header
 
                     ('ALIGN', (3, 1), (3, -1), 'RIGHT'),  # alignment for the last column of duration
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),  # 所有表格上下居中对齐
                 ])
-            bug_table_style.alignment = TA_LEFT
             index = 0
             bug_lines = [(
-                            Paragraph('<b>Index</b>', styleHeader),
+                            Paragraph('<b>No.</b>', styleHeader),
                             Paragraph('<b>Bug ID</b>', styleHeader),
                             Paragraph('<b>Summary</b>', styleHeader),
                             Paragraph('<b>Status</b>', styleHeader),
@@ -1427,27 +1749,28 @@ def test_report(request):
                                     Paragraph(bug_status, styleContent),
                                 ))
 
-            bugs_table = Table(bug_lines, colWidths=[40, 50, 400, 80], style=bug_table_style)
+            bugs_table = Table(bug_lines, colWidths=[30, 40, 350, 80], style=bug_table_style, hAlign='LEFT')
             Story.append(bugs_table)
-            Story.append(Spacer(1, 12))
+            Story.append(PageBreak())
 
             #######################################################################
             ##  Create the Job Duration table
             #######################################################################
+            Story.append(Paragraph('<b>Jobs Duration:</b>', styleHeading1))
+            Story.append(Spacer(1, 12))
             job_duration_table_style = TableStyle([
                     ("BOX", (0, 0), (-1, -1), 0.5, "black"),
                     ("INNERGRID", (0, 0), (-1, -1), 0.25, "black"),
 
-                    ('BACKGROUND', (0, 0), (3, 0), 'black'),  # background for the header
+                    ('BACKGROUND', (0, 0), (-1, 0), 'black'),  # background for the header
 
                     ('ALIGN', (3, 1), (3, -1), 'RIGHT'),  # alignment for the last column of duration
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),  # 所有表格上下居中对齐
                 ])
-            job_duration_table_style.alignment = TA_LEFT
 
             index = 0
             job_lines = [(
-                            Paragraph('<b>Index</b>', styleHeader),
+                            Paragraph('<b>No.</b>', styleHeader),
                             Paragraph('<b>Job ID</b>', styleHeader),
                             Paragraph('<b>Job Name</b>', styleHeader),
                             Paragraph('<b>Duration</b>', styleHeader),
@@ -1461,22 +1784,33 @@ def test_report(request):
                     Paragraph(str(index), styleContent),
                     Paragraph('<link href="%s/%s" underline="true" textColor="navy">%s</link>' % (LAVAS[job.lava_nick].job_url_prefix, job_id, job_id), styleContent),
                     Paragraph(job_name, styleContent),
-                    Paragraph(str(job_duration), styleContent),
+                    Paragraph(str(job_duration), styleContentRightAlign),
                 ))
             job_lines.append((
                     Paragraph(str(index + 1), styleContent),
                     Paragraph('-', styleContent),
                     Paragraph('-', styleContent),
-                    Paragraph(str(total_duration), styleContent),
+                    Paragraph(str(total_duration), styleContentRightAlign),
                 ))
-            job_duration_table = Table(job_lines, colWidths=[40, 50, 147, None], style=job_duration_table_style)
+            job_duration_table = Table(job_lines, colWidths=[30, 50, 147, None], style=job_duration_table_style, hAlign='LEFT')
             Story.append(job_duration_table)
 
             # Create the PDF object, using the BytesIO object as its "file."
+            class TestReportDocTemplate(SimpleDocTemplate):
+                def afterFlowable(self, flowable):
+                    "Registers TOC entries."
+                    if flowable.__class__.__name__ == 'Paragraph':
+                        text = flowable.getPlainText()
+                        style = flowable.style.name
+                        if style == 'Heading1':
+                            self.notify('TOCEntry', (0, text, self.page))
+                            key = text.replace(' ', '-')
+                            self.canv.bookmarkPage(key)
+                            self.canv.addOutlineEntry(text, key, 0, 0)
+
             buffer = BytesIO()
-            doc = SimpleDocTemplate(buffer,pagesize=letter,
-                                    rightMargin=72,leftMargin=72,
-                                    topMargin=72,bottomMargin=18)
+            #doc = TestReportDocTemplate(buffer, rightMargin=20, leftMargin=20, topMargin=72, bottomMargin=18)
+            doc = TestReportDocTemplate(buffer, rightMargin=20, leftMargin=20)
             doc.build(Story)
             pdf = buffer.getvalue()
             buffer.close()
