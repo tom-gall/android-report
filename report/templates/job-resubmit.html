@@ -13,10 +13,32 @@ Back to check the <a href="/report/jobs/">lava result report</a>
 {% else %}
 <title>Job resubmitted successfully </title>
 <table border=2>
-{% for job in new_job_ids %}
 <tr>
-<td>{{ job.0 }}</td>
-<td>{{ job.1 }}</td>
+    <th>Index</th>
+    <th>Job Name</th>
+    <th>Original</th>
+    <th>New</th>
+</tr>>
+{% for result in results %}
+<tr>
+    <td>{{ forloop.counter }}</td>
+    {% if result.old %}
+        {% with result.old as old %}
+        <td>{{ old.name }}</td>
+        <td><a href="{{ old.url }}">{{ old.url }}</a><br/><a href="{{ old.external_url }}">{{ old.external_url }}</a></td>
+        {% endwith %}
+        {% if result.new %}
+            {% with result.new as new %}
+            <td><a href="{{ new.url }}">{{ new.url }}</a><br/><a href="{{ new.external_url }}">{{ new.external_url }}</a></td>
+            {% endwith %}
+        {% else %}
+            <td>{% autoescape off %}{{ result.error_msg }}{% endautoescape %}</td>
+        {% endif %}
+    {% else %}
+        <td>{{ result.qa_job_url }}</td>
+        <td><a href="{{ result.qa_job_url }}">{{ result.qa_job_url }}</a></td>
+        <td>{% autoescape off %}{{ result.error_msg }}{% endautoescape %}</td>
+    {% endif %}
 </tr>
 {% endfor %}
 </table>

@@ -282,40 +282,113 @@ def cache_job_result_to_db(job_id, lava, job_status):
 
 @login_required
 def resubmit_job(request):
-    job_ids = request.POST.getlist("job_ids")
-    if len(job_ids) == 0:
-        job_id = request.GET.get("job_id", "")
-        build_name = request.GET.get("build_name", "")
-        if not job_id:
-            return render(request, 'job-resubmit.html',
-                          {
-                            'errors': True,
-                          })
-        job_ids = [job_id]
-    else:
-        build_name = request.POST.get("build_name", None)
+    qa_job_ids = request.POST.getlist("qa_job_ids")
+    if len(qa_job_ids) == 0:
+        qa_job_id = request.GET.get("qa_job_id", "")
+        if qa_job_id:
+            qa_job_ids = [qa_job_id]
 
-    if len(job_ids) == 0:
+    if len(qa_job_ids) == 0:
         return render(request, 'job-resubmit.html',
                       {
                         'errors': True,
                       })
 
-    lava = get_all_build_configs()[build_name]['lava_server']
+    qa_job = qa_report_api.get_job_with_id(qa_job_ids[0])
+    build_url = qa_job.get('target_build')
+    build_id = build_url.strip('/').split('/')[-1]
 
-    new_job_ids = []
-    for job_id in job_ids:
-        new_job_id = lava.server.scheduler.jobs.resubmit(job_id)
-        if new_job_id:
-            new_job_ids.append((job_id, new_job_id))
+    jobs = qa_report_api.get_jobs_for_build(build_id)
+    parent_job_urls = []
+    for job in jobs:
+        parent_job_url = job.get('parent_job')
+        if parent_job_url:
+            parent_job_urls.append(parent_job_url.strip('/'))
+
+    succeed_qa_job_urls = []
+    failed_qa_jobs = {}
+    old_job_urls = []
+    for qa_job_id in qa_job_ids:
+        qa_job_url = qa_report_api.get_job_api_url(qa_job_id).strip('/')
+        old_job_urls.append(qa_job_url)
+
+        if qa_job_url in parent_job_urls:
+            continue
+
+        res = qa_report_api.forceresubmit(qa_job_id)
+        if res.ok:
+            succeed_qa_job_urls.append(qa_job_url)
         else:
-            new_job_ids.append((job_id, "--"))
+            failed_qa_jobs[qa_job_url] = res
+
+    # assuming all the jobs are belong to the same build
+
+    jobs = qa_report_api.get_jobs_for_build(build_id)
+    old_jobs = {}
+    created_jobs = {}
+    for job in jobs:
+        qa_job_url = job.get('url').strip('/')
+        if qa_job_url in old_job_urls:
+            old_jobs[qa_job_url] = job
+
+        parent_job_url = job.get('parent_job')
+        if parent_job_url and parent_job_url.strip('/') in succeed_qa_job_urls:
+            created_jobs[parent_job_url.strip('/')] = job
+
+
+    results = []
+    for qa_job_id in qa_job_ids:
+        qa_job_url = qa_report_api.get_job_api_url(qa_job_id).strip('/')
+        old = old_jobs.get(qa_job_url)
+        if not old:
+            results.append({
+                'qa_job_url': qa_job_url,
+                'old': None,
+                'new': None,
+                'error_msg': 'The job does not exists on qa-report'
+            })
+            continue
+
+        if qa_job_url in parent_job_urls:
+            results.append({
+                'qa_job_url': qa_job_url,
+                'old': old,
+                'new': None,
+                'error_msg': 'The job is a parent job, could not be resubmitted again'
+            })
+            continue
+
+        new = created_jobs.get(qa_job_url)
+        if new:
+            results.append({
+                'qa_job_url': qa_job_url,
+                'old': old,
+                'new': new,
+                'error_msg': None
+                })
+            continue
+
+        response = failed_qa_jobs.get(qa_job_url)
+        if response is not None:
+            results.append({
+                'qa_job_url': qa_job_url,
+                'old': old,
+                'new': new,
+                'error_msg': 'Reason: %s<br/>Status Code: %s<br/>Url: %s' % (response.reason, response.status_code, response.url)
+            })
+        else:
+            results.append({
+                'qa_job_url': qa_job_url,
+                'old': old,
+                'new': new,
+                'error_msg': 'Unknown Error happend, No job has the original job as parent, and no response found'
+            })
+
     return render(request, 'job-resubmit.html',
                   {
-                   'new_job_ids': new_job_ids,
-                   'lava_server_job_prefix': lava.job_url_prefix,
+                   'results': results,
                   }
-        )
+    )
 
 def get_default_build_no(all_build_numbers=[], defaut_build_no=None):
     if len(all_build_numbers) > 0:
@@ -407,7 +480,7 @@ def get_build_config_value(build_config_url, key="MANIFEST_BRANCH"):
     response = urllib2.urlopen(build_config_url)
     html = response.read()
 
-    pat = re.compile('%s=(?P<value>android-.+)' % key)
+    pat = re.compile('%s=(?P<value>.+)' % key)
     all_builds = pat.findall(html)
     if len(all_builds) > 0:
         return all_builds[0]

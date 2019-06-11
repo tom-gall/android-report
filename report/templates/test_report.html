@@ -114,17 +114,15 @@
         {% if job.job_status == 'Submitted' or  job.job_status == 'Running' %}
             <a href="https://qa-reports.linaro.org/api/testjobs/{{ job.qa_job_id }}">{{ job.qa_job_id }} </a>
         {% else %}
-        <button name="resubmit_latest" onclick="this.disabled=true; window.location='/report/resubmit-job/?qa_job_id={{ job.qa_job_id }}'">
-            Resubmit {{ job.qa_job_id }}
-        </button>
-        <input type="checkbox" name="qa_job_ids" value="{{ job.qa_job_id }}" checked="true"/>
+            <a target='_blank' href="/report/resubmit-job/?qa_job_id={{ job.qa_job_id }}">Resubmit {{ job.qa_job_id }} </a>
+            <input type="checkbox" name="qa_job_ids" value="{{ job.qa_job_id }}" checked="true"/>
         {% endif %}
     </td>
     <td align='left'>
         {% with job.bugs as bugs %}
         {% for bug in bugs %}
             {% if not forloop.first %}<br/>{% endif %}
-            <a href="{{build_info.bugzilla_show_bug_prefix}}{{ bug.id }}">
+            <a target='_blank' href="{{build_info.bugzilla_show_bug_prefix}}{{ bug.id }}">
             {% if bug.resolution == 'WONTFIX' %}
             <del style="background-color:lightgrey; color:white"> {{ bug.id }} </del>
             {% else %}
@@ -243,7 +241,7 @@
         {% with test_info.bugs as bugs %}
         {% for bug in bugs %}
             {% if not forloop.first %}<br/>{% endif %}
-            <a href="{{build_info.bugzilla_show_bug_prefix}}{{ bug.id }}">
+            <a target='_blank' href="{{build_info.bugzilla_show_bug_prefix}}{{ bug.id }}">
             {% if bug.resolution == 'WONTFIX' %}
             <del style="background-color:lightgrey; color:white"> {{ bug.id }} </del>
             {% else %}
@@ -318,7 +316,7 @@ No result for basic test, or optee test, or weekly test jobs
         {% with test_info.bugs as bugs %}
         {% for bug in bugs %}
             {% if not forloop.first %}<br/>{% endif %}
-            <a href="{{build_info.bugzilla_show_bug_prefix}}{{ bug.id }}">
+            <a target='_blank' href="{{build_info.bugzilla_show_bug_prefix}}{{ bug.id }}">
             {% if bug.resolution == 'WONTFIX' %}
             <del style="background-color:lightgrey; color:white"> {{ bug.id }} </del>
             {% else %}
@@ -534,11 +532,11 @@ No result for cts test jobs.
 <tr>
     <td> {{ forloop.counter }}</td>
     {% if test_info.job_id %}
-    <td> <a href="{{ lava_server_job_prefix }}/{{ test_info.job_id }}">{{ test_info.job_name }}</a></td>
+    <td> <a target='_blank' href="{{ lava_server_job_prefix }}/{{ test_info.job_id }}">{{ test_info.job_name }}</a></td>
     {% else %}
     <td> {{ test_info.job_name }}</td>
     {% endif %}
-    <td align='left'> <a href="/report/show-trend/?category=cts&build_name={{ build_info.build_name }}&job_name={{ test_info.job_name }}&test_suite={{ test_info.job_name }}&test_case={{ test_info.module_name }}">{{ test_info.module_name }}</a></td>
+    <td align='left'> <a target='_blank' href="/report/show-trend/?category=cts&build_name={{ build_info.build_name }}&job_name={{ test_info.job_name }}&test_suite={{ test_info.job_name }}&test_case={{ test_info.module_name }}">{{ test_info.module_name }}</a></td>
     {% with test_info.base as base %}
     {% if base %}
     <td align='right'> {{ base.number_pass }}</td>
@@ -560,7 +558,7 @@ No result for cts test jobs.
     {% endif %}
     {% endwith %}
     {% if test_info.number_fail|add:0 > 0 %}
-    <td align='right'> <a href="/report/show-cts-vts-failures/?build_name={{ build_info.build_name }}&build_no={{ build_info.build_no }}&job_name={{ test_info.job_name }}&test_suite={{ test_info.job_name }}&test_case={{ test_info.module_name }}&job_ids={{ vts_job_ids }}#{{ test_info.module_name_noabi }}">{{ test_info.number_fail }}</a></td>
+    <td align='right'> <a target='_blank' href="/report/show-cts-vts-failures/?build_name={{ build_info.build_name }}&build_no={{ build_info.build_no }}&job_name={{ test_info.job_name }}&test_suite={{ test_info.job_name }}&test_case={{ test_info.module_name }}&job_ids={{ vts_job_ids }}#{{ test_info.module_name_noabi }}">{{ test_info.number_fail }}</a></td>
     {% else  %}
     <td align='right'> {{ test_info.number_fail }}</td>
     {% endif %}
@@ -646,7 +644,7 @@ No result for vts test jobs.
     {% ifnotequal  bug.status 'RESOLVED' %}
     <tr>
         <td>{{ forloop.counter }}</td>
-        <td><a href="https://bugs.linaro.org/show_bug.cgi?id={{ bug.id }}">{{ bug.id }}</a></td>
+        <td><a target='_blank' href="https://bugs.linaro.org/show_bug.cgi?id={{ bug.id }}">{{ bug.id }}</a></td>
         <td>{{ bug.summary }}</td>
         <td>{{ bug.status }}</td>
     </tr>
@@ -669,7 +667,7 @@ Excellent build, no open bugs on it at the moment.
 {% for job in jobs_duration %}
 <tr>
     <td>{{ forloop.counter }}</td>
-    <td><a href="{{ lava_server_job_prefix}}/{{ job.job_id }}">{{ job.job_id }}</a></td>
+    <td><a target='_blank' href="{{ lava_server_job_prefix}}/{{ job.job_id }}">{{ job.job_id }}</a></td>
     <td>{{ job.job_name }}</td>
     <td align="right">{{ job.duration }}</td>
 </tr>

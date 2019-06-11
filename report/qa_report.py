@@ -20,20 +20,32 @@ class RESTFullApi():
         self.domain = domain
         self.api_token = api_token
 
-    def call_with_full_url(self, request_url=''):
+    def call_with_full_url(self, request_url='', method='GET', returnResponse=False):
         headers = { 
                 'Content-Type': 'application/json',
-                'Authorization': 'Token %s' % self.api_token
+                'Authorization': 'Token %s' % self.api_token,
+                'Auth-Token':  self.api_token,
                 }
-        r = requests.get(request_url, headers=headers)
-        ret = DotDict(r.json())
-        if (not r.ok or ('error' in ret and ret.error == True)):
-            raise Exception(r.url, r.reason, r.status_code, r.json())
-        return ret 
+        if method == 'GET':
+            r = requests.get(request_url, headers=headers)
+        else:
+            r = requests.post(request_url, headers=headers)
 
-    def call_with_api_url(self, api_url=''):
+        if returnResponse:
+            return r
+
+        if not r.ok:
+            raise Exception(r.url, r.reason, r.status_code)
+
+        if r.content:
+            ret = DotDict(r.json())
+            return ret
+        else:
+            return r
+
+    def call_with_api_url(self, api_url='', method='GET', returnResponse=False):
         full_url = '%s/%s' % (self.get_api_url_prefix().strip('/'), api_url.strip('/'))
-        return self.call_with_full_url(request_url=full_url)
+        return self.call_with_full_url(request_url=full_url, method=method, returnResponse=returnResponse)
 
     @abstractmethod
     def get_api_url_prefix(sefl):
@@ -104,3 +116,15 @@ class QAReportApi(RESTFullApi):
             logger.info("qa report build for project(%s) with build no(%s) not found" % (project_name, build_version))
             return []
         return self.get_jobs_for_build(build.get('id'))
+
+    def forceresubmit(self, qa_job_id):
+        api_url = 'api/forceresubmit/%s' % qa_job_id
+        return self.call_with_api_url(api_url=api_url, method='POST', returnResponse=True)
+
+    def get_job_with_id(self, qa_job_id):
+        api_url = 'api/testjobs/%s' % qa_job_id
+        return self.call_with_api_url(api_url=api_url)
+
+    def get_job_api_url(self, qa_job_id):
+        api_url = '%s/api/testjobs/%s' % (self.get_api_url_prefix().strip('/'), qa_job_id)
+        return api_url
