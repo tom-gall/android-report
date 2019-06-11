@@ -459,17 +459,18 @@ def get_test_results_for_build(build_name, build_no, job_name_list=[]):
             job_start_time = datetime.datetime.strptime(str(job_lava_info['start_time']), '%Y-%m-%dT%H:%M:%S.%fZ')
             job_end_time =  datetime.datetime.strptime(str(job_lava_info['end_time']), '%Y-%m-%dT%H:%M:%S.%fZ')
             job_duration = job_end_time - job_start_time
-            job_cache_count = JobCache.objects.filter(lava_nick=lava.nick, job_id=job_id).count()
+            jobcache_query = JobCache.objects.filter(lava_nick=lava.nick, job_id=job_id)
+            job_cache_count = jobcache_query.count()
             if job_cache_count == 0:
                 JobCache.objects.create(build_name=build_name, build_no=build_no,
                                     lava_nick=lava.nick, job_id=job_id, job_name=local_job_name, status=job_status_int,
                                     duration=job_duration, cached=True)
             elif job_cache_count == 1:
-                JobCache.objects.get(lava_nick=lava.nick, job_id=job_id).update(cbuild_name=build_name, build_no=build_no,
+                jobcache_query.update(cbuild_name=build_name, build_no=build_no,
                                     lava_nick=lava.nick, job_id=job_id, job_name=local_job_name, status=job_status_int,
                                    duration=job_duration, cached=True)
             else:
-                JobCache.objects.filter(lava_nick=lava.nick, job_id=job_id).delete()
+                jobcache_query.delete()
                 JobCache.objects.create(build_name=build_name, build_no=build_no,
                                     lava_nick=lava.nick, job_id=job_id, job_name=local_job_name, status=job_status_int,
                                     duration=job_duration, cached=True)
