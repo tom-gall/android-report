@@ -8,4 +8,5 @@ urlpatterns = [
     url(r'^builds/.*$', views.list_builds, name='list_builds'),
     url(r'^jobs/.*$', views.list_jobs, name='list_jobs'),
     url(r'^file-bug/.*$', views.file_bug, name='file_bug'),
+    url(r'^resubmit-job/.*$', views.resubmit_job, name='resubmit_job'),
 ]

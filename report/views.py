@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 # Create your views here.
 from models import TestCase, JobCache, BaseResults, Bug, BuildSummary, LAVA, LAVAUser, BuildBugzilla, BuildConfig, Comment
 
-import qa_report
+from lcr import qa_report
 
 from lcr.settings import FILES_DIR, BUGZILLA_API_KEY, QA_REPORT, QA_REPORT_DEFAULT
 

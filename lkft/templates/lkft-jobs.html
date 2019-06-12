@@ -18,9 +18,10 @@
 <table border="1">
 <tr> 
     <th> Index</th>
-    <th> Job Id(Job Link)</a> </th>
-    <th> Job Name(Result Attachment Link) </a></th>
+    <th> Job Id/Job Link</a> </th>
+    <th> Job Name/Attachment</a></th>
     <th> Job Status </th>
+    <th> Resubmit </th>
     <th> FailureMsg </th>
     <th> Passed </th>
     <th> Failed </th>
@@ -31,11 +32,16 @@
     <td> {{ forloop.counter }}</td>
     <td> <a href="{{job.external_url}}">{{job.job_id}}</a> </td>
     {% if job.attachment_url %}
-    <td nowrap> <a href="{{job.attachment_url}}">{{job.name}} </a></td>
+    <td nowrap> <a target='_blank' href="{{job.attachment_url}}">{{job.name}} </a></td>
     {% else %}
     <td nowrap> {{job.name}}</td>
     {% endif %}
     <td>{{job.job_status}} </td>
+    {% if job.job_status == 'Running' %}
+    <td>&nbsp;</td>
+    {% else %}
+    <td><a target='_blank' href="/lkft/resubmit-job/?qa_job_id={{job.qa_job_id}}">Resubmit</a> </td>
+    {% endif %}
     {% if job.failure %}
     {% with job.failure as job_failure %}
     <td>{{job_failure.error_msg}} </td>

@@ -74,9 +74,26 @@ class QAReportApi(RESTFullApi):
         return self.call_with_api_url(api_url=api_url).get('results')
 
 
+    def get_project(self, project_id):
+        api_url = "/api/projects/%s" % project_id
+        return self.call_with_api_url(api_url=api_url)
+
+    def get_project_with_url(self, project_url):
+        return self.call_with_full_url(request_url=project_url)
+
+
     def get_all_builds(self, project_id):
         builds_api_url = "api/projects/%s/builds" % project_id
         return self.call_with_api_url(api_url=builds_api_url).get('results')
+
+
+    def get_build(self, build_id):
+        builds_api_url = "api/builds/%s" % build_id
+        return self.call_with_api_url(api_url=builds_api_url)
+
+
+    def get_build_with_url(self, build_url):
+        return self.call_with_full_url(request_url=build_url)
 
 
     def get_build_with_version(self, build_version, project_id):
@@ -128,3 +145,9 @@ class QAReportApi(RESTFullApi):
     def get_job_api_url(self, qa_job_id):
         api_url = '%s/api/testjobs/%s' % (self.get_api_url_prefix().strip('/'), qa_job_id)
         return api_url
+
+    def get_build_meta_with_url(self, build_meta_url):
+        return self.call_with_full_url(request_url=build_meta_url)
+
+    def get_qa_job_id_with_url(self, job_url):
+        return job_url.strip('/').split('/')[-1]

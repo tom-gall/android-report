@@ -21,6 +21,15 @@ import yaml
 import zipfile
 
 from lcr.settings import FILES_DIR, LAVA_SERVERS, BUGZILLA_API_KEY, BUILD_WITH_JOBS_NUMBER
+from lcr.settings import QA_REPORT, QA_REPORT_DEFAULT
+
+from lcr import qa_report
+from lcr.qa_report import DotDict
+from lcr.utils import download_urllib
+
+qa_report_def = QA_REPORT[QA_REPORT_DEFAULT]
+qa_report_api = qa_report.QAReportApi(qa_report_def.get('domain'), qa_report_def.get('token'))
+
 
 DIR_ATTACHMENTS = os.path.join(FILES_DIR, 'lkft')
 logger = logging.getLogger(__name__)
@@ -45,48 +54,11 @@ def find_lava_config(job_url):
             return config
     return None
 
-class DotDict(dict):
-    '''dict.item notation for dict()'s'''
-    __getattr__ = dict.__getitem__
-    __setattr__ = dict.__setitem__
-    __delattr__ = dict.__delitem__
-
-
-def download_urllib(url, path):
-    check_dict = {'file_not_exist': False}
-    import urllib
-    def Schedule(a,b,c):
-        '''
-        a: the number downloaded of blocks
-        b: the size of the block
-        c: the size of the file
-        '''
-        if c == -1:
-            #global file_not_exist
-            check_dict['file_not_exist'] = True
-            return
-
-        per = 100.0 * a * b / c
-        if per > 100 :
-            per = 100
-            sys.stdout.write("\r %.2f%%" % per)
-            sys.stdout.flush()
-            sys.stdout.write('\n')
-        else:
-            sys.stdout.write("\r %.2f%%" % per)
-            sys.stdout.flush()
-    urllib.urlretrieve(url, path, Schedule)
-    if not check_dict['file_not_exist']:
-        logger.info("File is saved to %s" % path)
-    return check_dict['file_not_exist']
-
-
 def get_attachment_urls(jobs=[]):
     first_job = jobs[0]
-    target_build_api_url = first_job.get('target_build')
-    target_build = qa_report_get_with_full_api(request_url=target_build_api_url)
-    target_build_metadata_api_url = target_build.get('metadata')
-    target_build_metadata = qa_report_get_with_full_api(request_url=target_build_metadata_api_url)
+    target_build = qa_report_api.get_build_with_url(first_job.get('target_build'))
+    target_build_metadata = qa_report_api.get_build_meta_with_url(target_build.get('metadata'))
+
     for job in jobs:
         lava_config = job.get('lava_config')
         if not lava_config :
@@ -135,17 +107,17 @@ def download_attachments_save_result(jobs=[]):
         job_url = job.get('external_url')
         result_file_path = get_result_file_path(job)
         if not os.path.exists(result_file_path):
-            attachment_url = job.get('attachment_url')
-            if not attachment_url:
-                logger.info("No attachment for job: %s" % job_url)
+            if job.get('job_status') != 'Complete':
+                logger.info("Skip to get the attachment as the job is not Complete: %s %s" % (job_url, job.get('name')))
                 continue
 
-            if job.get('job_status') != 'Complete':
-                logger.info("Skip to get the attachment as the job is not Complete: %s" % job_url)
+            attachment_url = job.get('attachment_url')
+            if not attachment_url:
+                logger.info("No attachment for job: %s %s" % (job_url, job.get('name')))
                 continue
 
             (temp_fd, temp_path) = tempfile.mkstemp(suffix='.tar.xz', text=False)
-            logger.info("Start downloading result file for job %s: %s" % (job_url, temp_path))
+            logger.info("Start downloading result file for job %s %s: %s" % (job_url, job.get('name'), temp_path))
             ret_err = download_urllib(attachment_url, temp_path)
             if ret_err:
                 logger.info("There is a problem with the size of the file: %s" % attachment_url)
@@ -226,26 +198,10 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
                 'failed_number': failed_number
             }
 
-qa_report_api_url = 'https://qa-reports.linaro.org/'
-def qa_report_get(api_url=''):
-    local_api_url = api_url.strip('/')
-    request_url = '%s/%s/?format=json' % (qa_report_api_url, local_api_url)
-    return qa_report_get_with_full_api(request_url=request_url)
-
-def qa_report_get_with_full_api(request_url=''):
-    headers = {'Content-Type': 'application/json'}
-    r = requests.get(request_url, headers=headers)
-    ret = DotDict(r.json())
-    if (not r.ok or ('error' in ret and ret.error == True)):
-        raise Exception(r.url, r.reason, r.status_code, r.json())
-    return ret
-
 
 def list_projects(request):
-    # https://qa-reports.linaro.org/api/projects/
-    api_url = "/api/projects/"
     projects = []
-    for project in qa_report_get(api_url=api_url).get('results'):
+    for project in qa_report_api.get_projects():
         project_full_name = project.get('full_name')
         if project_full_name.startswith('android-lkft/'):
             projects.append(project)
@@ -266,11 +222,8 @@ def list_projects(request):
 
 def list_builds(request):
     project_id = request.GET.get('project_id', None)
-    project_api_url = 'api/projects/%s' % project_id
-    project =  qa_report_get(api_url=project_api_url)
-
-    builds_api_url = "api/projects/%s/builds" % project_id
-    builds = qa_report_get(api_url=builds_api_url).get('results')
+    project =  qa_report_api.get_project(project_id)
+    builds = qa_report_api.get_all_builds(project_id)
     number_of_build_with_jobs = 0
     for build in builds:
         build_number_passed = 0
@@ -279,13 +232,8 @@ def list_builds(request):
         build_modules_total = 0
         build_modules_done = 0
 
-        def get_jobs_for_build(build):
-                api_url = build.get('testjobs')
-                jobs = qa_report_get_with_full_api(request_url=api_url).get('results')
-                return jobs
-
         if number_of_build_with_jobs < BUILD_WITH_JOBS_NUMBER:
-            jobs = get_jobs_for_build(build)
+            jobs = qa_report_api.get_jobs_for_build(build.get('id'))
             download_attachments_save_result(jobs=jobs)
             for job in jobs:
                 if job.get('parent_job'):
@@ -328,7 +276,6 @@ def list_builds(request):
                 build_modules_done = build_modules_done + numbers.get('modules_done')
                 job['numbers'] = numbers
             number_of_build_with_jobs = number_of_build_with_jobs + 1
-        logger.info('build No. %s  %s' % (number_of_build_with_jobs, build.get('version')) )
         build['numbers'] = {
                             'number_passed': build_number_passed,
                             'number_failed': build_number_failed,
@@ -367,15 +314,9 @@ def get_lkft_bugs():
 
 def list_jobs(request):
     build_id = request.GET.get('build_id', None)
-
-    build_api_url = 'api/builds/%s' % build_id
-    build =  qa_report_get(api_url=build_api_url)
-
-    project_api_url = build.get('project')
-    project =  qa_report_get_with_full_api(request_url=project_api_url)
-
-    api_url = "api/builds/%s/testjobs" % build_id
-    jobs = qa_report_get(api_url=api_url).get('results')
+    build =  qa_report_api.get_build(build_id)
+    project =  qa_report_api.get_project_with_url(build.get('project'))
+    jobs = qa_report_api.get_jobs_for_build(build_id)
 
     project_kernel_version = None
     if project.get('name').startswith('android-hikey-linaro-') \
@@ -383,6 +324,8 @@ def list_jobs(request):
         or project.get('name').startswith('android-x15-ti-') \
         or project.get('name').startswith('android-am65x-ti-') :
         project_kernel_version = project.get('name').split('-')[3]
+    elif project.get('name') == 'android-mainline':
+        project_kernel_version = 'mainline'
     else:
         # aosp-master-tracking and aosp-8.1-tracking
         pass
@@ -483,6 +426,7 @@ def list_jobs(request):
     final_jobs = []
     failed_jobs = []
     for job in sorted_jobs:
+        job['qa_job_id'] = qa_report_api.get_qa_job_id_with_url(job.get('url'))
         if job.get('url') in resubmitted_job_urls:
             failed_jobs.append(job)
         else:
@@ -601,14 +545,9 @@ def file_bug(request):
                     # TODO : report error on webpage
                     logger.error("The jobs are belong to different builds: %s" % (qa_job_ids_str))
 
-        project_api_url = qa_jobs[0].get('target')
-        project = qa_report_get_with_full_api(request_url=project_api_url)
-
-        build_api_url = qa_jobs[0].get('target_build')
-        build = qa_report_get_with_full_api(request_url=build_api_url)
-
-        build_meta_api_url = build.get('metadata')
-        build_meta = qa_report_get_with_full_api(request_url=build_meta_api_url)
+        project =  qa_report_api.get_project_with_url(qa_jobs[0].get('target'))
+        build = qa_report_api.get_build_with_url(qa_jobs[0].get('target_build'))
+        build_meta = qa_report_api.get_build_meta_with_url(build.get('metadata'))
 
         # download all the necessary attachments
         download_attachments_save_result(jobs=qa_jobs)
@@ -731,3 +670,114 @@ def file_bug(request):
                         "form": form,
                         'build_info': build_info,
                     })
+
+
+#@login_required
+def resubmit_job(request):
+    qa_job_ids = request.POST.getlist("qa_job_ids")
+    if len(qa_job_ids) == 0:
+        qa_job_id = request.GET.get("qa_job_id", "")
+        if qa_job_id:
+            qa_job_ids = [qa_job_id]
+
+    if len(qa_job_ids) == 0:
+        return render(request, 'lkft-job-resubmit.html',
+                      {
+                        'errors': True,
+                      })
+
+    qa_job = qa_report_api.get_job_with_id(qa_job_ids[0])
+    build_url = qa_job.get('target_build')
+    build_id = build_url.strip('/').split('/')[-1]
+
+    jobs = qa_report_api.get_jobs_for_build(build_id)
+    parent_job_urls = []
+    for job in jobs:
+        parent_job_url = job.get('parent_job')
+        if parent_job_url:
+            parent_job_urls.append(parent_job_url.strip('/'))
+
+    succeed_qa_job_urls = []
+    failed_qa_jobs = {}
+    old_job_urls = []
+    for qa_job_id in qa_job_ids:
+        qa_job_url = qa_report_api.get_job_api_url(qa_job_id).strip('/')
+        old_job_urls.append(qa_job_url)
+
+        if qa_job_url in parent_job_urls:
+            continue
+
+        res = qa_report_api.forceresubmit(qa_job_id)
+        if res.ok:
+            succeed_qa_job_urls.append(qa_job_url)
+        else:
+            failed_qa_jobs[qa_job_url] = res
+
+    # assuming all the jobs are belong to the same build
+
+    jobs = qa_report_api.get_jobs_for_build(build_id)
+    old_jobs = {}
+    created_jobs = {}
+    for job in jobs:
+        qa_job_url = job.get('url').strip('/')
+        if qa_job_url in old_job_urls:
+            old_jobs[qa_job_url] = job
+
+        parent_job_url = job.get('parent_job')
+        if parent_job_url and parent_job_url.strip('/') in succeed_qa_job_urls:
+            created_jobs[parent_job_url.strip('/')] = job
+
+
+    results = []
+    for qa_job_id in qa_job_ids:
+        qa_job_url = qa_report_api.get_job_api_url(qa_job_id).strip('/')
+        old = old_jobs.get(qa_job_url)
+        if not old:
+            results.append({
+                'qa_job_url': qa_job_url,
+                'old': None,
+                'new': None,
+                'error_msg': 'The job does not exists on qa-report'
+            })
+            continue
+
+        if qa_job_url in parent_job_urls:
+            results.append({
+                'qa_job_url': qa_job_url,
+                'old': old,
+                'new': None,
+                'error_msg': 'The job is a parent job, could not be resubmitted again'
+            })
+            continue
+
+        new = created_jobs.get(qa_job_url)
+        if new:
+            results.append({
+                'qa_job_url': qa_job_url,
+                'old': old,
+                'new': new,
+                'error_msg': None
+                })
+            continue
+
+        response = failed_qa_jobs.get(qa_job_url)
+        if response is not None:
+            results.append({
+                'qa_job_url': qa_job_url,
+                'old': old,
+                'new': new,
+                'error_msg': 'Reason: %s<br/>Status Code: %s<br/>Url: %s' % (response.reason, response.status_code, response.url)
+            })
+        else:
+            results.append({
+                'qa_job_url': qa_job_url,
+                'old': old,
+                'new': new,
+                'error_msg': 'Unknown Error happend, No job has the original job as parent, and no response found'
+            })
+
+    return render(request, 'lkft-job-resubmit.html',
+                  {
+                   'results': results,
+                  }
+    )
