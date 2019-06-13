@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import sys
 import logging
 import requests
 
-from abc import abstractmethod
-
 logger = logging.getLogger(__name__)
-
 
 def download_urllib(url, path):
     check_dict = {'file_not_exist': False}
