@@ -17,7 +17,6 @@ import tarfile
 import tempfile
 import xmlrpclib
 import xml.etree.ElementTree as ET
-import yaml
 import zipfile
 
 from lcr.settings import FILES_DIR, LAVA_SERVERS, BUGZILLA_API_KEY, BUILD_WITH_JOBS_NUMBER
@@ -335,7 +334,9 @@ def list_jobs(request):
     resubmitted_job_urls = []
     for job in jobs:
         if job.get('failure'):
-            failure_dict = yaml.load(job.get('failure'))
+            failure = job.get('failure')
+            new_str = failure.replace('"', '\\"').replace('\'', '"')
+            failure_dict = json.loads(new_str)
             job['failure'] = failure_dict
         if job.get('parent_job'):
             resubmitted_job_urls.append(job.get('parent_job'))
