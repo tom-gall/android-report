@@ -8,6 +8,7 @@ from django.contrib.auth.decorators import login_required, permission_required
 
 import collections
 import datetime
+import json
 import re
 import sys
 import urllib
@@ -430,7 +431,12 @@ def get_test_results_for_build(build_name, build_no, job_name_list=[]):
             resubmitted_jobs.append(job.get('parent_job'))
 
         if job.get('failure'):
-            failure_dict = yaml.load(job.get('failure'))
+            failure = job.get('failure')
+            new_str = failure.replace('"', '\\"').replace('\'', '"')
+            try:
+                failure_dict = json.loads(new_str)
+            except ValueError:
+                failure_dict = {'error_msg': new_str}
             job['failure'] = failure_dict
 
         if job_status_str != job_status_dict[2]:
@@ -934,12 +940,10 @@ def test_report(request):
 
         if job.get('failure'):
             job['error_msg'] = job.get('failure').get('error_msg')
-
         if not job.get('url') in resubmitted_job_urls:
             jobs_failed_not_resubmitted.append(job)
         else:
             resubmitted_jobs.append(job)
-
 
     lava_nick = get_all_build_configs()[build_name]['lava_server'].nick
     successful_job_ids = []
