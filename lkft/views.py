@@ -336,8 +336,10 @@ def list_jobs(request):
         if job.get('failure'):
             failure = job.get('failure')
             new_str = failure.replace('"', '\\"').replace('\'', '"')
-            failure_dict = json.loads(new_str)
-            job['failure'] = failure_dict
+            try:
+                failure_dict = json.loads(new_str)
+            except ValueError:
+                failure_dict = {'error_msg': new_str}
         if job.get('parent_job'):
             resubmitted_job_urls.append(job.get('parent_job'))
         result_file_path = get_result_file_path(job=job)
