@@ -323,7 +323,7 @@ def list_jobs(request):
         or project.get('name').startswith('android-x15-ti-') \
         or project.get('name').startswith('android-am65x-ti-') :
         project_kernel_version = project.get('name').split('-')[3]
-    elif project.get('name') == 'android-mainline':
+    elif project.get('name').startswith('android-mainline'):
         project_kernel_version = 'mainline'
     else:
         # aosp-master-tracking and aosp-8.1-tracking
