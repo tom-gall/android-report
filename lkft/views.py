@@ -319,6 +319,7 @@ def list_jobs(request):
 
     project_kernel_version = None
     if project.get('name').startswith('android-hikey-linaro-') \
+        or project.get('name').startswith('android-hikey960-linaro-') \
         or project.get('name').startswith('android-x15-linux-') \
         or project.get('name').startswith('android-x15-ti-') \
         or project.get('name').startswith('android-am65x-ti-') :
