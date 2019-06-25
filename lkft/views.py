@@ -536,8 +536,7 @@ def file_bug(request):
             if not qa_job_id in qa_job_ids:
                 qa_job_ids.append(qa_job_id)
                 #https://qa-reports.linaro.org/api/testjobs/1319604/?format=json
-                job_api_url = 'api/testjobs/%s' % qa_job_id
-                qa_job =  qa_report_get(api_url=job_api_url)
+                qa_job = qa_report_api.get_job_with_id(qa_job_id)
                 if qa_job is not None:
                     qa_jobs.append(qa_job)
                 if target_build is None:
