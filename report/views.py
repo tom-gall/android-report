@@ -67,6 +67,8 @@ def find_lava_config(job_url):
     for nick, config in LAVAS.items():
         if job_url.find('://%s/' % config.domain) >= 0:
             return config
+
+    logger.warn('No lava instance found for the job_url=%s' % job_url)
     return None
 
 

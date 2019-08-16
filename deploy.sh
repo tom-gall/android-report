@@ -53,6 +53,8 @@ pip install django psycopg2
 pip install python-ldap # will install the 3.0 version
 # https://django-auth-ldap.readthedocs.io/en/latest/install.html
 pip install django-auth-ldap # needs python-ldap >= 3.0
+pip install bugzilla
+pip install requests
 
 # https://docs.djangoproject.com/en/1.11/intro/tutorial01/
 python -m django --version
@@ -88,3 +90,10 @@ cd ${work_root} && git clone https://git.linaro.org/people/yongqin.liu/public/lc
 ## pip install reportlab
 ## pip install Pillow
 ## pip install rst2pdf
+
+## with new db.sqlite3 file
+## 1. remove the reference for the app in the lcr/urls.py
+## 2. run python manage.py migrate to generate a new database
+## 3. python manage.py createsuperuser to create a new user
+## 4. setup build configs, lava uses from the admin ui
+## 5. restartwith python manage.py runserver 0.0.0.0:9000

@@ -47,6 +47,16 @@ class RESTFullApi():
         full_url = '%s/%s' % (self.get_api_url_prefix().strip('/'), api_url.strip('/'))
         return self.call_with_full_url(request_url=full_url, method=method, returnResponse=returnResponse)
 
+    def get_list_results(self, api_url=''):
+        result = self.call_with_api_url(api_url=api_url)
+        list_results = result.get('results')
+        next_url = result.get('next')
+        while next_url:
+            result = self.call_with_full_url(request_url=next_url)
+            next_url = result.get('next')
+            list_results.extend(result.get('results'))
+        return list_results
+
     @abstractmethod
     def get_api_url_prefix(sefl):
         """Return the url prefix, which we could use with the api url directly"""
@@ -71,12 +81,13 @@ class QAReportApi(RESTFullApi):
 
     def get_projects(self):
         api_url = "/api/projects/"
-        return self.call_with_api_url(api_url=api_url).get('results')
+        return self.get_list_results(api_url=api_url)
 
 
     def get_project(self, project_id):
         api_url = "/api/projects/%s" % project_id
         return self.call_with_api_url(api_url=api_url)
+
 
     def get_project_with_url(self, project_url):
         return self.call_with_full_url(request_url=project_url)
@@ -84,7 +95,7 @@ class QAReportApi(RESTFullApi):
 
     def get_all_builds(self, project_id):
         builds_api_url = "api/projects/%s/builds" % project_id
-        return self.call_with_api_url(api_url=builds_api_url).get('results')
+        return self.get_list_results(api_url=builds_api_url)
 
 
     def get_build(self, build_id):
@@ -105,7 +116,7 @@ class QAReportApi(RESTFullApi):
 
     def get_jobs_for_build(self, build_id):
         api_url = "api/builds/%s/testjobs" % build_id
-        return self.call_with_api_url(api_url=api_url).get('results')
+        return self.get_list_results(api_url=api_url)
 
 
     def get_project_with_name(self, project_name):
