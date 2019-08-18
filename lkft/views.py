@@ -79,6 +79,9 @@ def get_attachment_urls(jobs=[]):
 
 
 def extract_save_result(tar_path, result_zip_path):
+    zip_parent = os.path.abspath(os.path.join(result_zip_path, os.pardir))
+    if not os.path.exists(zip_parent):
+        os.mkdirs(zip_parent)
     # https://pymotw.com/2/zipfile/
     tar = tarfile.open(tar_path, "r")
     for f_name in tar.getnames():
@@ -202,7 +205,8 @@ def list_projects(request):
     projects = []
     for project in qa_report_api.get_projects():
         project_full_name = project.get('full_name')
-        if project_full_name.startswith('android-lkft/'):
+        if project_full_name.startswith('android-lkft/') \
+                and not project.get('is_archived'):
             projects.append(project)
 
     bugs = get_lkft_bugs()
@@ -212,9 +216,14 @@ def list_projects(request):
             continue
         else:
             open_bugs.append(bug)
+
+    def get_project_name(item):
+        return item.get('name')
+
+    sorted_projects = sorted(projects, key=get_project_name)
     return render(request, 'lkft-projects.html',
                            {
-                                "projects": projects,
+                                "projects": sorted_projects,
                                 'open_bugs': open_bugs,
                             }
                 )
@@ -317,18 +326,11 @@ def list_jobs(request):
     project =  qa_report_api.get_project_with_url(build.get('project'))
     jobs = qa_report_api.get_jobs_for_build(build_id)
 
-    project_kernel_version = None
-    if project.get('name').startswith('android-hikey-linaro-') \
-        or project.get('name').startswith('android-hikey960-linaro-') \
-        or project.get('name').startswith('android-x15-linux-') \
-        or project.get('name').startswith('android-x15-ti-') \
-        or project.get('name').startswith('android-am65x-ti-') :
-        project_kernel_version = project.get('name').split('-')[3]
-    elif project.get('name').startswith('android-mainline'):
-        project_kernel_version = 'mainline'
+    project_name = project.get('name')
+    if project_name == 'aosp-master-tracking':
+        project_kernel_version = None
     else:
-        # aosp-master-tracking and aosp-8.1-tracking
-        pass
+        project_kernel_version = project_name.split('-')[0]
 
     download_attachments_save_result(jobs=jobs)
     failures = {}
@@ -347,6 +349,7 @@ def list_jobs(request):
         if not os.path.exists(result_file_path):
             continue
         if project_kernel_version is None:
+            # for project aosp-master-tracking
             environment = job.get('environment')
             if environment.startswith('hi6220-hikey_'):
                 kernel_version = environment.replace('hi6220-hikey_', '')
@@ -354,7 +357,7 @@ def list_jobs(request):
                 kernel_version = environment.replace('x15_', '')
             else:
                 # impossible path for hikey
-                pass
+                kernel_version = "%s-%s" % (project_name, environment)
         else:
             kernel_version = project_kernel_version
 
