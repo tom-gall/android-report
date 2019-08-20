@@ -242,10 +242,18 @@ def list_builds(request):
 
         if number_of_build_with_jobs < BUILD_WITH_JOBS_NUMBER:
             jobs = qa_report_api.get_jobs_for_build(build.get('id'))
+
+            resubmitted_job_urls = [ job.get('parent_job') for job in jobs if job.get('parent_job')]
             download_attachments_save_result(jobs=jobs)
+            job_names = []
             for job in jobs:
-                if job.get('parent_job'):
+                if job.get('url') in resubmitted_job_urls:
                     # ignore jobs which were resubmitted
+                    logger.info("%s: %s:%s has been resubmitted already" % (build.get('version'), job.get('job_id'), job.get('url')))
+                    continue
+
+                if job.get('name') in job_names:
+                    logger.info("%s %s: %s %s the same name job has been recorded" % (build.get('version'), job.get('name'), job.get('job_id'), job.get('url')))
                     continue
 
                 def get_testcases_number_for_job(job):
@@ -283,6 +291,7 @@ def list_builds(request):
                 build_modules_total = build_modules_total + numbers.get('modules_total')
                 build_modules_done = build_modules_done + numbers.get('modules_done')
                 job['numbers'] = numbers
+                job_names.append(job.get('name'))
             number_of_build_with_jobs = number_of_build_with_jobs + 1
         build['numbers'] = {
                             'number_passed': build_number_passed,
