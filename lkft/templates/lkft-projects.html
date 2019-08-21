@@ -8,14 +8,34 @@
 <div>
 <table border="1">
 	<tr>
-		<td>Index</td>
-		<td>Project</td>
+		<th>Index</th>
+		<th>Project</th>
+        <th>Last Build Timestamp</th>
+        <th>Last Build No.</th>
 	</tr>
 {% for project in projects %}
 <tr>
 	<td> {{ forloop.counter }}</td>
     <td>
         <a href="/lkft/builds?project_id={{project.id}}">{{project.name}}</a>
+    </td>
+    <td>
+    {% if project.last_build %}
+        {% with project.last_build as last_build %}
+        {{ last_build.created_at|date:'M. d, Y, H:i'}}, &nbsp;{{ last_build.created_at|timesince}}
+        {% endwith %}
+    {% else %}
+        No Build Yet
+    {% endif %}
+    </td>
+    <td>
+        {% if project.last_build %}
+        {% with project.last_build as last_build %}
+            {{ last_build.version}}
+        {% endwith %}
+        {% else %}
+            No Build Yet
+        {% endif %}
     </td>
 </tr>
 {% endfor %}
@@ -33,7 +53,7 @@
     <th>Status</th>
 </tr>
 {% for bug in open_bugs %}
-    {% ifnotequal  bug.status 'RESOLVED' %}
+    {% ifnotequal bug.status 'RESOLVED' %}
     <tr>
         <td>{{ forloop.counter }}</td>
         <td><a href="https://bugs.linaro.org/show_bug.cgi?id={{ bug.id }}">{{ bug.id }}</a></td>

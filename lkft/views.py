@@ -7,6 +7,7 @@ from django.shortcuts import render
 
 import bugzilla
 import collections
+import datetime
 import json
 import logging
 import os
@@ -200,14 +201,41 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
                 'failed_number': failed_number
             }
 
+citrigger_lkft = {
+    'trigger-lkft-aosp-mainline': [
+        'mainline-9.0-hikey',
+        'mainline-9.0-hikey-auto',
+        'mainline-9.0-hikey960',
+        'mainline-9.0-hikey960-auto',
+        'mainline-9.0-x15',
+        'mainline-9.0-x15',
+        ],
+}
+
+def find_citrigger(lkft_pname=""):
+    if not lkft_pname:
+        return None
+    for trigger_name, lkft_pnames in citrigger_lkft:
+        if lkft_pname in lkft_pnames:
+            return trigger_name
+    return None
 
 def list_projects(request):
     projects = []
     for project in qa_report_api.get_projects():
         project_full_name = project.get('full_name')
-        if project_full_name.startswith('android-lkft/') \
-                and not project.get('is_archived'):
-            projects.append(project)
+        if not project_full_name.startswith('android-lkft/') \
+                or project.get('is_archived'):
+            continue
+
+        builds = qa_report_api.get_all_builds(project.get('id'))
+        if len(builds) > 0:
+            last_build = builds[0]
+            created_str = last_build.get('created_at')
+            last_build['created_at'] = datetime.datetime.strptime(str(created_str), '%Y-%m-%dT%H:%M:%S.%fZ')
+            project['last_build'] = last_build
+
+        projects.append(project)
 
     bugs = get_lkft_bugs()
     open_bugs = []
@@ -300,6 +328,8 @@ def list_builds(request):
                             'modules_done': build_modules_done,
                             'modules_total': build_modules_total,
                             }
+        created_str = build.get('created_at')
+        build['created_at'] = datetime.datetime.strptime(str(created_str), '%Y-%m-%dT%H:%M:%S.%fZ')
         build['jobs'] = jobs
 
     return render(request, 'lkft-builds.html',
