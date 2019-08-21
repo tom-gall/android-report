@@ -23,9 +23,11 @@ class RESTFullApi():
     def call_with_full_url(self, request_url='', method='GET', returnResponse=False):
         headers = { 
                 'Content-Type': 'application/json',
-                'Authorization': 'Token %s' % self.api_token,
-                'Auth-Token':  self.api_token,
                 }
+        if self.api_token:
+            headers['Authorization'] = 'Token %s' % self.api_token
+            headers['Auth-Token'] = self.api_token
+
         if method == 'GET':
             r = requests.get(request_url, headers=headers)
         else:
@@ -62,6 +64,28 @@ class RESTFullApi():
         """Return the url prefix, which we could use with the api url directly"""
         """Should never be called."""
         raise NotImplementedError('%s.get_api_url_prefix should never be called directly' % self.__class__.__name__)
+
+
+class JenkinsApi(RESTFullApi):
+    def get_api_url_prefix(self, detail_url):
+        # https://ci.linaro.org/job/trigger-lkft-aosp-mainline/api/json
+        return 'https://%s/job/%s/api/json/' % (self.domain, detail_url)
+
+
+    def get_last_build(self, cijob_name=''):
+        if not cijob_name:
+            return None
+        full_url = self.get_api_url_prefix(detail_url=cijob_name)
+        result = self.call_with_full_url(request_url=full_url)
+        if result:
+            return result.get('lastBuild')
+        else:
+            return None
+
+
+    def get_build_details_with_full_url(self, build_url):
+        full_api_url = '%s/api/json/' % build_url
+        return self.call_with_full_url(request_url=full_api_url)
 
 
 class LAVAApi(RESTFullApi):

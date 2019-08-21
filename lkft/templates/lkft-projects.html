@@ -12,6 +12,7 @@
 		<th>Project</th>
         <th>Last Build Timestamp</th>
         <th>Last Build No.</th>
+        <th>Last Trigger Build No.</th>
 	</tr>
 {% for project in projects %}
 <tr>
@@ -36,6 +37,16 @@
         {% else %}
             No Build Yet
         {% endif %}
+    </td>
+    <td>
+        {% if project.last_trigger_build %}
+        {% with project.last_trigger_build as last_trigger_build %}
+            <a href="{{last_trigger_build.url}}">{{ last_trigger_build.displayName}}</a>
+        {% endwith %}
+        {% else %}
+            No Trigger Build Setup Yet
+        {% endif %}
+    </td>
     </td>
 </tr>
 {% endfor %}

@@ -26,9 +26,11 @@ from lcr.settings import QA_REPORT, QA_REPORT_DEFAULT
 from lcr import qa_report
 from lcr.qa_report import DotDict
 from lcr.utils import download_urllib
+from lkft.lkft_config import find_citrigger
 
 qa_report_def = QA_REPORT[QA_REPORT_DEFAULT]
 qa_report_api = qa_report.QAReportApi(qa_report_def.get('domain'), qa_report_def.get('token'))
+jenkins_api = qa_report.JenkinsApi('ci.linaro.org', None)
 
 
 DIR_ATTACHMENTS = os.path.join(FILES_DIR, 'lkft')
@@ -201,24 +203,12 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
                 'failed_number': failed_number
             }
 
-citrigger_lkft = {
-    'trigger-lkft-aosp-mainline': [
-        'mainline-9.0-hikey',
-        'mainline-9.0-hikey-auto',
-        'mainline-9.0-hikey960',
-        'mainline-9.0-hikey960-auto',
-        'mainline-9.0-x15',
-        'mainline-9.0-x15',
-        ],
-}
 
-def find_citrigger(lkft_pname=""):
-    if not lkft_pname:
+def get_last_trigger_build(lkft_pname=''):
+    ci_trigger_name = find_citrigger(lkft_pname=lkft_pname)
+    if not ci_trigger_name:
         return None
-    for trigger_name, lkft_pnames in citrigger_lkft:
-        if lkft_pname in lkft_pnames:
-            return trigger_name
-    return None
+    return jenkins_api.get_last_build(cijob_name=ci_trigger_name)
 
 def list_projects(request):
     projects = []
@@ -234,6 +224,11 @@ def list_projects(request):
             created_str = last_build.get('created_at')
             last_build['created_at'] = datetime.datetime.strptime(str(created_str), '%Y-%m-%dT%H:%M:%S.%fZ')
             project['last_build'] = last_build
+
+        last_trigger_build = get_last_trigger_build(project.get('name'))
+        if last_trigger_build:
+            last_trigger_url = last_trigger_build.get('url')
+            project['last_trigger_build'] = jenkins_api.get_build_details_with_full_url(build_url=last_trigger_url)
 
         projects.append(project)
 
