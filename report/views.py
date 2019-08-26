@@ -2555,7 +2555,7 @@ def file_bug(request):
         abis = sorted(failures.keys())
         stacktrace_msg = ''
         if len(abis) == 0:
-            logger.error('Failed to get stacktrace information for %s %s form jobs: '% (module_name, test_name, str(job_ids)))
+            logger.error('Failed to get stacktrace information for %s %s form jobs: %s'% (module_name, test_name, str(job_ids)))
         elif (len(abis) == 2) and (failures.get(abis[0]) != failures.get(abis[1])):
             for abi in abis:
                 stacktrace_msg = '%s\n\n%s:\n%s' % (stacktrace_msg, abi, failures.get(abi))
