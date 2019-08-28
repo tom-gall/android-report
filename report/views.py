@@ -30,7 +30,7 @@ from models import TestCase, JobCache, BaseResults, Bug, BuildSummary, LAVA, LAV
 
 from lcr import qa_report
 
-from lcr.settings import FILES_DIR, BUGZILLA_API_KEY, QA_REPORT, QA_REPORT_DEFAULT
+from lcr.settings import BASE_DIR, FILES_DIR, BUGZILLA_API_KEY, QA_REPORT, QA_REPORT_DEFAULT
 
 from lcr_config import DEFAULT_LCR_BUILD_NAME, DEFAULT_LAVA_USER, TEST_RESULT_XML_NAME
 from lcr_config import job_priority_list, job_status_string_int, job_status_dict
@@ -1403,9 +1403,16 @@ def test_report(request):
             import time
             from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER, TA_LEFT, TA_RIGHT
             from reportlab.lib.pagesizes import A4, landscape
-            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table,TableStyle, ListFlowable, PageBreak
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle, ListFlowable, PageBreak
             from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle, ListStyle
             from reportlab.lib import colors
+            from reportlab.lib.units import cm, mm
+
+            def get_link_text(url=None, text=""):
+                if not url or url == '--':
+                    return text
+                else:
+                    return '<link href="%s" underline="true" textColor="navy">%s</link>' % (url, text)
 
             Story = []
 
@@ -1433,12 +1440,44 @@ def test_report(request):
             styleHeading1 = styles["Heading1"]
             styleHeading1.backColor = 'darkgrey'
 
+            styleBlockQuote = styles["Normal"].clone(ParagraphStyle)
+            styleBlockQuote.leftIndent = 20
+            styleBlockQuote.allowWidows = 1
+            styleBlockQuote.backColor = '#FFFFE0'
+
             #######################################################################
             ##  Create the Title Page
             #######################################################################
-            Story.append(Paragraph('<b>%s Reference LCR for %s</b>' % (datetime.datetime.now().strftime('%y.%m'),
+            date_today = datetime.datetime.now()
+
+            STATICS_DIR = os.path.join(BASE_DIR, "static")
+            IMAGES_DIR = os.path.join(STATICS_DIR, "images")
+            LOGO_PATH = os.path.join(IMAGES_DIR, "Linaro-Logo_standard.png")
+
+            logo = Image(LOGO_PATH, width=9*cm, height=4.5*cm, hAlign='RIGHT')
+            Story.append(logo)
+            Story.append(Spacer(1, 24))
+
+            Story.append(Paragraph('<b>%s Reference LCR for %s</b>' % (date_today.strftime('%y.%m'),
                                                                                         get_platform_name(build_info.get('build_name'))), styleTitle))
             Story.append(Paragraph('<b>Test Report</b>', styleTitle))
+            Story.append(Spacer(1, 240))
+
+            lines = []
+            lines.append(('Date', date_today.strftime('%Y.%m.%d')))
+            lines.append(('Author', 'Yongqin Liu <yongqin.liu@linaro.org>, Linaro Consumer Group'))
+            lines.append(('Approvers', 'Tom Gall <tom.gall@linaro.org>, Linaro Consumer Group'))
+
+            ci_link = "%s/%s/%s" % (ci_job_url_base, build_info.get('build_name'), build_info.get('build_no'))
+            lines.append(('Build', Paragraph(get_link_text(url=ci_link, text=ci_link), styleContent)))
+            lines.append(('Release', Paragraph(get_link_text(url=build_info.get('images_url'), text=build_info.get('images_url')), styleContent)))
+            table_style = TableStyle([
+                    ("BOX", (0, 0), (-1, -1), 0.5, "black"), # outter border
+                    ("INNERGRID", (0, 0), (-1, -1), 0.25, "black"), # inner grid
+                ])
+
+            table = Table(lines, colWidths=[60,300], style=table_style, hAlign='CENTER', vAlign='BOTTOM')
+            Story.append(table)
             Story.append(PageBreak())
 
             #######################################################################
@@ -1452,11 +1491,6 @@ def test_report(request):
 
                     ('BACKGROUND', (0, 0), (0, -1), 'black'),  # background for the header
                 ])
-            def get_link_text(url=None, text=""):
-                if not url or url == '--':
-                    return text
-                else:
-                    return '<link href="%s" underline="true" textColor="navy">%s</link>' % (url, text)
 
             lines = []
             lines.append((Paragraph('<b>Build Name</b>', styleHeaderVertical), Paragraph(build_info.get('build_name'), styleContent)))
@@ -1480,6 +1514,21 @@ def test_report(request):
             Story.append(table)
             Story.append(Spacer(1, 12))
 
+            Story.append(Paragraph('<b>Glossary</b>', styleHeading1))
+            lines = []
+            lines.append(('CTS', 'Android Compatibility Test Suite'))
+            lines.append(('VTS', 'Android Vendor Test Suite'))
+            lines.append(('LAVA', 'Linaro Automated Validation Architecture'))
+            table_style = TableStyle([
+                    ("BOX", (0, 0), (-1, -1), 0.5, "black"), # outter border
+                    ("INNERGRID", (0, 0), (-1, -1), 0.25, "black"), #  inner border
+                ])
+
+            table = Table(lines, colWidths=[40,400], style=table_style, hAlign='LEFT')
+            Story.append(table)
+            Story.append(Spacer(1, 12))
+            Story.append(Spacer(1, 12))
+
             Story.append(Paragraph('<b>Pass-rate encodings</b>', styleHeading1))
             lines = [('100%',), ('50% - 99%',), ('1 - 49%',), ('0%',)]
             table_style = TableStyle([
@@ -1495,7 +1544,7 @@ def test_report(request):
             #######################################################################
             ##  Create the Failed Jobs table
             #######################################################################
-            Story.append(Paragraph('<b>Jobs Without Test Result</b>', styleHeading1))
+            Story.append(Paragraph('<b>Failed Jobs Without Test Result</b>', styleHeading1))
             Story.append(Spacer(1, 12))
             table_style = TableStyle([
                     ("BOX", (0, 0), (-1, -1), 0.5, "black"),
@@ -1663,6 +1712,13 @@ def test_report(request):
             ##  Create the CTS table
             #######################################################################
             Story.append(Paragraph('<b>CTS</b>', styleHeading1))
+            Story.append(Paragraph('To start complete CTS as a test plan run:', styleContent))
+            Story.append(Paragraph('# ./android-cts/tools/cts-tradefed<br/>cts-tf > run cts --disable-reboot', style=styleBlockQuote))
+            Story.append(Paragraph('To start CTS tests as individual package tests run:', styleContent))
+            Story.append(Paragraph('# ./android-cts/tools/cts-tradefed<br/>cts-tf > run cts --module <MODULE_NAME> --disable-reboot', style=styleBlockQuote))
+            Story.append(Paragraph('To run CTS test package as a plan:', styleContent))
+            Story.append(Paragraph('# ./android-cts/tools/cts-tradefed<br/>cts-tf > run <PLAN_NAME> --disable-reboot', style=styleBlockQuote))
+
             Story.append(Spacer(1, 12))
             table_style_cmds = [
                     ("BOX", (0, 0), (-1, -1), 0.5, "black"),
@@ -1732,6 +1788,14 @@ def test_report(request):
             #######################################################################
             Story.append(Paragraph('<b>VTS</b>', styleHeading1))
             Story.append(Spacer(1, 12))
+
+            Story.append(Paragraph('To start complete VTS as a test plan run:', styleContent))
+            Story.append(Paragraph('# ./android-vts/tools/vts-tradefed<br/>vts-tf > run vts --disable-reboot', style=styleBlockQuote))
+            Story.append(Paragraph('To start VTS tests as individual package tests run:', styleContent))
+            Story.append(Paragraph('# ./android-vts/tools/vts-tradefed<br/>vts-tf > run <vts or othe Plan Name> --module <MODULE_NAME> --disable-reboot', style=styleBlockQuote))
+            Story.append(Paragraph('To run VTS test package as a plan:', styleContent))
+            Story.append(Paragraph('# ./android-vts/tools/vts-tradefed<br/>vts-tf > run <PLAN_NAME> --disable-reboot', style=styleBlockQuote))
+
             table_style_cmds = [
                     ("BOX", (0, 0), (-1, -1), 0.5, "black"),
                     ("INNERGRID", (0, 0), (-1, -1), 0.25, "black"),
@@ -1875,6 +1939,9 @@ def test_report(request):
             job_duration_table = Table(job_lines, colWidths=[30, 50, 147, None], style=job_duration_table_style, hAlign='LEFT')
             Story.append(job_duration_table)
 
+            Story.append(PageBreak())
+            Story.append(Paragraph('<b>Test End<br/>Thanks!</b>', styleTitle))
+
             # Create the PDF object, using the BytesIO object as its "file."
             class TestReportDocTemplate(SimpleDocTemplate):
                 def afterFlowable(self, flowable):
@@ -1888,10 +1955,19 @@ def test_report(request):
                             self.canv.bookmarkPage(key)
                             self.canv.addOutlineEntry(text, key, 0, 0)
 
+
+            def addPageNumber(canvas, doc):
+                """
+                Add the page number
+                """
+                page_num = canvas.getPageNumber()
+                text = "Page #%s" % page_num
+                canvas.drawRightString(200*mm, 20*mm, text)
+
             buffer = BytesIO()
             #doc = TestReportDocTemplate(buffer, rightMargin=20, leftMargin=20, topMargin=72, bottomMargin=18)
             doc = TestReportDocTemplate(buffer, rightMargin=20, leftMargin=20)
-            doc.build(Story)
+            doc.build(Story, onFirstPage=addPageNumber, onLaterPages=addPageNumber)
             pdf = buffer.getvalue()
             buffer.close()
             response.write(pdf)
