@@ -416,7 +416,7 @@ def get_test_results_for_build(build_name, build_no, job_name_list=[]):
 
     jobs_raw = qa_report_api.get_jobs_with_project_name_build_version(get_qa_project_name_with_lcr_build_name(build_name), build_no)
 
-    resubmitted_jobs = []
+    resubmitted_jobs_url = [ job.get('parent_job') for job in jobs_raw if job.get('parent_job') ]
     for job in jobs_raw:
         job_id = job.get("job_id")
         lava = find_lava_config(job.get('external_url'))
@@ -428,9 +428,6 @@ def get_test_results_for_build(build_name, build_no, job_name_list=[]):
         local_job_name = job.get("name").replace("%s-%s-" % (build_name, build_no), "")
         job["name"] = local_job_name
         job["lava_nick"] = lava.nick
-
-        if job.get('parent_job'):
-            resubmitted_jobs.append(job.get('parent_job'))
 
         if job.get('failure'):
             failure = job.get('failure')
@@ -444,6 +441,11 @@ def get_test_results_for_build(build_name, build_no, job_name_list=[]):
         if job_status_str != job_status_dict[2]:
             jobs_failed.append(job)
             continue
+
+        if job.get('url') in resubmitted_jobs_url:
+            jobs_failed.append(job)
+            continue
+
         job_status_int = job_status_string_int[job_status_str]
         job_cached = is_job_cached(job_id, lava)
         if not job_cached:
@@ -483,7 +485,7 @@ def get_test_results_for_build(build_name, build_no, job_name_list=[]):
                                     lava_nick=lava.nick, job_id=job_id, job_name=local_job_name, status=job_status_int,
                                     duration=job_duration, cached=True)
 
-    return (jobs_failed, total_tests_res, resubmitted_jobs)
+    return (jobs_failed, total_tests_res, resubmitted_jobs_url)
 
 def get_build_config_value(build_config_url, key="MANIFEST_BRANCH"):
     response = urllib2.urlopen(build_config_url)
