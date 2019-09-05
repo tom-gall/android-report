@@ -82,6 +82,9 @@ class JenkinsApi(RESTFullApi):
         else:
             return None
 
+    def get_build_details_with_job_url(self, job_url):
+        full_api_url = self.get_api_url_prefix(detail_url=job_url)
+        return self.call_with_full_url(request_url=full_api_url)
 
     def get_build_details_with_full_url(self, build_url):
         full_api_url = '%s/api/json/' % build_url

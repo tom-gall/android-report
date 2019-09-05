@@ -4,60 +4,76 @@ from __future__ import unicode_literals
 import re
 
 citrigger_lkft = {
-    'trigger-lkft-aosp-mainline': [
-        'mainline-9.0-hikey',
-        'mainline-9.0-hikey-auto',
-        'mainline-9.0-hikey960',
-        'mainline-9.0-hikey960-auto',
-        'mainline-9.0-x15',
-        'mainline-9.0-x15-auto',
-        ],
+    'trigger-lkft-aosp-mainline': {
+        'mainline-9.0-hikey': 'lkft-android-9.0-mainline',
+        'mainline-9.0-hikey-auto': 'lkft-android-9.0-mainline',
+        'mainline-9.0-hikey960': 'lkft-android-9.0-mainline-hikey960',
+        'mainline-9.0-hikey960-auto': 'lkft-android-9.0-mainline-hikey960',
+        'mainline-9.0-x15': 'lkft-android-9.0-mainline-x15',
+        'mainline-9.0-x15-auto': 'lkft-android-9.0-mainline-x15',
+        },
 
-    'trigger-lkft-ti-4.19': [
-        '4.19-9.0-x15',
-        '4.19-9.0-x15-auto',
-        '4.19-9.0-am65x',
-        '4.19-9.0-am65x-auto',
-        ],
-    'trigger-lkft-hikey-4.19': [
-        '4.19-9.0-hikey',
-        '4.19-9.0-hikey-auto',
-        '4.19-9.0-hikey960',
-        '4.19-9.0-hikey960-auto',
-        ],
+    'trigger-lkft-ti-4.19': {
+        '4.19-9.0-x15': 'lkft-x15-android-9.0-4.19',
+        '4.19-9.0-x15-auto': 'lkft-x15-android-9.0-4.19',
+        '4.19-9.0-am65x': 'lkft-am65x-android-9.0-4.19',
+        '4.19-9.0-am65x-auto': 'lkft-am65x-android-9.0-4.19',
+        },
+    'trigger-lkft-hikey-4.19': {
+        '4.19-9.0-hikey': 'lkft-hikey-android-9.0-4.19',
+        '4.19-9.0-hikey-auto': 'lkft-hikey-android-9.0-4.19',
+        '4.19-9.0-hikey960': 'lkft-hikey-android-9.0-4.19',
+        '4.19-9.0-hikey960-auto': 'lkft-hikey-android-9.0-4.19',
+        },
 
-    'trigger-lkft-x15-4.14': [
-        '4.14-8.1-x15',
-        ],
-    'trigger-lkft-hikey-4.14-premerge-ci': [
-        '4.14-9.0-hikey',
-        '4.14-9.0-hikey960',
-        ],
-    'trigger-lkft-hikey-4.14': [
-        '4.14-8.1-hikey',
-        ],
+    'trigger-lkft-hikey-aosp-4.19-r': {
+        '4.19-master-hikey': 'lkft-hikey-aosp-master-4.19',
+        '4.19-master-hikey960': 'lkft-hikey-aosp-master-4.19',
+        },
 
-    'trigger-lkft-hikey-4.9-premerge-ci': [
-        '4.9-9.0-hikey',
-        '4.9-9.0-hikey960',
-        ],
-    'trigger-lkft-hikey-4.9': [
-        '4.9-8.1-hikey',
-        ],
+    'trigger-lkft-x15-4.14': {
+        '4.14-8.1-x15': 'lkft-x15-android-8.1-4.14',
+        },
+    'trigger-lkft-hikey-4.14-premerge-ci': {
+        '4.14-9.0-hikey': 'lkft-hikey-aosp-4.14-premerge-ci',
+        '4.14-9.0-hikey960': 'lkft-hikey-aosp-4.14-premerge-ci',
+        },
+    'trigger-lkft-hikey-4.14': {
+        '4.14-8.1-hikey': 'lkft-hikey-android-8.1-4.14',
+        },
 
-    'trigger-lkft-hikey-4.4-premerge-ci': [
-        '4.4-lts-9.0-hikey',
-        ],
-    'trigger-lkft-hikey-4.4': [
-        '4.4-8.1-hikey',
-        '4.4-9.0-hikey',
-        ],
+    'trigger-lkft-hikey-4.9-premerge-ci': {
+        '4.9-9.0-hikey': 'lkft-hikey-aosp-4.9-premerge-ci',
+        '4.9-9.0-hikey960': 'lkft-hikey-aosp-4.9-premerge-ci',
+        },
+    'trigger-lkft-hikey-4.9': {
+        '4.9-8.1-hikey': 'lkft-hikey-android-8.1-4.9',
+        },
+
+    'trigger-lkft-hikey-4.4-premerge-ci': {
+        '4.4-lts-9.0-hikey': 'lkft-hikey-aosp-4.4-premerge-ci',
+        },
+    'trigger-lkft-hikey-4.4': {
+        '4.4-8.1-hikey': 'lkft-hikey-android-8.1-4.4',
+        '4.4-9.0-hikey': 'lkft-hikey-android-9.0-4.4',
+        },
 }
 
 def find_citrigger(lkft_pname=""):
     if not lkft_pname:
         return None
     for trigger_name, lkft_pnames in citrigger_lkft.items():
-        if lkft_pname in lkft_pnames:
+        if lkft_pname in lkft_pnames.keys():
             return trigger_name
+    return None
+
+
+def find_cibuild(lkft_pname=""):
+    if not lkft_pname:
+        return None
+    if lkft_pname == 'aosp-master-tracking':
+        return 'lkft-aosp-master-tracking'
+    for trigger_name, lkft_pnames in citrigger_lkft.items():
+        if lkft_pname in lkft_pnames.keys():
+            return lkft_pnames.get(lkft_pname)
     return None

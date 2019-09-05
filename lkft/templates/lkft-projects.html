@@ -30,9 +30,20 @@
     {% endif %}
     </td>
     <td>
-        {% if project.last_build %}
-        {% with project.last_build as last_build %}
-            {{ last_build.version}}
+        {% if project.last_ci_build %}
+        {% with project.last_ci_build as last_ci_build %}
+            {% if last_ci_build.build_status == 'SUCCESS' %}
+                <a href="{{last_ci_build.ci_build_project_url}}">{{ last_ci_build.kernel_version}}</a>&nbsp;&nbsp; <p style="background-color: green">{{ last_ci_build.build_status}} </p>
+            {% endif %}
+            {% if last_ci_build.build_status == 'INQUEUE' %}
+                <a href="{{last_ci_build.ci_build_project_url}}">{{ last_ci_build.kernel_version}}</a>&nbsp;&nbsp; <p style="background-color: grey">{{ last_ci_build.build_status}}</p>
+            {% endif %}
+            {% if last_ci_build.build_status == 'INPROGRESS' %}
+               <a href="{{last_ci_build.ci_build_project_url}}">{{ last_ci_build.kernel_version}}</a>&nbsp;&nbsp; <p style="background-color: yellow">{{ last_ci_build.build_status}}</p>
+            {% endif %}
+            {% if last_ci_build.build_status == 'FAILURE' %}
+               <a href="{{last_ci_build.ci_build_project_url}}">{{ last_ci_build.kernel_version}}</a>&nbsp;&nbsp; <p style="background-color: red">{{ last_ci_build.build_status}}</p>
+            {% endif %}
         {% endwith %}
         {% else %}
             No Build Yet
