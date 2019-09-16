@@ -231,43 +231,44 @@ def list_projects(request):
             project['last_trigger_build'] = jenkins_api.get_build_details_with_full_url(build_url=last_trigger_url)
 
         ci_build_project_name = find_cibuild(lkft_pname=project.get('name'))
-        ci_build_project = jenkins_api.get_build_details_with_job_url(ci_build_project_name)
+        if ci_build_project_name:
+            ci_build_project = jenkins_api.get_build_details_with_job_url(ci_build_project_name)
 
-        isInQueue = ci_build_project.get('inQueue')
+            isInQueue = ci_build_project.get('inQueue')
 
-        if isInQueue:
-            build_status = 'INQUEUE'
-            kernel_version = 'Unknown'
-            queueItem = ci_build_project.get('queueItem')
-            if queueItem:
-                # BUILD_DIR=lkft
-                # ANDROID_BUILD_CONFIG=lkft-hikey-android-9.0-mainline lkft-hikey-android-9.0-mainline-auto
-                # KERNEL_DESCRIBE=v5.3-rc7-223-g5da9f3fe49d4
-                # SRCREV_kernel=5da9f3fe49d47e313e397694c195c3b9b9b24134
-                # MAKE_KERNELVERSION=5.3.0-rc7
-                params = queueItem.get('params').strip().split('\n')
-                for param in params:
-                    if param.find('KERNEL_DESCRIBE') >= 0:
-                        kernel_version = param.split('=')[1]
-                        break
-            # case for aosp master tracking build
-            if kernel_version == 'dummy':
-                kernel_version = ci_build_project.get('nextBuildNumber')
-        else:
-            ci_build_last_url = ci_build_project.get('lastBuild').get('url')
-            ci_build_last = jenkins_api.get_build_details_with_full_url(build_url=ci_build_last_url)
-            kernel_version = ci_build_last.get('displayName') # #buildNo.-kernelInfo
-            if ci_build_last.get('building'):
-                build_status = 'INPROGRESS'
+            if isInQueue:
+                build_status = 'INQUEUE'
+                kernel_version = 'Unknown'
+                queueItem = ci_build_project.get('queueItem')
+                if queueItem:
+                    # BUILD_DIR=lkft
+                    # ANDROID_BUILD_CONFIG=lkft-hikey-android-9.0-mainline lkft-hikey-android-9.0-mainline-auto
+                    # KERNEL_DESCRIBE=v5.3-rc7-223-g5da9f3fe49d4
+                    # SRCREV_kernel=5da9f3fe49d47e313e397694c195c3b9b9b24134
+                    # MAKE_KERNELVERSION=5.3.0-rc7
+                    params = queueItem.get('params').strip().split('\n')
+                    for param in params:
+                        if param.find('KERNEL_DESCRIBE') >= 0:
+                            kernel_version = param.split('=')[1]
+                            break
+                # case for aosp master tracking build
+                if kernel_version == 'dummy':
+                    kernel_version = ci_build_project.get('nextBuildNumber')
             else:
-                build_status = ci_build_last.get('result') # null or SUCCESS, FAILURE
+                ci_build_last_url = ci_build_project.get('lastBuild').get('url')
+                ci_build_last = jenkins_api.get_build_details_with_full_url(build_url=ci_build_last_url)
+                kernel_version = ci_build_last.get('displayName') # #buildNo.-kernelInfo
+                if ci_build_last.get('building'):
+                    build_status = 'INPROGRESS'
+                else:
+                    build_status = ci_build_last.get('result') # null or SUCCESS, FAILURE
 
-        last_ci_build= {
-            'build_status': build_status,
-            'kernel_version': kernel_version,
-            'ci_build_project_url': ci_build_project.get('url'),
-        }
-        project['last_ci_build'] = last_ci_build
+            last_ci_build= {
+                'build_status': build_status,
+                'kernel_version': kernel_version,
+                'ci_build_project_url': ci_build_project.get('url'),
+            }
+            project['last_ci_build'] = last_ci_build
 
         projects.append(project)
 
