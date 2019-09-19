@@ -51,6 +51,8 @@ bugzilla_instance = bugzilla.Bugzilla(url=bugzilla_api_url, api_key=BUGZILLA_API
 bugzilla_show_bug_prefix = 'https://%s/show_bug.cgi?id=' % bugzilla_host_name
 
 def find_lava_config(job_url):
+    if job_url is None:
+        return None
     for nick, config in LAVA_SERVERS.items():
         if job_url.find('://%s/' % config.get('hostname')) >= 0:
             return config
@@ -66,7 +68,7 @@ def get_attachment_urls(jobs=[]):
         if not lava_config :
             lava_config = find_lava_config(job.get('external_url'))
             if not lava_config:
-                logger.error('lava server is not found for job: %s' % job.get('external_url'))
+                logger.error('lava server is not found for job: %s' % job.get('url'))
                 return None
             else:
                 job['lava_config'] = lava_config
@@ -98,6 +100,8 @@ def extract_save_result(tar_path, result_zip_path):
 
 
 def get_result_file_path(job=None):
+    if not job.get('lava_config'):
+        return None
     lava_nick = job.get('lava_config').get('nick')
     job_id = job.get('job_id')
     result_file_path = os.path.join(DIR_ATTACHMENTS, "%s-%s.zip" % (lava_nick, job_id))
@@ -107,10 +111,16 @@ def download_attachments_save_result(jobs=[]):
     # https://lkft.validation.linaro.org/scheduler/job/566144
     get_attachment_urls(jobs=jobs)
     for job in jobs:
+        if not job.get('lava_config'):
+            continue
+
         lava_nick = job.get('lava_config').get('nick')
         job_id = job.get('job_id')
         job_url = job.get('external_url')
         result_file_path = get_result_file_path(job)
+        if not result_file_path:
+            logger.info("Skip to get the attachment as the result_file_path is not found: %s %s" % (job_url, job.get('url')))
+            continue
         if not os.path.exists(result_file_path):
             if job.get('job_status') != 'Complete':
                 logger.info("Skip to get the attachment as the job is not Complete: %s %s" % (job_url, job.get('name')))
@@ -327,7 +337,7 @@ def list_builds(request):
                     modules_done = 0
 
                     result_file_path = get_result_file_path(job=job)
-                    if os.path.exists(result_file_path):
+                    if result_file_path and os.path.exists(result_file_path):
                         with zipfile.ZipFile(result_file_path, 'r') as f_zip_fd:
                             try:
                                 root = ET.fromstring(f_zip_fd.read(TEST_RESULT_XML_NAME))
@@ -420,7 +430,7 @@ def list_jobs(request):
         if job.get('parent_job'):
             resubmitted_job_urls.append(job.get('parent_job'))
         result_file_path = get_result_file_path(job=job)
-        if not os.path.exists(result_file_path):
+        if not result_file_path or not os.path.exists(result_file_path):
             continue
         if project_kernel_version is None:
             # for project aosp-master-tracking
@@ -687,6 +697,9 @@ def file_bug(request):
         for qa_job in qa_jobs:
             lava_job_id = qa_job.get('job_id')
             lava_url = qa_job.get('external_url')
+            if not lava_url:
+                logger.error('Job seems not submitted yet: '% job.get('url'))
+                continue
             lava_config = find_lava_config(lava_url)
             result_file_path = get_result_file_path(qa_job)
 
