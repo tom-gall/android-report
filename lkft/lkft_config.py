@@ -12,6 +12,7 @@ citrigger_lkft = {
         'mainline-9.0-x15': 'lkft-android-9.0-mainline-x15',
         'mainline-9.0-x15-auto': 'lkft-android-9.0-mainline-x15',
 
+        'mainline-gki-10.0-gsi-hikey': 'lkft-hikey-aosp-master-mainline-gki',
         'mainline-gki-aosp-master-hikey': 'lkft-hikey-aosp-master-mainline-gki',
         },
 
