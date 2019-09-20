@@ -20,6 +20,8 @@ import xmlrpclib
 import xml.etree.ElementTree as ET
 import zipfile
 
+from django.contrib.auth.decorators import login_required
+
 from lcr.settings import FILES_DIR, LAVA_SERVERS, BUGZILLA_API_KEY, BUILD_WITH_JOBS_NUMBER
 from lcr.settings import QA_REPORT, QA_REPORT_DEFAULT
 
@@ -765,7 +767,7 @@ def file_bug(request):
                     })
 
 
-#@login_required
+@login_required
 def resubmit_job(request):
     qa_job_ids = request.POST.getlist("qa_job_ids")
     if len(qa_job_ids) == 0:
@@ -778,6 +780,7 @@ def resubmit_job(request):
                       {
                         'errors': True,
                       })
+    logger.info('user: %s is going to resubmit job: %s' % (request.user, str(qa_job_ids)))
 
     qa_job = qa_report_api.get_job_with_id(qa_job_ids[0])
     build_url = qa_job.get('target_build')
