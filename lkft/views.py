@@ -222,6 +222,8 @@ def get_last_trigger_build(lkft_pname=''):
         return None
     return jenkins_api.get_last_build(cijob_name=ci_trigger_name)
 
+
+@login_required
 def list_projects(request):
     projects = []
     for project in qa_report_api.get_projects():
@@ -303,6 +305,7 @@ def list_projects(request):
                             }
                 )
 
+@login_required
 def list_builds(request):
     project_id = request.GET.get('project_id', None)
     project =  qa_report_api.get_project(project_id)
@@ -406,6 +409,7 @@ def get_lkft_bugs():
     sorted_bugs = sorted(bugs, key=get_bug_summary)
     return sorted_bugs
 
+@login_required
 def list_jobs(request):
     build_id = request.GET.get('build_id', None)
     build =  qa_report_api.get_build(build_id)
@@ -570,7 +574,7 @@ class BugCreationForm(forms.Form):
     summary = forms.CharField(label='Summary', widget=forms.TextInput(attrs={'size': 80}))
     description = forms.CharField(label='Description', widget=forms.Textarea(attrs={'cols': 80}))
 
-
+@login_required
 def file_bug(request):
     submit_result = False
     if request.method == 'POST':
