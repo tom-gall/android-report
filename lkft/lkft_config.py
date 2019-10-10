@@ -14,6 +14,7 @@ citrigger_lkft = {
 
         'mainline-gki-10.0-gsi-hikey': 'lkft-hikey-aosp-master-mainline-gki',
         'mainline-gki-aosp-master-hikey': 'lkft-hikey-aosp-master-mainline-gki',
+        'mainline-gki-aosp-master-hikey960': 'lkft-hikey960-aosp-master-mainline-gki',
         },
 
     # configs for 4.19 kernels
@@ -93,3 +94,46 @@ def find_cibuild(lkft_pname=""):
         if lkft_pname in lkft_pnames.keys():
             return lkft_pnames.get(lkft_pname)
     return None
+
+def get_hardware_from_pname(pname=None, env=''):
+    if not pname:
+        # for aosp master build
+        if env.find('hi6220-hikey')>=0:
+            return 'HiKey'
+        else:
+            return None
+    if pname.find('hikey960') >= 0:
+        return 'HiKey960'
+    elif pname.find('hikey') >= 0:
+        return 'HiKey'
+    elif pname.find('x15') >= 0:
+        return 'BeagleBoard-X15'
+    elif pname.find('am65x') >= 0:
+        return 'AM65X'
+
+def get_version_from_pname(pname=None):
+    if pname.find('10.0') >= 0:
+        return 'ANDROID-10'
+    elif pname.find('8.1') >= 0:
+        return 'OREO-8.1'
+    elif pname.find('9.0') >= 0:
+        return 'PIE-9.0'
+    else:
+        return 'Master'
+
+def get_kver_with_pname_env(prj_name='', env=''):
+    if prj_name == 'aosp-master-tracking':
+        # for project aosp-master-tracking
+        if env.startswith('hi6220-hikey_'):
+            kernel_version = env.replace('hi6220-hikey_', '')
+        elif env.startswith('x15_'):
+            kernel_version = env.replace('x15_', '')
+        else:
+            # impossible path for hikey
+            kernel_version = "%s-%s" % (prj_name, env)
+    elif prj_name.startswith('mainline-gki'):
+        kernel_version = 'mainline-gki'
+    else:
+        kernel_version = prj_name.split('-')[0]
+
+    return kernel_version

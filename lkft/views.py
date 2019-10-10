@@ -28,7 +28,7 @@ from lcr.settings import QA_REPORT, QA_REPORT_DEFAULT
 from lcr import qa_report
 from lcr.qa_report import DotDict
 from lcr.utils import download_urllib
-from lkft.lkft_config import find_citrigger, find_cibuild
+from lkft.lkft_config import find_citrigger, find_cibuild, get_hardware_from_pname, get_version_from_pname, get_kver_with_pname_env
 
 qa_report_def = QA_REPORT[QA_REPORT_DEFAULT]
 qa_report_api = qa_report.QAReportApi(qa_report_def.get('domain'), qa_report_def.get('token'))
@@ -179,7 +179,8 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
                     failed_tests = test_case.findall('.//Test[@result="fail"]')
                     failed_number = failed_number + len(failed_tests)
                     for failed_test in failed_tests:
-                        test_name = '%s#%s' % (test_case.get("name"), vts_abi_suffix_pat.sub('', failed_test.get("name")))
+                        #test_name = '%s#%s' % (test_case.get("name"), vts_abi_suffix_pat.sub('', failed_test.get("name")))
+                        test_name = '%s#%s' % (test_case.get("name"), failed_test.get("name"))
                         stacktrace = failed_test.find('.//Failure/StackTrace').text
                         ## ignore duplicate cases as the jobs are for different modules
                         failed_testcase = failed_tests_module.get(test_name)
@@ -206,6 +207,7 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
                                                                 'kernel_versions': [ kernel_version ],
                                                                 'platforms': [ platform ],
                                                             }
+
         except ET.ParseError as e:
             logger.error('xml.etree.ElementTree.ParseError: %s' % e)
             logger.info('Please Check %s manually' % result_zip_path)
@@ -268,7 +270,7 @@ def list_projects(request):
                 # case for aosp master tracking build
                 if kernel_version == 'dummy':
                     kernel_version = ci_build_project.get('nextBuildNumber')
-            else:
+            elif ci_build_project.get('lastBuild') is not None:
                 ci_build_last_url = ci_build_project.get('lastBuild').get('url')
                 ci_build_last = jenkins_api.get_build_details_with_full_url(build_url=ci_build_last_url)
                 kernel_version = ci_build_last.get('displayName') # #buildNo.-kernelInfo
@@ -276,6 +278,9 @@ def list_projects(request):
                     build_status = 'INPROGRESS'
                 else:
                     build_status = ci_build_last.get('result') # null or SUCCESS, FAILURE
+            else:
+                build_status = 'NOBUILDYET'
+                kernel_version = 'Unknown'
 
             last_ci_build= {
                 'build_status': build_status,
@@ -409,6 +414,7 @@ def get_lkft_bugs():
     sorted_bugs = sorted(bugs, key=get_bug_summary)
     return sorted_bugs
 
+
 @login_required
 def list_jobs(request):
     build_id = request.GET.get('build_id', None)
@@ -417,10 +423,6 @@ def list_jobs(request):
     jobs = qa_report_api.get_jobs_for_build(build_id)
 
     project_name = project.get('name')
-    if project_name == 'aosp-master-tracking':
-        project_kernel_version = None
-    else:
-        project_kernel_version = project_name.split('-')[0]
 
     download_attachments_save_result(jobs=jobs)
     failures = {}
@@ -438,24 +440,14 @@ def list_jobs(request):
         result_file_path = get_result_file_path(job=job)
         if not result_file_path or not os.path.exists(result_file_path):
             continue
-        if project_kernel_version is None:
-            # for project aosp-master-tracking
-            environment = job.get('environment')
-            if environment.startswith('hi6220-hikey_'):
-                kernel_version = environment.replace('hi6220-hikey_', '')
-            elif environment.startswith('x15_'):
-                kernel_version = environment.replace('x15_', '')
-            else:
-                # impossible path for hikey
-                kernel_version = "%s-%s" % (project_name, environment)
-        else:
-            kernel_version = project_kernel_version
+
+        kernel_version = get_kver_with_pname_env(prj_name=project_name, env=job.get('environment'))
 
         platform = job.get('environment').split('_')[0]
 
         metadata = {
             'job_id': job.get('job_id'),
-            'qa_job_id': job.get('url').replace('/?format=json', '').split('/')[-1],
+            'qa_job_id': qa_report_api.get_qa_job_id_with_url(job_url=job.get('url')),
             'result_url': job.get('attachment_url'),
             'lava_nick': job.get('lava_config').get('nick'),
             'kernel_version': kernel_version,
@@ -498,7 +490,7 @@ def list_jobs(request):
                     else:
                         failure['bugs'] = [bug]
 
-    android_version = get_bug_android_version_from_project_name(project_name=project.get('name'))
+    android_version = get_version_from_pname(pname=project.get('name'))
     open_bugs = []
     for bug in bugs:
         if bug.status == 'VERIFIED' or bug.status == 'RESOLVED':
@@ -548,16 +540,6 @@ def get_bug_hardware_from_environment(environment):
         return 'HiKey'
     else:
         return None
-
-def get_bug_android_version_from_project_name(project_name=None):
-    if project_name.endswith('android-9.0'):
-        # android-hikey-linaro-4.14-android-9.0
-        return 'PIE-9.0'
-    elif project_name.endswith('android-8.1'):
-        return 'OREO-8.1'
-    elif project_name.find('aosp') >=0:
-        # exception of the aosp premerge ci builds, might need to fix when it is changed to use pie based builds
-        return 'Master'
 
 class BugCreationForm(forms.Form):
     project_name = forms.CharField(label='Project Name', widget=forms.TextInput(attrs={'size': 80}))
@@ -648,9 +630,9 @@ def file_bug(request):
         # download all the necessary attachments
         download_attachments_save_result(jobs=qa_jobs)
 
-
+        pname = project.get('name')
         form_initial = {
-                        "project_name": project.get('name'),
+                        "project_name": pname,
                         "project_id": project.get('id'),
                         'build_version': build.get('version'),
                         'build_id': build.get('id'),
@@ -658,13 +640,14 @@ def file_bug(request):
                         'component': 'General',
                         'severity': 'normal',
                         'os': 'Android',
-                        'hardware': get_bug_hardware_from_environment(qa_jobs[0].get('environment')),
+                        'hardware': get_hardware_from_pname(pname=pname, env=qa_jobs[0].get('environment')),
                         'keywords': 'LKFT',
-                        'version': get_bug_android_version_from_project_name(project.get('name')),
+                        'version': get_version_from_pname(pname=pname),
                         }
 
 
         def extract_abi_stacktrace(result_zip_path, module_name='', test_name=''):
+
             failures = {}
             class_method = test_name.split('#')
             with zipfile.ZipFile(result_zip_path, 'r') as f_zip_fd:
@@ -672,13 +655,14 @@ def file_bug(request):
                     root = ET.fromstring(f_zip_fd.read(TEST_RESULT_XML_NAME))
                     for elem in root.findall('.//Module[@name="%s"]' %(module_name)):
                         abi = elem.attrib['abi']
-                        stacktrace_node = root.find('.//TestCase[@name="%s"]/Test[@name="%s"]/Failure/StackTrace' %(class_method[0], class_method[1]))
+                        stacktrace_node = elem.find('.//TestCase[@name="%s"]/Test[@name="%s"]/Failure/StackTrace' %(class_method[0], class_method[1]))
                         if stacktrace_node is None:
                             # Try for VtsHal test cases
                             if abi == 'arm64-v8a':
-                                stacktrace_node = root.find('.//TestCase[@name="%s"]/Test[@name="%s_64bit"]/Failure/StackTrace' %(class_method[0], class_method[1]))
+                                stacktrace_node = elem.find('.//TestCase[@name="%s"]/Test[@name="%s_64bit"]/Failure/StackTrace' %(class_method[0], class_method[1]))
                             elif abi == 'armeabi-v7a':
-                                stacktrace_node = root.find('.//TestCase[@name="%s"]/Test[@name="%s_32bit"]/Failure/StackTrace' %(class_method[0], class_method[1]))
+                                stacktrace_node = elem.find('.//TestCase[@name="%s"]/Test[@name="%s_32bit"]/Failure/StackTrace' %(class_method[0], class_method[1]))
+
                         if stacktrace_node is not None:
                             failures[abi] = stacktrace_node.text
                         else:
@@ -688,13 +672,6 @@ def file_bug(request):
                     logger.error('xml.etree.ElementTree.ParseError: %s' % e)
                     logger.info('Please Check %s manually' % result_zip_path)
             return failures
-
-        project_kernel_version = None
-        if project.get('name').startswith('android-hikey-linaro-') or project.get('name').startswith('android-x15-linux-'):
-            project_kernel_version = project.get('name').split('-')[3]
-        else:
-            # aosp-master-tracking and aosp-8.1-tracking
-            pass
 
         abis = []
         stacktrace_msg = None
@@ -709,15 +686,7 @@ def file_bug(request):
             lava_config = find_lava_config(lava_url)
             result_file_path = get_result_file_path(qa_job)
 
-            if project_kernel_version is None:
-                environment = qa_job.get('environment')
-                if environment.startswith('hi6220-hikey_'):
-                    kernel_version = environment.replace('hi6220-hikey_', '')
-                else:
-                    # impossible path for hikey
-                    pass
-            else:
-                kernel_version = project_kernel_version
+            kernel_version = get_kver_with_pname_env(prj_name=project.get('name'), env=qa_job.get('environment'))
 
             qa_job['kernel_version'] = kernel_version
             job_failures = extract_abi_stacktrace(result_file_path, module_name=module_name, test_name=test_name)
@@ -737,15 +706,30 @@ def file_bug(request):
             stacktrace_msg = failures.get(abis[0])
 
         if test_name.find(module_name) >=0:
-            form_initial['summary'] = '%s %s' % (' '.join(sorted(failed_kernels)), test_name)
+            form_initial['summary'] = '%s: %s' % (project.get('name'), test_name)
             description = '%s' % (test_name)
         else:
-            form_initial['summary'] = '%s %s %s' % (' '.join(sorted(failed_kernels)), module_name, test_name)
+            form_initial['summary'] = '%s: %s %s' % (project.get('name'), module_name, test_name)
             description = '%s %s' % ( module_name, test_name)
 
+        history_urls = []
+        for abi in abis:
+            if module_name.startswith('Vts'):
+                test_res_dir = 'vts-test'
+            else:
+                test_res_dir = 'cts-lkft'
+            history_url = '%s/%s/tests/%s/%s.%s/%s' % (qa_report_api.get_api_url_prefix(),
+                                                             project.get('full_name'),
+                                                             test_res_dir,
+                                                             abi,
+                                                             module_name,
+                                                             test_name.replace('#', '.'))
+            history_urls.append(history_url)
 
         description += '\n\nABIs:\n%s' % (' '.join(abis))
+        description += '\n\nQA Report Test History Urls:\n%s' % ('\n'.join(history_urls))
         description += '\n\nKernels:\n%s' % (' '.join(sorted(failed_kernels)))
+        description += '\n\nBuild Version:\n%s' % (build.get('version'))
         description += '\n\nStackTrace: \n%s' % (stacktrace_msg.strip())
         description += '\n\nLava Jobs:'
         for qa_job in qa_jobs:
