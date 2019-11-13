@@ -21,6 +21,7 @@ citrigger_lkft = {
     'trigger-lkft-ti-4.19': {
         '4.19-9.0-x15': 'lkft-x15-android-9.0-4.19',
         '4.19-9.0-x15-auto': 'lkft-x15-android-9.0-4.19',
+        '4.19-10.0-gsi-x15': 'lkft-x15-10.0-gsi-4.19',
         '4.19-9.0-am65x': 'lkft-am65x-android-9.0-4.19',
         '4.19-9.0-am65x-auto': 'lkft-am65x-android-9.0-4.19',
         },
@@ -72,7 +73,8 @@ citrigger_lkft = {
 
     # configs for 4.4 kernels
     'trigger-lkft-hikey-4.4-premerge-ci': {
-        '4.4p-9.0-hikey': 'lkft-hikey-aosp-4.4-premerge-ci',
+        '4.4p-9.0-hikey': 'lkft-hikey-4.4-p',
+        '4.4p-10.0-gsi-hikey': 'lkft-hikey-4.4-p',
         },
     'trigger-lkft-hikey-4.4': {
         '4.4-8.1-hikey': 'lkft-hikey-android-8.1-4.4',
