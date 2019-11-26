@@ -4,6 +4,11 @@ from __future__ import unicode_literals
 import re
 
 citrigger_lkft = {
+    'lkft-aosp-master-cts-vts': {
+        'aosp-master-tracking':'lkft-aosp-master-tracking',
+        'aosp-master-tracking-x15':'lkft-aosp-master-tracking',
+        },
+
     'trigger-lkft-aosp-mainline': {
         'mainline-9.0-hikey': 'lkft-android-9.0-mainline',
         'mainline-9.0-hikey-auto': 'lkft-android-9.0-mainline',
@@ -11,6 +16,10 @@ citrigger_lkft = {
         'mainline-9.0-hikey960-auto': 'lkft-android-9.0-mainline-hikey960',
         'mainline-9.0-x15': 'lkft-android-9.0-mainline-x15',
         'mainline-9.0-x15-auto': 'lkft-android-9.0-mainline-x15',
+        'mainline-aosp-master-x15': 'lkft-x15-aosp-master-mainline',
+
+        'mainline-gki-aosp-master-db845c': 'lkft-db845c-aosp-master-mainline',
+        'mainline-aosp-master-db845c': 'lkft-db845c-aosp-master-mainline',
 
         'mainline-gki-10.0-gsi-hikey': 'lkft-hikey-aosp-master-mainline-gki',
         'mainline-gki-aosp-master-hikey': 'lkft-hikey-aosp-master-mainline-gki',
@@ -129,13 +138,9 @@ def get_version_from_pname(pname=None):
 def get_kver_with_pname_env(prj_name='', env=''):
     if prj_name == 'aosp-master-tracking':
         # for project aosp-master-tracking
-        if env.startswith('hi6220-hikey_'):
-            kernel_version = env.replace('hi6220-hikey_', '')
-        elif env.startswith('x15_'):
-            kernel_version = env.replace('x15_', '')
-        else:
-            # impossible path for hikey
-            kernel_version = "%s-%s" % (prj_name, env)
+        kernel_version = env.replace('hi6220-hikey_', '')
+    elif prj_name == 'aosp-master-tracking-x15':
+        kernel_version = env.replace('x15_', '')
     elif prj_name.startswith('mainline-gki'):
         kernel_version = 'mainline-gki'
     else:
