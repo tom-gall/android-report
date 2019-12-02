@@ -13,17 +13,32 @@
         <th>Last Build Timestamp</th>
         <th>Last Build No.</th>
         <th>Last Trigger Build No.</th>
-	</tr>
+        <th>Pass</th>
+        <th>Fail</th>
+        <th>Total</th>
+        <th>Modules Done</th>
+        <th>Modules Total</th>
+</tr>
 {% for project in projects %}
 <tr>
-	<td> {{ forloop.counter }}</td>
+    <td> {{ forloop.counter }}</td>
     <td>
         <a href="/lkft/builds?project_id={{project.id}}">{{project.name}}</a>
     </td>
     <td>
     {% if project.last_build %}
         {% with project.last_build as last_build %}
-        {{ last_build.created_at|date:'M. d, Y, H:i'}}, &nbsp;{{ last_build.created_at|timesince}}
+        {{ last_build.created_at|date:'M. d, Y, H:i'}}, &nbsp;{{ last_build.created_at|timesince}}<br/>
+        {% if last_build.build_status == 'JOBSNOTSUBMITTED' %}
+            <p style="background-color: yellow">{{ last_build.build_status}} </p>
+        {% endif %}
+        {% if last_build.build_status == 'JOBSINPROGRESS' %}
+            <p style="background-color: green">{{ last_build.build_status}} </p>
+        {% endif %}
+        {% if last_build.build_status == 'JOBSCOMPLETED' %}
+            {{ last_build.last_fetched_timestamp|date:'M. d, Y, H:i'}}, &nbsp;{{ last_build.last_fetched_timestamp|timesince}}<br/>
+            Took {{ project.duration }} to finish.
+        {% endif %}
         {% endwith %}
     {% else %}
         No Build Yet
@@ -44,7 +59,12 @@
             {% if last_ci_build.build_status == 'FAILURE' %}
                <a href="{{last_ci_build.ci_build_project_url}}">{{ last_ci_build.kernel_version}}</a>&nbsp;&nbsp; <p style="background-color: red">{{ last_ci_build.build_status}}</p>
             {% endif %}
+            {% if last_ci_build.build_status == 'ABORTED' %}
+               <a href="{{last_ci_build.ci_build_project_url}}">{{ last_ci_build.kernel_version}}</a>&nbsp;&nbsp; <p style="background-color: gray">{{ last_ci_build.build_status}}</p>
+            {% endif %}
+            &nbsp;&nbsp;{{last_ci_build.duration}}&nbsp;&nbsp; {{last_ci_build.timestamp}}
         {% endwith %}
+            <br/>{{ last_build.start_timestamp|date:'M. d, Y, H:i'}}, &nbsp;{{ last_build.start_timestamp|timesince}}
         {% else %}
             No Build Yet
         {% endif %}
@@ -52,13 +72,30 @@
     <td>
         {% if project.last_trigger_build %}
         {% with project.last_trigger_build as last_trigger_build %}
-            <a href="{{last_trigger_build.url}}">{{ last_trigger_build.displayName}}</a>
+            <a href="{{last_trigger_build.url}}">{{ last_trigger_build.displayName}}</a><br/>
+            {{ last_trigger_build.start_timestamp|date:'M. d, Y, H:i'}}, &nbsp;{{ last_trigger_build.start_timestamp|timesince}}
         {% endwith %}
         {% else %}
             No Trigger Build Setup Yet
         {% endif %}
     </td>
-    </td>
+    {% if project.last_build %}
+        {% with project.last_build as last_build %}
+        {% with last_build.numbers_of_result as numbers_of_result %}
+        <td>{{ numbers_of_result.number_passed }}</td>
+        <td>{{ numbers_of_result.number_failed }}</td>
+        <td>{{ numbers_of_result.number_total }}</td>
+        <td>{{ numbers_of_result.modules_done }}</td>
+        <td>{{ numbers_of_result.modules_total }}</td>
+        {% endwith %}
+        {% endwith %}
+    {% else %}
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+    {% endif %}
 </tr>
 {% endfor %}
 </table>

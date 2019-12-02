@@ -225,6 +225,117 @@ def get_last_trigger_build(lkft_pname=''):
     return jenkins_api.get_last_build(cijob_name=ci_trigger_name)
 
 
+def get_testcases_number_for_job(job):
+    job_number_passed = 0
+    job_number_failed = 0
+    job_number_total = 0
+    modules_total = 0
+    modules_done = 0
+
+    result_file_path = get_result_file_path(job=job)
+    if result_file_path and os.path.exists(result_file_path):
+        with zipfile.ZipFile(result_file_path, 'r') as f_zip_fd:
+            try:
+                root = ET.fromstring(f_zip_fd.read(TEST_RESULT_XML_NAME))
+                summary_node = root.find('Summary')
+                job_number_passed = summary_node.attrib['pass']
+                job_number_failed = summary_node.attrib['failed']
+                modules_total = summary_node.attrib['modules_total']
+                modules_done = summary_node.attrib['modules_done']
+            except ET.ParseError as e:
+                logger.error('xml.etree.ElementTree.ParseError: %s' % e)
+                logger.info('Please Check %s manually' % result_zip_path)
+    return {
+            'number_passed': int(job_number_passed),
+            'number_failed': int(job_number_failed),
+            'number_total': int(job_number_passed) + int(job_number_failed),
+            'modules_total': int(modules_total),
+            'modules_done': int(modules_done)
+            }
+
+
+def get_test_result_number_for_build(build, jobs=None):
+    build_number_passed = 0
+    build_number_failed = 0
+    build_number_total = 0
+    build_modules_total = 0
+    build_modules_done = 0
+
+    if not jobs:
+        jobs = qa_report_api.get_jobs_for_build(build.get("id"))
+
+    resubmitted_job_urls = [ job.get('parent_job') for job in jobs if job.get('parent_job')]
+    download_attachments_save_result(jobs=jobs)
+    job_names = []
+    for job in jobs:
+        if job.get('url') in resubmitted_job_urls:
+            # ignore jobs which were resubmitted
+            logger.info("%s: %s:%s has been resubmitted already" % (build.get('version'), job.get('job_id'), job.get('url')))
+            continue
+
+        if job.get('name') in job_names:
+            logger.info("%s %s: %s %s the same name job has been recorded" % (build.get('version'), job.get('name'), job.get('job_id'), job.get('url')))
+            continue
+
+        numbers = get_testcases_number_for_job(job)
+        build_number_passed = build_number_passed + numbers.get('number_passed')
+        build_number_failed = build_number_failed + numbers.get('number_failed')
+        build_number_total = build_number_total + numbers.get('number_total')
+        build_modules_total = build_modules_total + numbers.get('modules_total')
+        build_modules_done = build_modules_done + numbers.get('modules_done')
+        job['numbers'] = numbers
+        job_names.append(job.get('name'))
+
+    return {
+        'number_passed': build_number_passed,
+        'number_failed': build_number_failed,
+        'number_total': build_number_total,
+        'modules_done': build_modules_done,
+        'modules_total': build_modules_total,
+        }
+
+def get_lkft_build_status(build, jobs):
+    if not jobs:
+        jobs = qa_report_api.get_jobs_for_build(build.get("id"))
+
+    resubmitted_job_urls = [ job.get('parent_job') for job in jobs if job.get('parent_job')]
+    job_names = []
+    jobs_to_be_checked = []
+    for job in jobs:
+        if job.get('url') in resubmitted_job_urls:
+            # ignore jobs which were resubmitted
+            logger.info("%s: %s:%s has been resubmitted already" % (build.get('version'), job.get('job_id'), job.get('url')))
+            continue
+
+        if job.get('name') in job_names:
+            logger.info("%s %s: %s %s the same name job has been recorded" % (build.get('version'), job.get('name'), job.get('job_id'), job.get('url')))
+            continue
+
+        jobs_to_be_checked.append(job)
+        job_names.append(job.get('name'))
+
+    last_fetched_timestamp = build.get('created_at')
+    has_unsubmitted = False
+    is_inprogress = False
+    for job in jobs_to_be_checked:
+        if not job.get('submitted'):
+            has_unsubmitted = True
+            break
+        if job.get('fetched'):
+            job_last_fetched_timestamp = datetime.datetime.strptime(job.get('fetched_at'), '%Y-%m-%dT%H:%M:%S.%fZ')
+            if job_last_fetched_timestamp > last_fetched_timestamp:
+                last_fetched_timestamp = job_last_fetched_timestamp
+        else:
+            is_inprogress = True
+            break
+
+    return {
+        'is_inprogress': is_inprogress,
+        'has_unsubmitted': has_unsubmitted,
+        'last_fetched_timestamp': last_fetched_timestamp,
+        }
+
+
 @login_required
 def list_projects(request):
     projects = []
@@ -239,12 +350,26 @@ def list_projects(request):
             last_build = builds[0]
             created_str = last_build.get('created_at')
             last_build['created_at'] = datetime.datetime.strptime(str(created_str), '%Y-%m-%dT%H:%M:%S.%fZ')
+
+            jobs = qa_report_api.get_jobs_for_build(last_build.get("id"))
+            last_build['numbers_of_result'] = get_test_result_number_for_build(last_build, jobs)
+            build_status = get_lkft_build_status(last_build, jobs)
+            if build_status['has_unsubmitted']:
+                last_build['build_status'] = "JOBSNOTSUBMITTED"
+            elif build_status['is_inprogress']:
+                last_build['build_status'] = "JOBSINPROGRESS"
+            else:
+                last_build['build_status'] = "JOBSCOMPLETED"
+                last_build['last_fetched_timestamp'] = build_status['last_fetched_timestamp']
             project['last_build'] = last_build
 
         last_trigger_build = get_last_trigger_build(project.get('name'))
         if last_trigger_build:
             last_trigger_url = last_trigger_build.get('url')
-            project['last_trigger_build'] = jenkins_api.get_build_details_with_full_url(build_url=last_trigger_url)
+            last_trigger_build = jenkins_api.get_build_details_with_full_url(build_url=last_trigger_url)
+            last_trigger_build['start_timestamp'] = datetime.datetime.fromtimestamp(int(last_trigger_build['timestamp'])/1000)
+            last_trigger_build['duration'] = datetime.timedelta(milliseconds=last_trigger_build['duration'])
+            project['last_trigger_build'] = last_trigger_build
 
         ci_build_project_name = find_cibuild(lkft_pname=project.get('name'))
         if ci_build_project_name:
@@ -273,11 +398,14 @@ def list_projects(request):
             elif ci_build_project.get('lastBuild') is not None:
                 ci_build_last_url = ci_build_project.get('lastBuild').get('url')
                 ci_build_last = jenkins_api.get_build_details_with_full_url(build_url=ci_build_last_url)
+                ci_build_last['start_timestamp'] = datetime.datetime.fromtimestamp(int(ci_build_last['timestamp'])/1000)
+                ci_build_last['duration'] = datetime.timedelta(milliseconds=ci_build_last['duration'])
+
                 kernel_version = ci_build_last.get('displayName') # #buildNo.-kernelInfo
                 if ci_build_last.get('building'):
                     build_status = 'INPROGRESS'
                 else:
-                    build_status = ci_build_last.get('result') # null or SUCCESS, FAILURE
+                    build_status = ci_build_last.get('result') # null or SUCCESS, FAILURE, ABORTED
             else:
                 build_status = 'NOBUILDYET'
                 kernel_version = 'Unknown'
@@ -289,12 +417,15 @@ def list_projects(request):
             }
             project['last_ci_build'] = last_ci_build
 
+        if project['last_build'] and last_trigger_build and \
+            project['last_build']['build_status'] == "JOBSCOMPLETED":
+            project['duration'] = project['last_build']['last_fetched_timestamp'] - last_trigger_build['start_timestamp']
         projects.append(project)
 
     bugs = get_lkft_bugs()
     open_bugs = []
     for bug in bugs:
-        if bug.status== 'VERIFIED' or bug.status== 'RESOLVED':
+        if bug.status == 'VERIFIED' or bug.status== 'RESOLVED':
             continue
         else:
             open_bugs.append(bug)
@@ -310,6 +441,7 @@ def list_projects(request):
                             }
                 )
 
+
 @login_required
 def list_builds(request):
     project_id = request.GET.get('project_id', None)
@@ -323,59 +455,16 @@ def list_builds(request):
         build_modules_total = 0
         build_modules_done = 0
 
+        jobs = qa_report_api.get_jobs_for_build(build.get("id"))
         if number_of_build_with_jobs < BUILD_WITH_JOBS_NUMBER:
-            jobs = qa_report_api.get_jobs_for_build(build.get('id'))
-
-            resubmitted_job_urls = [ job.get('parent_job') for job in jobs if job.get('parent_job')]
-            download_attachments_save_result(jobs=jobs)
-            job_names = []
-            for job in jobs:
-                if job.get('url') in resubmitted_job_urls:
-                    # ignore jobs which were resubmitted
-                    logger.info("%s: %s:%s has been resubmitted already" % (build.get('version'), job.get('job_id'), job.get('url')))
-                    continue
-
-                if job.get('name') in job_names:
-                    logger.info("%s %s: %s %s the same name job has been recorded" % (build.get('version'), job.get('name'), job.get('job_id'), job.get('url')))
-                    continue
-
-                def get_testcases_number_for_job(job):
-                    job_number_passed = 0
-                    job_number_failed = 0
-                    job_number_total = 0
-                    modules_total = 0
-                    modules_done = 0
-
-                    result_file_path = get_result_file_path(job=job)
-                    if result_file_path and os.path.exists(result_file_path):
-                        with zipfile.ZipFile(result_file_path, 'r') as f_zip_fd:
-                            try:
-                                root = ET.fromstring(f_zip_fd.read(TEST_RESULT_XML_NAME))
-                                summary_node = root.find('Summary')
-                                job_number_passed = summary_node.attrib['pass']
-                                job_number_failed = summary_node.attrib['failed']
-                                modules_total = summary_node.attrib['modules_total']
-                                modules_done = summary_node.attrib['modules_done']
-                            except ET.ParseError as e:
-                                logger.error('xml.etree.ElementTree.ParseError: %s' % e)
-                                logger.info('Please Check %s manually' % result_zip_path)
-                    return {
-                            'number_passed': int(job_number_passed),
-                            'number_failed': int(job_number_failed),
-                            'number_total': int(job_number_passed) + int(job_number_failed),
-                            'modules_total': int(modules_total),
-                            'modules_done': int(modules_done)
-                            }
-
-                numbers = get_testcases_number_for_job(job)
-                build_number_passed = build_number_passed + numbers.get('number_passed')
-                build_number_failed = build_number_failed + numbers.get('number_failed')
-                build_number_total = build_number_total + numbers.get('number_total')
-                build_modules_total = build_modules_total + numbers.get('modules_total')
-                build_modules_done = build_modules_done + numbers.get('modules_done')
-                job['numbers'] = numbers
-                job_names.append(job.get('name'))
+            build_numbers = get_test_result_number_for_build(build, jobs)
+            build_number_passed = build_number_passed + build_numbers.get('number_passed')
+            build_number_failed = build_number_failed + build_numbers.get('number_failed')
+            build_number_total = build_number_total + build_numbers.get('number_total')
+            build_modules_total = build_modules_total + build_numbers.get('modules_total')
+            build_modules_done = build_modules_done + build_numbers.get('modules_done')
             number_of_build_with_jobs = number_of_build_with_jobs + 1
+
         build['numbers'] = {
                             'number_passed': build_number_passed,
                             'number_failed': build_number_failed,
@@ -391,8 +480,8 @@ def list_builds(request):
                            {
                                 "builds": builds,
                                 'project': project,
-                            }
-                )
+                            })
+
 
 def get_lkft_bugs():
     bugs = []
