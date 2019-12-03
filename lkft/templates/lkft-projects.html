@@ -10,9 +10,9 @@
 	<tr>
 		<th>Index</th>
 		<th>Project</th>
-        <th>Last Build Timestamp</th>
-        <th>Last Build No.</th>
-        <th>Last Trigger Build No.</th>
+        <th>Last QA Build</th>
+        <th>Last CI Build</th>
+        <th>Last CI Trigger Build</th>
         <th>Pass</th>
         <th>Fail</th>
         <th>Total</th>
@@ -28,7 +28,6 @@
     <td>
     {% if project.last_build %}
         {% with project.last_build as last_build %}
-        {{ last_build.created_at|date:'M. d, Y, H:i'}}, &nbsp;{{ last_build.created_at|timesince}}<br/>
         {% if last_build.build_status == 'JOBSNOTSUBMITTED' %}
             <p style="background-color: yellow">{{ last_build.build_status}} </p>
         {% endif %}
@@ -36,7 +35,7 @@
             <p style="background-color: green">{{ last_build.build_status}} </p>
         {% endif %}
         {% if last_build.build_status == 'JOBSCOMPLETED' %}
-            {{ last_build.last_fetched_timestamp|date:'M. d, Y, H:i'}}, &nbsp;{{ last_build.last_fetched_timestamp|timesince}}<br/>
+            Finished at {{ last_build.last_fetched_timestamp|date:'M. d, Y, H:i'}}, &nbsp;{{ last_build.last_fetched_timestamp|timesince}} ago<br/>
             Took {{ project.duration }} to finish.
         {% endif %}
         {% endwith %}
@@ -48,13 +47,14 @@
         {% if project.last_ci_build %}
         {% with project.last_ci_build as last_ci_build %}
             {% if last_ci_build.build_status == 'SUCCESS' %}
-                <a href="{{last_ci_build.ci_build_project_url}}">{{ last_ci_build.kernel_version}}</a>&nbsp;&nbsp; <p style="background-color: green">{{ last_ci_build.build_status}} </p>
+                <a href="{{last_ci_build.ci_build_project_url}}">{{ last_ci_build.kernel_version}}</a><br/>Took {{ last_ci_build.duration }} to finish.
             {% endif %}
             {% if last_ci_build.build_status == 'INQUEUE' %}
                 <a href="{{last_ci_build.ci_build_project_url}}">{{ last_ci_build.kernel_version}}</a>&nbsp;&nbsp; <p style="background-color: grey">{{ last_ci_build.build_status}}</p>
             {% endif %}
             {% if last_ci_build.build_status == 'INPROGRESS' %}
                <a href="{{last_ci_build.ci_build_project_url}}">{{ last_ci_build.kernel_version}}</a>&nbsp;&nbsp; <p style="background-color: yellow">{{ last_ci_build.build_status}}</p>
+               <br/>Started at {{ last_ci_build.last_fetched_timestamp|date:'M. d, Y, H:i'}}, &nbsp;{{ last_build.last_fetched_timestamp|timesince}} ago<br/>
             {% endif %}
             {% if last_ci_build.build_status == 'FAILURE' %}
                <a href="{{last_ci_build.ci_build_project_url}}">{{ last_ci_build.kernel_version}}</a>&nbsp;&nbsp; <p style="background-color: red">{{ last_ci_build.build_status}}</p>
@@ -62,9 +62,7 @@
             {% if last_ci_build.build_status == 'ABORTED' %}
                <a href="{{last_ci_build.ci_build_project_url}}">{{ last_ci_build.kernel_version}}</a>&nbsp;&nbsp; <p style="background-color: gray">{{ last_ci_build.build_status}}</p>
             {% endif %}
-            &nbsp;&nbsp;{{last_ci_build.duration}}&nbsp;&nbsp; {{last_ci_build.timestamp}}
         {% endwith %}
-            <br/>{{ last_build.start_timestamp|date:'M. d, Y, H:i'}}, &nbsp;{{ last_build.start_timestamp|timesince}}
         {% else %}
             No Build Yet
         {% endif %}
@@ -73,7 +71,7 @@
         {% if project.last_trigger_build %}
         {% with project.last_trigger_build as last_trigger_build %}
             <a href="{{last_trigger_build.url}}">{{ last_trigger_build.displayName}}</a><br/>
-            {{ last_trigger_build.start_timestamp|date:'M. d, Y, H:i'}}, &nbsp;{{ last_trigger_build.start_timestamp|timesince}}
+            Started at {{ last_trigger_build.start_timestamp|date:'M. d, Y, H:i'}}, &nbsp;{{ last_trigger_build.start_timestamp|timesince}} ago
         {% endwith %}
         {% else %}
             No Trigger Build Setup Yet
@@ -86,7 +84,11 @@
         <td>{{ numbers_of_result.number_failed }}</td>
         <td>{{ numbers_of_result.number_total }}</td>
         <td>{{ numbers_of_result.modules_done }}</td>
+        {% if last_build.build_status == 'JOBSCOMPLETED' and numbers_of_result.modules_total == 0 %}
+        <td><p style="background-color: red">{{ numbers_of_result.modules_total }}</p></td>
+        {% else %}
         <td>{{ numbers_of_result.modules_total }}</td>
+        {% endif %}
         {% endwith %}
         {% endwith %}
     {% else %}

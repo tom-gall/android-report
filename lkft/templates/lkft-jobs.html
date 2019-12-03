@@ -98,6 +98,7 @@
 <div>
 <h2>Bug Status:</h2>
 {% if open_bugs %}
+<h2>Reproduced Bugs:</h2>
 <table border=2>
 <tr>
     <th>Index</th>
@@ -116,8 +117,27 @@
     {% endifnotequal %}
 {% endfor %}
 </table>
-{% else %}
-Excellent build, no open bugs on it at the moment.
+{% endif %}
+{% if bugs_not_reproduced %}
+<h2>Nonreproduced Bugs:</h2>
+<table border=2>
+<tr>
+    <th>Index</th>
+    <th>Bug Id</th>
+    <th>Summary</th>
+    <th>Status</th>
+</tr>
+{% for bug in bugs_not_reproduced %}
+    {% ifnotequal bug.status 'RESOLVED' %}
+    <tr>
+        <td>{{ forloop.counter }}</td>
+        <td><a href="{{bugzilla_show_bug_prefix}}{{ bug.id }}">{{ bug.id }}</a></td>
+        <td>{{ bug.summary }}</td>
+        <td>{{ bug.status }}</td>
+    </tr>
+    {% endifnotequal %}
+{% endfor %}
+</table>
 {% endif %}
 </div>
 

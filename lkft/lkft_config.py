@@ -6,7 +6,7 @@ import re
 citrigger_lkft = {
     'lkft-aosp-master-cts-vts': {
         'aosp-master-tracking':'lkft-aosp-master-tracking',
-        'aosp-master-tracking-x15':'lkft-aosp-master-tracking',
+        'aosp-master-tracking-x15':'lkft-aosp-master-x15',
         },
 
     'trigger-lkft-aosp-mainline': {

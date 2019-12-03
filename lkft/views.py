@@ -414,6 +414,7 @@ def list_projects(request):
                 'build_status': build_status,
                 'kernel_version': kernel_version,
                 'ci_build_project_url': ci_build_project.get('url'),
+                'duration': ci_build_last.get('duration'),
             }
             project['last_ci_build'] = last_ci_build
 
@@ -483,19 +484,24 @@ def list_builds(request):
                             })
 
 
-def get_lkft_bugs():
+def get_lkft_bugs(summary_keyword=None, platform=None):
     bugs = []
 
     terms = [
                 {u'product': 'Linaro Android'},
                 {u'component': 'General'},
-                {u'platform': 'HiKey'},
                 {u'op_sys': 'Android'},
                 {u'keywords': 'LKFT'}
             ]
+    if platform is not None:
+        terms.append({u'platform': platform})
 
     for bug in bugzilla_instance.search_bugs(terms).bugs:
-        bugs.append(bugzilla.DotDict(bug))
+        bug_dict = bugzilla.DotDict(bug)
+        if summary_keyword is not None and \
+            bug_dict.get('summary').find(summary_keyword) < 0:
+            continue
+        bugs.append(bug_dict)
 
     def get_bug_summary(item):
         return item.get('summary')
@@ -545,7 +551,8 @@ def list_jobs(request):
         numbers = extract(result_file_path, failed_testcases_all=failures, metadata=metadata)
         job['numbers'] = numbers
 
-    bugs = get_lkft_bugs()
+    bugs = get_lkft_bugs(summary_keyword=project_name, platform=get_hardware_from_pname(project_name))
+    bugs_reproduced = []
     failures_list = []
     for module_name in sorted(failures.keys()):
         failures_in_module = failures.get(module_name)
@@ -574,6 +581,7 @@ def list_jobs(request):
                     search_key = '%s %s' % (module_name, test_name)
 
                 if bug.summary.find(search_key) >= 0:
+                    bugs_reproduced.append(bug)
                     if failure.get('bugs'):
                         failure['bugs'].append(bug)
                     else:
@@ -581,6 +589,7 @@ def list_jobs(request):
 
     android_version = get_version_from_pname(pname=project.get('name'))
     open_bugs = []
+    bugs_not_reproduced = []
     for bug in bugs:
         if bug.status == 'VERIFIED' or bug.status == 'RESOLVED':
             continue
@@ -588,14 +597,15 @@ def list_jobs(request):
         if bug.version != android_version:
             continue
 
-        open_bugs.append(bug)
-
+        if bug in bugs_reproduced:
+            open_bugs.append(bug)
+        else:
+            bugs_not_reproduced.append(bug)
 
     # sort failures
     for module_name, failures_in_module in failures.items():
         failures[module_name] = collections.OrderedDict(sorted(failures_in_module.items()))
     failures = collections.OrderedDict(sorted(failures.items()))
-
 
     def get_job_name(item):
         return item.get('name')
@@ -618,6 +628,7 @@ def list_jobs(request):
                                 'failures': failures,
                                 'failures_list': failures_list,
                                 'open_bugs':open_bugs,
+                                'bugs_not_reproduced': bugs_not_reproduced,
                                 'project': project,
                                 'bugzilla_show_bug_prefix': bugzilla_show_bug_prefix,
                             }
