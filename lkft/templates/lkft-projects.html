@@ -54,7 +54,7 @@
             {% endif %}
             {% if last_ci_build.build_status == 'INPROGRESS' %}
                <a href="{{last_ci_build.ci_build_project_url}}">{{ last_ci_build.kernel_version}}</a>&nbsp;&nbsp; <p style="background-color: yellow">{{ last_ci_build.build_status}}</p>
-               <br/>Started at {{ last_ci_build.last_fetched_timestamp|date:'M. d, Y, H:i'}}, &nbsp;{{ last_build.last_fetched_timestamp|timesince}} ago<br/>
+               <br/>Started at {{ last_ci_build.start_timestamp|date:'M. d, Y, H:i'}}, &nbsp;{{ last_build.start_timestamp|timesince}} ago<br/>
             {% endif %}
             {% if last_ci_build.build_status == 'FAILURE' %}
                <a href="{{last_ci_build.ci_build_project_url}}">{{ last_ci_build.kernel_version}}</a>&nbsp;&nbsp; <p style="background-color: red">{{ last_ci_build.build_status}}</p>

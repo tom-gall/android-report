@@ -23,7 +23,9 @@ citrigger_lkft = {
 
         'mainline-gki-10.0-gsi-hikey': 'lkft-hikey-aosp-master-mainline-gki',
         'mainline-gki-aosp-master-hikey': 'lkft-hikey-aosp-master-mainline-gki',
+        'mainline-aosp-master-hikey': 'lkft-hikey-aosp-master-mainline-gki',
         'mainline-gki-aosp-master-hikey960': 'lkft-hikey960-aosp-master-mainline-gki',
+        'mainline-aosp-master-hikey960': 'lkft-hikey960-aosp-master-mainline-gki',
         },
 
     # configs for 4.19 kernels

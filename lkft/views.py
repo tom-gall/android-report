@@ -376,7 +376,8 @@ def list_projects(request):
             ci_build_project = jenkins_api.get_build_details_with_job_url(ci_build_project_name)
 
             isInQueue = ci_build_project.get('inQueue')
-
+            ci_build_last_duration = None
+            ci_build_last_start_timestamp = None
             if isInQueue:
                 build_status = 'INQUEUE'
                 kernel_version = 'Unknown'
@@ -398,8 +399,8 @@ def list_projects(request):
             elif ci_build_project.get('lastBuild') is not None:
                 ci_build_last_url = ci_build_project.get('lastBuild').get('url')
                 ci_build_last = jenkins_api.get_build_details_with_full_url(build_url=ci_build_last_url)
-                ci_build_last['start_timestamp'] = datetime.datetime.fromtimestamp(int(ci_build_last['timestamp'])/1000)
-                ci_build_last['duration'] = datetime.timedelta(milliseconds=ci_build_last['duration'])
+                ci_build_last_start_timestamp = datetime.datetime.fromtimestamp(int(ci_build_last['timestamp'])/1000)
+                ci_build_last_duration = datetime.timedelta(milliseconds=ci_build_last['duration'])
 
                 kernel_version = ci_build_last.get('displayName') # #buildNo.-kernelInfo
                 if ci_build_last.get('building'):
@@ -414,7 +415,8 @@ def list_projects(request):
                 'build_status': build_status,
                 'kernel_version': kernel_version,
                 'ci_build_project_url': ci_build_project.get('url'),
-                'duration': ci_build_last.get('duration'),
+                'duration': ci_build_last_duration,
+                'start_timestamp': ci_build_last_start_timestamp,
             }
             project['last_ci_build'] = last_ci_build
 
