@@ -1,7 +1,6 @@
 from django.conf.urls import url
 
 from . import views
-from . import accountviews
 
 urlpatterns = [
     url(r'^$', views.index, name='home'),
@@ -16,10 +15,4 @@ urlpatterns = [
     url(r'^show-trend/.*$', views.show_trend, name='show_trend'),
     url(r'^show-cts-vts-failures/.*$', views.show_cts_vts_failures, name='show_cts_vts_failures'),
     url(r'^file-bug/.*$', views.file_bug, name='file_bug'),
-
-    url(r'^accounts/register/$', accountviews.SignUpView.as_view(), name='signup'),
-    url(r'^accounts/login/$', accountviews.LoginView.as_view(), name='login'),
-    url(r'^accounts/logout/$', accountviews.LogOutView.as_view(), name='logout'),
-    url(r'^accounts/change_password/$', accountviews.change_password, name='change_password'),
-    url(r'^accounts/no_permission/$', accountviews.NoPermissionView.as_view(), name='no_permmission'),
 ]

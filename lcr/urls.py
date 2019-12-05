@@ -16,9 +16,17 @@ Including another URLconf
 from django.conf.urls import include, url
 from django.contrib import admin
 
+from . import accountviews
+
 urlpatterns = [
     url(r'^', include('report.urls')),
     url(r'^report/', include('report.urls')), ## TO BE UPDATED, to uncomment when enable the lcr report app
     url(r'^lkft/', include('lkft.urls')),
     url(r'^admin/', admin.site.urls),
+
+    url(r'^accounts/register/$', accountviews.SignUpView.as_view(), name='signup'),
+    url(r'^accounts/login/$', accountviews.LoginView.as_view(), name='login'),
+    url(r'^accounts/logout/$', accountviews.LogOutView.as_view(), name='logout'),
+    url(r'^accounts/change_password/$', accountviews.change_password, name='change_password'),
+    url(r'^accounts/no_permission/$', accountviews.NoPermissionView.as_view(), name='no_permmission'),
 ]
