@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -ex
 
 if [ "/*" = "$0" ]; then
     echo "Please run this script with absolute path"
@@ -9,7 +9,7 @@ if [ -n "$1" ]; then
     work_root=$1
 fi
 if [ -d "${work_root}" ]; then
-    work_root=${work_root}
+    work_root=$(cd ${work_root}; pwd)
 elif [ -d /sata250/django_instances ]; then
     work_root="/sata250/django_instances"
 elif [ -d /SATA3/django_instances ]; then
@@ -23,10 +23,10 @@ fi
 
 instance_name="lcr-report"
 instance_report_app="report"
+instance_dir="${work_root}/${instance_name}"
 
-virenv_dir="/${work_root}/workspace"
-instance_dir="/${work_root}/${instance_name}"
-mkdir -p ${virenv_dir} 
+virenv_dir="${work_root}/workspace"
+mkdir -p ${virenv_dir}
 cd ${virenv_dir}
 # https://pip.pypa.io/en/latest/installing/#installing-with-get-pip-py
 curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
@@ -36,6 +36,7 @@ sudo apt-get update
 #sudo apt-get install python-django-auth-ldap
 ## dependency for python-ldap
 sudo apt-get install libsasl2-dev python-dev libldap2-dev libssl-dev
+#sudo apt-get install libtiff5-dev libjpeg8-dev zlib1g-dev libfreetype6-dev liblcms2-dev libwebp-dev libharfbuzz-dev libfribidi-dev tcl8.6-dev tk8.6-dev python-tk
 # https://virtualenv.pypa.io/en/stable/
 sudo pip install virtualenv
 virtualenv ${virenv_dir}
@@ -49,22 +50,35 @@ pip install Django==1.11.8
 pip install pyaml
 pip install lava-tool
 pip install django-crispy-forms
-pip install django psycopg2
+#pip install psycopg2
+pip install psycopg2-binary
 pip install python-ldap # will install the 3.0 version
 # https://django-auth-ldap.readthedocs.io/en/latest/install.html
 pip install django-auth-ldap # needs python-ldap >= 3.0
 pip install bugzilla
 pip install requests
+pip install reportlab
+## pip install Pillow
+## pip install rst2pdf
 
 # https://docs.djangoproject.com/en/1.11/intro/tutorial01/
 python -m django --version
 #python manage.py startapp ${instance_report_app}
 # django-admin startproject ${instance_name}
-cd ${work_root} && git clone https://git.linaro.org/people/yongqin.liu/public/lcr-report.git
-#cd ${instance_dir} && python manage.py runserver 0.0.0.0:9000
-#echo "Please update the LAVA_USER_TOKEN and LAVA_USER in report/views.py"
+cd ${work_root}
+if [ -d lcr-report ]; then
+    cd lcr-report && git pull && cd -
+else
+    git clone https://git.linaro.org/people/yongqin.liu/public/lcr-report.git lcr-report
 
-# python manage.py createsuperuser
+fi
+
+cd lcr-report
+python manage.py createsuperuser
+echo "Please update the LAVA_USER_TOKEN and LAVA_USER in report/views.py"
+echo "And then run following command to start the instance"
+echo "     cd ${instance_dir} && python manage.py runserver 0.0.0.0:9000"
+echo "Then you could access the site via http://127.0.0.1:9000/lkft"
 # By running makemigrations, you’re telling Django that you’ve made some changes to your models (in this case,
 # you’ve made new ones) and that you’d like the changes to be stored as a migration.
 # python manage.py makemigrations report
@@ -86,10 +100,6 @@ cd ${work_root} && git clone https://git.linaro.org/people/yongqin.liu/public/lc
 # sqlite3 db.sqlite3 "select * from report_testcase where job_id = 99965 ORDER BY name;"
 # sqlite3 db.sqlite3 "delete from report_testcase where job_id = 99859;"
 
-## sudo apt-get install libtiff5-dev libjpeg8-dev zlib1g-dev libfreetype6-dev liblcms2-dev libwebp-dev libharfbuzz-dev libfribidi-dev tcl8.6-dev tk8.6-dev python-tk
-## pip install reportlab
-## pip install Pillow
-## pip install rst2pdf
 
 ## with new db.sqlite3 file
 ## 1. remove the reference for the app in the lcr/urls.py
