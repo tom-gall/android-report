@@ -30,7 +30,7 @@ mkdir -p ${virenv_dir}
 cd ${virenv_dir}
 # https://pip.pypa.io/en/latest/installing/#installing-with-get-pip-py
 if [ ! -f get-pip.py ]; then
-i   curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+   curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
 fi
 sudo python get-pip.py
 
