@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/1.11/ref/settings/
 """
 
+from django.conf.urls import include, url
 import os
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
@@ -74,10 +75,14 @@ DATABASES = { ## TO BE UPDATED
 
 
 APPS_TOBE_ADDED = [
-    'report', ## TO BE UPDATED, with lcr/urls.py, to uncomment when you want to enabled the report for lcr builds
+#    'report', ## TO BE UPDATED, with lcr/urls.py, to uncomment when you want to enabled the report for lcr builds
     'lkft',
     'lcr',
     'crispy_forms',
+]
+
+REPORT_URLS = [
+#    url(r'^report/', include('report.urls')), ## TO BE UPDATED, to uncomment when enable the lcr report app
 ]
 ########################################################################
 ### PLEASE DO NOT CHANGE ANYTHIN IN THE BELOW ##########################
@@ -105,6 +110,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = [u'127.0.0.1',
                  u'192.168.0.104',
+                 u'192.168.31.221',
                  u'android.linaro.org',
                  u'192.168.0.106']
 

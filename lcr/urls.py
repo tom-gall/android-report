@@ -17,10 +17,10 @@ from django.conf.urls import include, url
 from django.contrib import admin
 
 from . import accountviews
+from . import settings
 
 urlpatterns = [
-    url(r'^', include('report.urls')),
-    url(r'^report/', include('report.urls')), ## TO BE UPDATED, to uncomment when enable the lcr report app
+#    url(r'^', include('report.urls')),
     url(r'^lkft/', include('lkft.urls')),
     url(r'^admin/', admin.site.urls),
 
@@ -29,4 +29,4 @@ urlpatterns = [
     url(r'^accounts/logout/$', accountviews.LogOutView.as_view(), name='logout'),
     url(r'^accounts/change_password/$', accountviews.change_password, name='change_password'),
     url(r'^accounts/no_permission/$', accountviews.NoPermissionView.as_view(), name='no_permmission'),
-]
+] + settings.REPORT_URLS
