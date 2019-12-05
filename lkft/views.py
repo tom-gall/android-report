@@ -265,8 +265,8 @@ def get_test_result_number_for_build(build, jobs=None):
         jobs = qa_report_api.get_jobs_for_build(build.get("id"))
 
     resubmitted_job_urls = [ job.get('parent_job') for job in jobs if job.get('parent_job')]
-    download_attachments_save_result(jobs=jobs)
     job_names = []
+    jobs_to_be_checked = []
     for job in jobs:
         if job.get('url') in resubmitted_job_urls:
             # ignore jobs which were resubmitted
@@ -277,6 +277,10 @@ def get_test_result_number_for_build(build, jobs=None):
             logger.info("%s %s: %s %s the same name job has been recorded" % (build.get('version'), job.get('name'), job.get('job_id'), job.get('url')))
             continue
 
+        jobs_to_be_checked.append(job)
+
+    download_attachments_save_result(jobs=jobs_to_be_checked)
+    for job in jobs_to_be_checked:
         numbers = get_testcases_number_for_job(job)
         build_number_passed = build_number_passed + numbers.get('number_passed')
         build_number_failed = build_number_failed + numbers.get('number_failed')
@@ -345,7 +349,7 @@ def list_projects(request):
                 or project.get('is_archived'):
             continue
 
-        builds = qa_report_api.get_all_builds(project.get('id'))
+        builds = qa_report_api.get_all_builds(project.get('id'), only_first=True)
         if len(builds) > 0:
             last_build = builds[0]
             created_str = last_build.get('created_at')

@@ -49,14 +49,15 @@ class RESTFullApi():
         full_url = '%s/%s' % (self.get_api_url_prefix().strip('/'), api_url.strip('/'))
         return self.call_with_full_url(request_url=full_url, method=method, returnResponse=returnResponse)
 
-    def get_list_results(self, api_url=''):
+    def get_list_results(self, api_url='', only_first=False):
         result = self.call_with_api_url(api_url=api_url)
         list_results = result.get('results')
-        next_url = result.get('next')
-        while next_url:
-            result = self.call_with_full_url(request_url=next_url)
+        if not only_first:
             next_url = result.get('next')
-            list_results.extend(result.get('results'))
+            while next_url:
+                result = self.call_with_full_url(request_url=next_url)
+                next_url = result.get('next')
+                list_results.extend(result.get('results'))
         return list_results
 
     @abstractmethod
@@ -120,9 +121,9 @@ class QAReportApi(RESTFullApi):
         return self.call_with_full_url(request_url=project_url)
 
 
-    def get_all_builds(self, project_id):
+    def get_all_builds(self, project_id, only_first=False):
         builds_api_url = "api/projects/%s/builds" % project_id
-        return self.get_list_results(api_url=builds_api_url)
+        return self.get_list_results(api_url=builds_api_url, only_first=only_first)
 
 
     def get_build(self, build_id):
