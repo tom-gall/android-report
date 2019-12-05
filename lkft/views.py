@@ -88,7 +88,7 @@ def get_attachment_urls(jobs=[]):
 def extract_save_result(tar_path, result_zip_path):
     zip_parent = os.path.abspath(os.path.join(result_zip_path, os.pardir))
     if not os.path.exists(zip_parent):
-        os.mkdirs(zip_parent)
+        os.makedirs(zip_parent)
     # https://pymotw.com/2/zipfile/
     tar = tarfile.open(tar_path, "r")
     for f_name in tar.getnames():
@@ -349,6 +349,7 @@ def list_projects(request):
                 or project.get('is_archived'):
             continue
 
+        logger.info("Start to get qa-build information for project: %s", project.get('name'))
         builds = qa_report_api.get_all_builds(project.get('id'), only_first=True)
         if len(builds) > 0:
             last_build = builds[0]
@@ -367,6 +368,7 @@ def list_projects(request):
                 last_build['last_fetched_timestamp'] = build_status['last_fetched_timestamp']
             project['last_build'] = last_build
 
+        logger.info("Start to get ci trigger build information for project: %s", project.get('name'))
         last_trigger_build = get_last_trigger_build(project.get('name'))
         if last_trigger_build:
             last_trigger_url = last_trigger_build.get('url')
@@ -375,6 +377,7 @@ def list_projects(request):
             last_trigger_build['duration'] = datetime.timedelta(milliseconds=last_trigger_build['duration'])
             project['last_trigger_build'] = last_trigger_build
 
+        logger.info("Start to get ci build information for project: %s", project.get('name'))
         ci_build_project_name = find_cibuild(lkft_pname=project.get('name'))
         if ci_build_project_name:
             ci_build_project = jenkins_api.get_build_details_with_job_url(ci_build_project_name)
