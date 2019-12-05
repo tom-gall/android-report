@@ -29,7 +29,9 @@ virenv_dir="${work_root}/workspace"
 mkdir -p ${virenv_dir}
 cd ${virenv_dir}
 # https://pip.pypa.io/en/latest/installing/#installing-with-get-pip-py
-curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+if [ ! -f get-pip.py ]; then
+i   curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+fi
 sudo python get-pip.py
 
 sudo apt-get update
@@ -74,7 +76,10 @@ else
 fi
 
 cd lcr-report
+rm -fr db.sqlite3
+python manage.py migrate
 python manage.py createsuperuser
+python manage.py runserver 0.0.0.0:9000
 echo "Please update the LAVA_USER_TOKEN and LAVA_USER in report/views.py"
 echo "And then run following command to start the instance"
 echo "     cd ${instance_dir} && python manage.py runserver 0.0.0.0:9000"
