@@ -29,10 +29,10 @@
     {% if project.last_build %}
         {% with project.last_build as last_build %}
         {% if last_build.build_status == 'JOBSNOTSUBMITTED' %}
-            <p style="background-color: yellow">{{ last_build.build_status}} </p>
+            <p style="background-color: grey">{{ last_build.build_status}} </p>
         {% endif %}
         {% if last_build.build_status == 'JOBSINPROGRESS' %}
-            <p style="background-color: green">{{ last_build.build_status}} </p>
+            <p style="background-color: yellow">{{ last_build.build_status}} </p>
         {% endif %}
         {% if last_build.build_status == 'JOBSCOMPLETED' %}
             Finished at {{ last_build.last_fetched_timestamp|date:'M. d, Y, H:i'}}, &nbsp;{{ last_build.last_fetched_timestamp|timesince}} ago<br/>
@@ -53,8 +53,9 @@
                 <a href="{{last_ci_build.ci_build_project_url}}">{{ last_ci_build.kernel_version}}</a>&nbsp;&nbsp; <p style="background-color: grey">{{ last_ci_build.build_status}}</p>
             {% endif %}
             {% if last_ci_build.build_status == 'INPROGRESS' %}
-               <a href="{{last_ci_build.ci_build_project_url}}">{{ last_ci_build.kernel_version}}</a>&nbsp;&nbsp; <p style="background-color: yellow">{{ last_ci_build.build_status}}</p>
-               <br/>Started at {{ last_ci_build.start_timestamp|date:'M. d, Y, H:i'}}, &nbsp;{{ last_build.start_timestamp|timesince}} ago<br/>
+               <a href="{{last_ci_build.ci_build_project_url}}">{{ last_ci_build.kernel_version}}</a>&nbsp;&nbsp;
+               <p style="background-color: yellow">{{ last_ci_build.build_status}}</p>
+               <p>Started at {{ last_ci_build.start_timestamp|date:'M. d, Y, H:i'}}, &nbsp;{{ last_ci_build.start_timestamp|timesince}} ago</p>
             {% endif %}
             {% if last_ci_build.build_status == 'FAILURE' %}
                <a href="{{last_ci_build.ci_build_project_url}}">{{ last_ci_build.kernel_version}}</a>&nbsp;&nbsp; <p style="background-color: red">{{ last_ci_build.build_status}}</p>
