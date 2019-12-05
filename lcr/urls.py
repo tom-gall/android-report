@@ -18,7 +18,7 @@ from django.contrib import admin
 
 urlpatterns = [
     url(r'^', include('report.urls')),
-    url(r'^report/', include('report.urls')),
+    url(r'^report/', include('report.urls')), ## TO BE UPDATED, to uncomment when enable the lcr report app
     url(r'^lkft/', include('lkft.urls')),
     url(r'^admin/', admin.site.urls),
 ]

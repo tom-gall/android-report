@@ -12,33 +12,81 @@ https://docs.djangoproject.com/en/1.11/ref/settings/
 
 import os
 
-db_name = ""
-db_username = ""
-db_passwd = ""
-bind_user=""
-bind_passwd=""
-
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Directoy used to store cts vts result files
-FILES_DIR = os.path.join(BASE_DIR, "files/cts-vts")
+######################################################################
+############INFO TO BE UPDATED########################################
+######################################################################
+db_name = "" ## TO BE UPDATED
+db_username = "" ## TO BE UPDATED
+db_passwd = "" ## TO BE UPDATED
+bind_user="" ## TO BE UPDATED
+bind_passwd="" ## TO BE UPDATED
 
+BUGZILLA_API_KEY = '' ## TO BE UPDATED
 
+QA_REPORT = {
+    'production': {
+                    'nick': 'production',
+                    'domain': 'qa-reports.linaro.org',
+                    'token': '', ## TO BE UPDATED
+                    },
+    }
 LAVA_SERVERS = {
     'lkft': {
                 'nick':'lkft',
                 'hostname': 'lkft.validation.linaro.org',
-                'username': '',
-                'token': '',
+                'username': '', ## TO BE UPDATED
+                'token': '', ## TO BE UPDATED
             },
     'production': {
                 'nick': 'production',
                 'hostname': 'validation.linaro.org',
-                'username': '',
-                'token': '',
+                'username': '', ## TO BE UPDATED
+                'token': '', ## TO BE UPDATED
+                },
+    'staging': {
+                'nick': 'staging',
+                'hostname': 'staging.validation.linaro.org',
+                'username': '', ## TO BE UPDATED
+                'token': '', ## TO BE UPDATED
                 },
 }
+
+# Database
+# https://docs.djangoproject.com/en/1.11/ref/settings/#databases
+
+DATABASES = { ## TO BE UPDATED
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+    }
+    #'default': {
+    #    'ENGINE': 'django.db.backends.postgresql_psycopg2',
+    #    'NAME': '%s' % db_name,
+    #    'USER': '%s' % db_username,
+    #    'PASSWORD': '%s' % db_passwd,
+    #    'HOST': 'localhost',
+    #    'PORT': '',
+    #}
+}
+
+
+APPS_TOBE_ADDED = [
+    'report', ## TO BE UPDATED, with lcr/urls.py, to uncomment when you want to enabled the report for lcr builds
+    'lkft',
+    'lcr',
+    'crispy_forms',
+]
+########################################################################
+### PLEASE DO NOT CHANGE ANYTHIN IN THE BELOW ##########################
+########################################################################
+
+# Directoy used to store cts vts result files
+FILES_DIR = os.path.join(BASE_DIR, "files/cts-vts")
+
+QA_REPORT_DEFAULT = 'production'
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.11/howto/deployment/checklist/
@@ -46,16 +94,7 @@ LAVA_SERVERS = {
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'dr663lyqjd_b-a*0ttwcycp5wfm7&$0-#l6odw#^==ewq!s51s'
 
-BUGZILLA_API_KEY = ''
 
-QA_REPORT = {
-    'production': {
-                    'nick': 'production',
-                    'domain': 'qa-reports.linaro.org',
-                    'token': '',
-                    },
-    }
-QA_REPORT_DEFAULT = 'production'
 
 # old file might be removed from archive.validation.linaro.org already
 # so only list numbers for the recent 20 builds
@@ -79,10 +118,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'report',
-    'lkft',
-    'crispy_forms',
-]
+] + APPS_TOBE_ADDED
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -115,23 +151,6 @@ TEMPLATES = [
 WSGI_APPLICATION = 'lcr.wsgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/1.11/ref/settings/#databases
-
-DATABASES = {
-    #'default': {
-    #    'ENGINE': 'django.db.backends.sqlite3',
-    #    'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-    #}
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': '%s' % db_name,
-        'USER': '%s' % db_username,
-        'PASSWORD': '%s' % db_passwd,
-        'HOST': 'localhost',
-        'PORT': '',
-    }
-}
 
 
 # Password validation
@@ -239,6 +258,11 @@ LOGGING = {
             #'level': 'DEBUG',
         },
         'lkft': {
+            'handlers': ['console', 'logfile'],
+            'level': 'INFO',
+            #'level': 'DEBUG',
+        },
+        'lcr': {
             'handlers': ['console', 'logfile'],
             'level': 'INFO',
             #'level': 'DEBUG',
