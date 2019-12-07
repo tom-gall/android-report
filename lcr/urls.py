@@ -29,4 +29,9 @@ urlpatterns = [
     url(r'^accounts/logout/$', accountviews.LogOutView.as_view(), name='logout'),
     url(r'^accounts/change_password/$', accountviews.change_password, name='change_password'),
     url(r'^accounts/no_permission/$', accountviews.NoPermissionView.as_view(), name='no_permmission'),
-] + settings.REPORT_URLS
+]
+
+if settings.ENABLE_APP_REPORT:
+    urlpatterns = urlpatterns + [
+            url(r'^report/', include('report.urls')), ## TO BE UPDATED, to uncomment when enable the lcr report app
+        ]

@@ -75,15 +75,15 @@ DATABASES = { ## TO BE UPDATED
 
 
 APPS_TOBE_ADDED = [
-#    'report', ## TO BE UPDATED, with lcr/urls.py, to uncomment when you want to enabled the report for lcr builds
     'lkft',
     'lcr',
     'crispy_forms',
 ]
 
-REPORT_URLS = [
-#    url(r'^report/', include('report.urls')), ## TO BE UPDATED, to uncomment when enable the lcr report app
-]
+ENABLE_APP_REPORT = False ## TO BE UPDATED, to uncomment when you want to enabled the report for lcr builds
+if ENABLE_APP_REPORT:
+    APPS_TOBE_ADDED = APPS_TOBE_ADDED + [ 'report' ]
+
 ########################################################################
 ### PLEASE DO NOT CHANGE ANYTHIN IN THE BELOW ##########################
 ########################################################################
