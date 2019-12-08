@@ -340,97 +340,112 @@ def get_lkft_build_status(build, jobs):
         }
 
 
+def get_project_info(project):
+
+    logger.info("%s: Start to get qa-build information for project", project.get('name'))
+    builds = qa_report_api.get_all_builds(project.get('id'), only_first=True)
+    if len(builds) > 0:
+        last_build = builds[0]
+        created_str = last_build.get('created_at')
+        last_build['created_at'] = datetime.datetime.strptime(str(created_str), '%Y-%m-%dT%H:%M:%S.%fZ')
+
+        jobs = qa_report_api.get_jobs_for_build(last_build.get("id"))
+        last_build['numbers_of_result'] = get_test_result_number_for_build(last_build, jobs)
+        build_status = get_lkft_build_status(last_build, jobs)
+        if build_status['has_unsubmitted']:
+            last_build['build_status'] = "JOBSNOTSUBMITTED"
+        elif build_status['is_inprogress']:
+            last_build['build_status'] = "JOBSINPROGRESS"
+        else:
+            last_build['build_status'] = "JOBSCOMPLETED"
+            last_build['last_fetched_timestamp'] = build_status['last_fetched_timestamp']
+        project['last_build'] = last_build
+
+    logger.info("%s: Start to get ci trigger build information for project", project.get('name'))
+    last_trigger_build = get_last_trigger_build(project.get('name'))
+    if last_trigger_build:
+        last_trigger_url = last_trigger_build.get('url')
+        last_trigger_build = jenkins_api.get_build_details_with_full_url(build_url=last_trigger_url)
+        last_trigger_build['start_timestamp'] = datetime.datetime.fromtimestamp(int(last_trigger_build['timestamp'])/1000)
+        last_trigger_build['duration'] = datetime.timedelta(milliseconds=last_trigger_build['duration'])
+        project['last_trigger_build'] = last_trigger_build
+
+    logger.info("%s: Start to get ci build information for project", project.get('name'))
+    ci_build_project_name = find_cibuild(lkft_pname=project.get('name'))
+    if ci_build_project_name:
+        ci_build_project = jenkins_api.get_build_details_with_job_url(ci_build_project_name)
+
+        isInQueue = ci_build_project.get('inQueue')
+        ci_build_last_duration = None
+        ci_build_last_start_timestamp = None
+        if isInQueue:
+            build_status = 'INQUEUE'
+            kernel_version = 'Unknown'
+            queueItem = ci_build_project.get('queueItem')
+            if queueItem:
+                # BUILD_DIR=lkft
+                # ANDROID_BUILD_CONFIG=lkft-hikey-android-9.0-mainline lkft-hikey-android-9.0-mainline-auto
+                # KERNEL_DESCRIBE=v5.3-rc7-223-g5da9f3fe49d4
+                # SRCREV_kernel=5da9f3fe49d47e313e397694c195c3b9b9b24134
+                # MAKE_KERNELVERSION=5.3.0-rc7
+                params = queueItem.get('params').strip().split('\n')
+                for param in params:
+                    if param.find('KERNEL_DESCRIBE') >= 0:
+                        kernel_version = param.split('=')[1]
+                        break
+            # case for aosp master tracking build
+            if kernel_version == 'dummy':
+                kernel_version = ci_build_project.get('nextBuildNumber')
+        elif ci_build_project.get('lastBuild') is not None:
+            ci_build_last_url = ci_build_project.get('lastBuild').get('url')
+            ci_build_last = jenkins_api.get_build_details_with_full_url(build_url=ci_build_last_url)
+            ci_build_last_start_timestamp = datetime.datetime.fromtimestamp(int(ci_build_last['timestamp'])/1000)
+            ci_build_last_duration = datetime.timedelta(milliseconds=ci_build_last['duration'])
+
+            kernel_version = ci_build_last.get('displayName') # #buildNo.-kernelInfo
+            if ci_build_last.get('building'):
+                build_status = 'INPROGRESS'
+            else:
+                build_status = ci_build_last.get('result') # null or SUCCESS, FAILURE, ABORTED
+        else:
+            build_status = 'NOBUILDYET'
+            kernel_version = 'Unknown'
+
+        last_ci_build= {
+            'build_status': build_status,
+            'kernel_version': kernel_version,
+            'ci_build_project_url': ci_build_project.get('url'),
+            'duration': ci_build_last_duration,
+            'start_timestamp': ci_build_last_start_timestamp,
+        }
+        project['last_ci_build'] = last_ci_build
+
+    if project['last_build'] and last_trigger_build and \
+        project['last_build']['build_status'] == "JOBSCOMPLETED":
+        project['duration'] = project['last_build']['last_fetched_timestamp'] - last_trigger_build['start_timestamp']
+
+    logger.info("%s: finished to get information for project", project.get('name'))
+
+
 @login_required
 def list_projects(request):
+    import threading
+    threads = list()
     projects = []
     for project in qa_report_api.get_projects():
         project_full_name = project.get('full_name')
         if not project_full_name.startswith('android-lkft/') \
-                or project.get('is_archived'):
+            or project.get('is_archived'):
             continue
 
-        logger.info("Start to get qa-build information for project: %s", project.get('name'))
-        builds = qa_report_api.get_all_builds(project.get('id'), only_first=True)
-        if len(builds) > 0:
-            last_build = builds[0]
-            created_str = last_build.get('created_at')
-            last_build['created_at'] = datetime.datetime.strptime(str(created_str), '%Y-%m-%dT%H:%M:%S.%fZ')
-
-            jobs = qa_report_api.get_jobs_for_build(last_build.get("id"))
-            last_build['numbers_of_result'] = get_test_result_number_for_build(last_build, jobs)
-            build_status = get_lkft_build_status(last_build, jobs)
-            if build_status['has_unsubmitted']:
-                last_build['build_status'] = "JOBSNOTSUBMITTED"
-            elif build_status['is_inprogress']:
-                last_build['build_status'] = "JOBSINPROGRESS"
-            else:
-                last_build['build_status'] = "JOBSCOMPLETED"
-                last_build['last_fetched_timestamp'] = build_status['last_fetched_timestamp']
-            project['last_build'] = last_build
-
-        logger.info("Start to get ci trigger build information for project: %s", project.get('name'))
-        last_trigger_build = get_last_trigger_build(project.get('name'))
-        if last_trigger_build:
-            last_trigger_url = last_trigger_build.get('url')
-            last_trigger_build = jenkins_api.get_build_details_with_full_url(build_url=last_trigger_url)
-            last_trigger_build['start_timestamp'] = datetime.datetime.fromtimestamp(int(last_trigger_build['timestamp'])/1000)
-            last_trigger_build['duration'] = datetime.timedelta(milliseconds=last_trigger_build['duration'])
-            project['last_trigger_build'] = last_trigger_build
-
-        logger.info("Start to get ci build information for project: %s", project.get('name'))
-        ci_build_project_name = find_cibuild(lkft_pname=project.get('name'))
-        if ci_build_project_name:
-            ci_build_project = jenkins_api.get_build_details_with_job_url(ci_build_project_name)
-
-            isInQueue = ci_build_project.get('inQueue')
-            ci_build_last_duration = None
-            ci_build_last_start_timestamp = None
-            if isInQueue:
-                build_status = 'INQUEUE'
-                kernel_version = 'Unknown'
-                queueItem = ci_build_project.get('queueItem')
-                if queueItem:
-                    # BUILD_DIR=lkft
-                    # ANDROID_BUILD_CONFIG=lkft-hikey-android-9.0-mainline lkft-hikey-android-9.0-mainline-auto
-                    # KERNEL_DESCRIBE=v5.3-rc7-223-g5da9f3fe49d4
-                    # SRCREV_kernel=5da9f3fe49d47e313e397694c195c3b9b9b24134
-                    # MAKE_KERNELVERSION=5.3.0-rc7
-                    params = queueItem.get('params').strip().split('\n')
-                    for param in params:
-                        if param.find('KERNEL_DESCRIBE') >= 0:
-                            kernel_version = param.split('=')[1]
-                            break
-                # case for aosp master tracking build
-                if kernel_version == 'dummy':
-                    kernel_version = ci_build_project.get('nextBuildNumber')
-            elif ci_build_project.get('lastBuild') is not None:
-                ci_build_last_url = ci_build_project.get('lastBuild').get('url')
-                ci_build_last = jenkins_api.get_build_details_with_full_url(build_url=ci_build_last_url)
-                ci_build_last_start_timestamp = datetime.datetime.fromtimestamp(int(ci_build_last['timestamp'])/1000)
-                ci_build_last_duration = datetime.timedelta(milliseconds=ci_build_last['duration'])
-
-                kernel_version = ci_build_last.get('displayName') # #buildNo.-kernelInfo
-                if ci_build_last.get('building'):
-                    build_status = 'INPROGRESS'
-                else:
-                    build_status = ci_build_last.get('result') # null or SUCCESS, FAILURE, ABORTED
-            else:
-                build_status = 'NOBUILDYET'
-                kernel_version = 'Unknown'
-
-            last_ci_build= {
-                'build_status': build_status,
-                'kernel_version': kernel_version,
-                'ci_build_project_url': ci_build_project.get('url'),
-                'duration': ci_build_last_duration,
-                'start_timestamp': ci_build_last_start_timestamp,
-            }
-            project['last_ci_build'] = last_ci_build
-
-        if project['last_build'] and last_trigger_build and \
-            project['last_build']['build_status'] == "JOBSCOMPLETED":
-            project['duration'] = project['last_build']['last_fetched_timestamp'] - last_trigger_build['start_timestamp']
         projects.append(project)
+
+        t = threading.Thread(target=get_project_info, args=(project,))
+        threads.append(t)
+        t.start()
+
+    for t in threads:
+        t.join()
 
     bugs = get_lkft_bugs()
     open_bugs = []
