@@ -5,7 +5,6 @@ from __future__ import unicode_literals
 from django import forms
 from django.shortcuts import render
 
-import bugzilla
 import collections
 import datetime
 import json
@@ -25,7 +24,7 @@ from django.contrib.auth.decorators import login_required
 from lcr.settings import FILES_DIR, LAVA_SERVERS, BUGZILLA_API_KEY, BUILD_WITH_JOBS_NUMBER
 from lcr.settings import QA_REPORT, QA_REPORT_DEFAULT
 
-from lcr import qa_report
+from lcr import qa_report, bugzilla
 from lcr.qa_report import DotDict
 from lcr.utils import download_urllib
 from lkft.lkft_config import find_citrigger, find_cibuild, get_hardware_from_pname, get_version_from_pname, get_kver_with_pname_env
@@ -47,10 +46,39 @@ for nick, config in LAVA_SERVERS.items():
     server = xmlrpclib.ServerProxy(server_url)
     config.update({'server': server})
 
+
+class LinaroAndroidLKFTBug(bugzilla.Bugzilla):
+
+    def __init__(self, host_name, api_key):
+        self.host_name = host_name
+        self.new_bug_url_prefix = "https://%s/enter_bug.cgi" % self.host_name
+        self.rest_api_url = "https://%s/rest" % self.host_name
+        self.show_bug_prefix = 'https://%s/show_bug.cgi?id=' % self.host_name
+
+        self.product = 'Linaro Android'
+        self.component = 'General'
+        self.bug_severity = 'normal'
+        self.op_sys = 'Android'
+        self.keywords = "LKFT"
+
+        super(LinaroAndroidLKFTBug, self).__init__(self.rest_api_url, api_key)
+
+        #self.build_version = None
+        #self.hardware = None
+        #self.version = None
+
+    def get_new_bug_url_prefix(self):
+        new_bug_url = '%s?product=%s&op_sys=%s&bug_severity=%s&component=%s&keywords=%s' % ( self.new_bug_url_prefix,
+                                                                                                   self.product,
+                                                                                                   self.op_sys,
+                                                                                                   self.bug_severity,
+                                                                                                   self.component,
+                                                                                                   self.keywords)
+        return new_bug_url
+
 bugzilla_host_name = 'bugs.linaro.org'
-bugzilla_api_url = "https://%s/rest" % bugzilla_host_name
-bugzilla_instance = bugzilla.Bugzilla(url=bugzilla_api_url, api_key=BUGZILLA_API_KEY)
-bugzilla_show_bug_prefix = 'https://%s/show_bug.cgi?id=' % bugzilla_host_name
+bugzilla_instance = LinaroAndroidLKFTBug(host_name=bugzilla_host_name, api_key=BUGZILLA_API_KEY)
+bugzilla_show_bug_prefix = bugzilla_instance.show_bug_prefix
 
 def find_lava_config(job_url):
     if job_url is None:
@@ -560,6 +588,14 @@ def list_jobs(request):
                 failure_dict = {'error_msg': new_str}
         if job.get('parent_job'):
             resubmitted_job_urls.append(job.get('parent_job'))
+
+        short_desc = "%s: %s job failed to get test result with %s" % (project_name, job.get('name'), build.get('version'))
+        new_bug_url = '%s&rep_platform=%s&version=%s&short_desc=%s' % ( bugzilla_instance.get_new_bug_url_prefix(),
+                                                                          get_hardware_from_pname(pname=project_name, env=job.get('environment')),
+                                                                          get_version_from_pname(pname=project_name),
+                                                                          short_desc)
+        job['new_bug_url'] = new_bug_url
+
         result_file_path = get_result_file_path(job=job)
         if not result_file_path or not os.path.exists(result_file_path):
             continue

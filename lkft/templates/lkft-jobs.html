@@ -26,6 +26,7 @@
     <th> Passed </th>
     <th> Failed </th>
     <th> Total </th>
+    <th> Report Bug </th>
 </tr>
 {% for job in final_jobs %}
 <tr>
@@ -58,6 +59,7 @@
     <td> - </td>
     <td> - </td>
     {% endif %}
+    <td><a target='_blank' href="{{job.new_bug_url}}">Report Bug</a></td>
 </tr>
 {% endfor %}
 </table>

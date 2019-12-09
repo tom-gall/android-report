@@ -57,7 +57,7 @@ pip install psycopg2-binary
 pip install python-ldap # will install the 3.0 version
 # https://django-auth-ldap.readthedocs.io/en/latest/install.html
 pip install django-auth-ldap # needs python-ldap >= 3.0
-pip install bugzilla
+#pip install bugzilla
 pip install requests
 pip install reportlab
 ## pip install Pillow
