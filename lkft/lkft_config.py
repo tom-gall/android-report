@@ -10,10 +10,6 @@ citrigger_lkft = {
         },
 
     'trigger-lkft-aosp-mainline': {
-        'mainline-9.0-hikey': 'lkft-android-9.0-mainline',
-        'mainline-9.0-hikey-auto': 'lkft-android-9.0-mainline',
-        'mainline-9.0-hikey960': 'lkft-android-9.0-mainline-hikey960',
-        'mainline-9.0-hikey960-auto': 'lkft-android-9.0-mainline-hikey960',
         'mainline-9.0-x15': 'lkft-android-9.0-mainline-x15',
         'mainline-9.0-x15-auto': 'lkft-android-9.0-mainline-x15',
         'mainline-aosp-master-x15': 'lkft-x15-aosp-master-mainline',
@@ -21,14 +17,13 @@ citrigger_lkft = {
         'mainline-gki-aosp-master-db845c': 'lkft-db845c-aosp-master-mainline',
         'mainline-aosp-master-db845c': 'lkft-db845c-aosp-master-mainline',
 
-        'mainline-gki-10.0-gsi-hikey': 'lkft-hikey-aosp-master-mainline-gki',
         'mainline-gki-aosp-master-hikey': 'lkft-hikey-aosp-master-mainline-gki',
         'mainline-aosp-master-hikey': 'lkft-hikey-aosp-master-mainline-gki',
         'mainline-gki-aosp-master-hikey960': 'lkft-hikey960-aosp-master-mainline-gki',
         'mainline-aosp-master-hikey960': 'lkft-hikey960-aosp-master-mainline-gki',
         },
 
-    # configs for 4.19 kernels
+    # configs for TI 4.14 and 4.19 kernels
     'trigger-lkft-ti-4.19': {
         '4.19-9.0-x15': 'lkft-x15-android-9.0-4.19',
         '4.19-9.0-x15-auto': 'lkft-x15-android-9.0-4.19',
@@ -36,59 +31,47 @@ citrigger_lkft = {
         '4.19-9.0-am65x': 'lkft-am65x-android-9.0-4.19',
         '4.19-9.0-am65x-auto': 'lkft-am65x-android-9.0-4.19',
         },
-    'trigger-lkft-hikey-4.19': {
-        '4.19q-9.0-hikey': 'lkft-hikey-android-9.0-4.19',
-        '4.19q-9.0-hikey-auto': 'lkft-hikey-android-9.0-4.19',
-        '4.19q-9.0-hikey960': 'lkft-hikey-android-9.0-4.19',
-        '4.19q-9.0-hikey960-auto': 'lkft-hikey-android-9.0-4.19',
-        '4.19q-10.0-gsi-hikey': 'lkft-hikey-android-10.0-gsi-4.19',
-        '4.19q-10.0-gsi-hikey960': 'lkft-hikey-android-10.0-gsi-4.19',
-        },
-    'trigger-lkft-hikey-aosp-4.19-r': {
-        '4.19r-master-hikey': 'lkft-hikey-aosp-master-4.19',
-        '4.19r-master-hikey960': 'lkft-hikey-aosp-master-4.19',
-        },
 
-    # configs for 4.14 kernels
     'trigger-lkft-x15-4.14': {
         '4.14-8.1-x15': 'lkft-x15-android-8.1-4.14',
         },
-    'trigger-lkft-hikey-4.14-q': {
-        '4.14q-10.0-gsi-hikey': 'lkft-hikey-10.0-4.14-q',
-        '4.14q-10.0-gsi-hikey960': 'lkft-hikey-10.0-4.14-q',
-        },
-    'trigger-lkft-hikey-4.14-premerge-ci': {
-        '4.14p-9.0-hikey': 'lkft-hikey-aosp-4.14-premerge-ci',
-        '4.14p-9.0-hikey960': 'lkft-hikey-aosp-4.14-premerge-ci',
-        '4.14p-10.0-gsi-hikey': 'lkft-hikey-aosp-4.14-premerge-ci',
-        '4.14p-10.0-gsi-hikey960': 'lkft-hikey-aosp-4.14-premerge-ci',
-        },
+    # configs for 4.14 kernels
     'trigger-lkft-hikey-4.14': {
         '4.14-8.1-hikey': 'lkft-hikey-android-8.1-4.14',
         },
 
-    # configs for 4.9 kernels
-    'trigger-lkft-hikey-4.9-q': {
-        '4.9q-10.0-gsi-hikey': 'lkft-hikey-10.0-4.9-q',
-        '4.9q-10.0-gsi-hikey960': 'lkft-hikey-10.0-4.9-q',
-        },
-    'trigger-lkft-hikey-4.9-premerge-ci': {
+    # configs for hikey kernels
+    'trigger-hikey-stable': {
+        '4.4o-8.1-hikey': 'lkft-hikey-4.4-o',
+        '4.4o-9.0-lcr-hikey': 'lkft-hikey-4.4-o',
+        '4.4o-10.0-gsi-hikey': 'lkft-hikey-4.4-o',
+
+        '4.4p-9.0-hikey': 'lkft-hikey-4.4-p',
+        '4.4p-10.0-gsi-hikey': 'lkft-hikey-4.4-p',
+
+        '4.9o-8.1-hikey': 'lkft-hikey-4.9-o',
+        '4.9o-9.0-lcr-hikey': 'lkft-hikey-4.9-o',
+        '4.9o-10.0-gsi-hikey': 'lkft-hikey-4.9-o',
+        '4.9o-10.0-gsi-hikey960': 'lkft-hikey-4.9-o',
+
         '4.9p-9.0-hikey': 'lkft-hikey-aosp-4.9-premerge-ci',
         '4.9p-9.0-hikey960': 'lkft-hikey-aosp-4.9-premerge-ci',
         '4.9p-10.0-gsi-hikey': 'lkft-hikey-aosp-4.9-premerge-ci',
         '4.9p-10.0-gsi-hikey960': 'lkft-hikey-aosp-4.9-premerge-ci',
-        },
-    'trigger-lkft-hikey-4.9': {
-        '4.9-8.1-hikey': 'lkft-hikey-android-8.1-4.9',
-        },
 
-    # configs for 4.4 kernels
-    'trigger-lkft-hikey-4.4-premerge-ci': {
-        '4.4p-9.0-hikey': 'lkft-hikey-4.4-p',
-        '4.4p-10.0-gsi-hikey': 'lkft-hikey-4.4-p',
-        },
-    'trigger-lkft-hikey-4.4': {
-        '4.4-8.1-hikey': 'lkft-hikey-android-8.1-4.4',
+        '4.9q-10.0-gsi-hikey': 'lkft-hikey-10.0-4.9-q',
+        '4.9q-10.0-gsi-hikey960': 'lkft-hikey-10.0-4.9-q',
+
+        '4.14p-9.0-hikey': 'lkft-hikey-aosp-4.14-premerge-ci',
+        '4.14p-9.0-hikey960': 'lkft-hikey-aosp-4.14-premerge-ci',
+        '4.14p-10.0-gsi-hikey': 'lkft-hikey-aosp-4.14-premerge-ci',
+        '4.14p-10.0-gsi-hikey960': 'lkft-hikey-aosp-4.14-premerge-ci',
+
+        '4.14q-10.0-gsi-hikey': 'lkft-hikey-10.0-4.14-q',
+        '4.14q-10.0-gsi-hikey960': 'lkft-hikey-10.0-4.14-q',
+
+        '4.19q-10.0-gsi-hikey': 'lkft-hikey-android-10.0-gsi-4.19',
+        '4.19q-10.0-gsi-hikey960': 'lkft-hikey-android-10.0-gsi-4.19',
         },
 }
 
