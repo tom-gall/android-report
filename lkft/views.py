@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 
 from django import forms
+from django.http import HttpResponse
 from django.shortcuts import render
 
 import collections
@@ -28,6 +29,8 @@ from lcr import qa_report, bugzilla
 from lcr.qa_report import DotDict
 from lcr.utils import download_urllib
 from lkft.lkft_config import find_citrigger, find_cibuild, get_hardware_from_pname, get_version_from_pname, get_kver_with_pname_env
+
+from .models import KernelChange, CiBuild
 
 qa_report_def = QA_REPORT[QA_REPORT_DEFAULT]
 qa_report_api = qa_report.QAReportApi(qa_report_def.get('domain'), qa_report_def.get('token'))
@@ -1029,3 +1032,63 @@ def resubmit_job(request):
                    'results': results,
                   }
     )
+
+
+def new_kernel_changes(request, branch, describe, trigger_name, trigger_number):
+
+    remote_addr = request.META.get("REMOTE_ADDR")
+    remote_host = request.META.get("REMOTE_HOST")
+    logger.info('request from remote_host=%s,remote_addr=%s' % (remote_host, remote_addr))
+    logger.info('request for branch=%s, describe=%s, trigger_name=%s, trigger_number=%s' % (branch, describe, trigger_name, trigger_number))
+
+    err_msg = None
+    try:
+        KernelChange.objects.get(branch=branch, describe=describe)
+        err_msg = 'request for branch=%s, describe=%s is already there' % (branch, describe)
+        logger.info(err_msg)
+    except KernelChange.DoesNotExist:
+        KernelChange.objects.create(branch=branch,
+                                    describe=describe,
+                                    reported=False,
+                                    trigger_name=trigger_name,
+                                    trigger_number=trigger_number)
+
+
+    if err_msg is None:
+        return HttpResponse(status=200)
+    else:
+        return HttpResponse("ERROR:%s" % err_msg,
+                            status=200)
+
+
+def new_build(request, branch, describe, name, number):
+
+    remote_addr = request.META.get("REMOTE_ADDR")
+    remote_host = request.META.get("REMOTE_HOST")
+    logger.info('request from %s %s' % (remote_host, remote_addr))
+    logger.info('request for branch=%s, describe=%s, trigger_name=%s, trigger_number=%s' % (branch, describe, name, number))
+
+    err_msg = None
+    try:
+        kernel_change = KernelChange.objects.get(branch=branch, describe=describe)
+
+        try:
+            CiBuild.objects.get(name=name, number=number)
+            err_msg = "The build already recorded: name=%s, number=%s" % (name, number)
+            logger.info(err_msg)
+        except CiBuild.DoesNotExist:
+            CiBuild.objects.create(name=name,
+                                    number=number,
+                                    kernel_change=kernel_change)
+            kernel_change.reported = False
+            kernel.save()
+
+    except KernelChange.DoesNotExist:
+        err_msg = "The change for the specified kernel and describe does not exist: branch=%s, describe=%s" % (branch, describe)
+        logger.info(err_msg)
+
+    if err_msg is None:
+        return HttpResponse(status=200)
+    else:
+        return HttpResponse("ERROR:%s" % err_msg,
+                            status=200)

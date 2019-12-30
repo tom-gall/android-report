@@ -91,6 +91,14 @@ class JenkinsApi(RESTFullApi):
         full_api_url = '%s/api/json/' % build_url
         return self.call_with_full_url(request_url=full_api_url)
 
+    def get_job_url(self, name=None, number=None):
+        if name is None:
+            return "https://%s" % (self.domain)
+        elif number is None:
+            return "https://%s/job/%s/" % (self.domain, name)
+        else:
+            return "https://%s/job/%s/%s/" % (self.domain, name, number)
+
 
 class LAVAApi(RESTFullApi):
     def get_api_url_prefix(self):
