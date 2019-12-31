@@ -1081,7 +1081,7 @@ def new_build(request, branch, describe, name, number):
                                     number=number,
                                     kernel_change=kernel_change)
             kernel_change.reported = False
-            kernel.save()
+            kernel_change.save()
 
     except KernelChange.DoesNotExist:
         err_msg = "The change for the specified kernel and describe does not exist: branch=%s, describe=%s" % (branch, describe)
