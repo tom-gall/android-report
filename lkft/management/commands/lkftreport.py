@@ -100,10 +100,20 @@ class Command(BaseCommand):
             trigger_build['start_timestamp'] = datetime.datetime.fromtimestamp(int(trigger_build['timestamp'])/1000)
             trigger_build['duration'] = datetime.timedelta(milliseconds=trigger_build['duration'])
 
+            kernel_change_status = "TRIGGER_BUILD_COMPLETED"
+            ## TODO: how to check if a ci build is still in queue?
+            ##       check which ci build should be started from the information of the trigger build?
 
-            ci_builds = CiBuild.objects_kernel_change.get_builds_per_kernel_change(kernel_change=kernel_change)
+            ci_builds = CiBuild.objects_kernel_change.get_builds_per_kernel_change(kernel_change=kernel_change).order_by('name', '-number')
+
             jenkins_ci_builds = []
+            ci_build_names = []
             for ci_build in ci_builds:
+                if ci_build.name in ci_build_names:
+                    continue
+                else:
+                    ci_build_names.append(ci_build.name)
+
                 build_url = jenkins_api.get_job_url(name=ci_build.name, number=ci_build.number)
                 build = jenkins_api.get_build_details_with_full_url(build_url=build_url)
                 build['start_timestamp'] = datetime.datetime.fromtimestamp(int(build['timestamp'])/1000)
@@ -124,27 +134,46 @@ class Command(BaseCommand):
             for lkft_build_config in lkft_build_configs:
                 (team, project) = self.get_qa_server_project(lkft_build_config_name=lkft_build_config)
                 target_lkft_project_full_name = "%s/%s" % (team, project)
+                found_build = False
                 for lkft_project in lkft_projects:
-                    if lkft_project.get('full_name') == target_lkft_project_full_name:
-                        builds = qa_report_api.get_all_builds(lkft_project.get('id'))
-                        for build in builds:
-                            if build.get('version') == kernel_change.describe:
-                                created_str = build.get('created_at')
-                                build['created_at'] = datetime.datetime.strptime(str(created_str), '%Y-%m-%dT%H:%M:%S.%fZ')
+                    if lkft_project.get('full_name') != target_lkft_project_full_name:
+                        continue
 
-                                jobs = qa_report_api.get_jobs_for_build(build.get("id"))
-                                build_status = get_lkft_build_status(build, jobs)
-                                if build_status['has_unsubmitted']:
-                                    build['build_status'] = "JOBSNOTSUBMITTED"
-                                elif build_status['is_inprogress']:
-                                    build['build_status'] = "JOBSINPROGRESS"
-                                else:
-                                    build['build_status'] = "JOBSCOMPLETED"
-                                    build['last_fetched_timestamp'] = build_status['last_fetched_timestamp']
+                    builds = qa_report_api.get_all_builds(lkft_project.get('id'))
+                    for build in builds:
+                        if build.get('version') != kernel_change.describe:
+                            continue
 
-                                build['numbers_of_result'] = get_test_result_number_for_build(build, jobs)
-                                build['qa_report_project'] = lkft_project
-                                qa_report_builds.append(build)
+                        created_str = build.get('created_at')
+                        build['created_at'] = datetime.datetime.strptime(str(created_str), '%Y-%m-%dT%H:%M:%S.%fZ')
+
+                        jobs = qa_report_api.get_jobs_for_build(build.get("id"))
+                        build_status = get_lkft_build_status(build, jobs)
+                        if build_status['has_unsubmitted']:
+                            build['build_status'] = "JOBSNOTSUBMITTED"
+                        elif build_status['is_inprogress']:
+                            build['build_status'] = "JOBSINPROGRESS"
+                        else:
+                            build['build_status'] = "JOBSCOMPLETED"
+                            build['last_fetched_timestamp'] = build_status['last_fetched_timestamp']
+
+                        build['numbers_of_result'] = get_test_result_number_for_build(build, jobs)
+                        build['qa_report_project'] = lkft_project
+                        final_jobs = []
+                        resubmitted_or_duplicated_jobs = []
+                        for job in jobs:
+                            is_resubmited_job = job.get('resubmitted')
+                            is_duplicated_job = job.get('duplicated')
+                            if is_resubmited_job is None and is_duplicated_job is None:
+                                final_jobs.append(job)
+                            else:
+                                resubmitted_or_duplicated_jobs.append(job)
+
+                        build['final_jobs'] = final_jobs
+                        build['resubmitted_or_duplicated_jobs'] = resubmitted_or_duplicated_jobs
+                        qa_report_builds.append(build)
+                        found_build = True
+                        break
 
             kernel_change_report = {
                     'kernel_change': kernel_change,
@@ -167,25 +196,39 @@ class Command(BaseCommand):
             print "\t Reports for CI Builds:"
             for build in jenkins_ci_builds:
                 db_ci_build = build.get('db_ci_build')
-                print "\t\t %s %s, started at %s, took %s" % (db_ci_build.name,
+                print "\t\t %s#%s %s, started at %s, took %s" % (db_ci_build.name, db_ci_build.number,
                                                              build.get('status'),
                                                              build.get('start_timestamp'),
                                                              build.get('duration'))
 
-            print "\t Summary of Builds Status:"
+            print "\t Summary of Projects Status:"
             for build in qa_report_builds:
                 qa_report_project = build.get('qa_report_project')
                 print "\t\t %s %s %s" % (qa_report_project.get('full_name'),
                                             build.get('build_status'),
                                             build.get('created_at'))
                 numbers_of_result = build.get('numbers_of_result')
-                str_numbers = "\t\t\t modules_total=%s, modules_done=%s, number_total=%s, number_failed=%s"
+                str_numbers = "\t\t\t Summary: modules_total=%s, modules_done=%s, number_total=%s, number_failed=%s"
                 print str_numbers % (numbers_of_result.get('modules_total'),
                                         numbers_of_result.get('modules_done'),
                                         numbers_of_result.get('number_total'),
                                         numbers_of_result.get('number_failed'))
+                str_numbers = "\t\t\t %s: modules_total=%s, modules_done=%s, number_total=%s, number_failed=%s"
+                final_jobs = build.get('final_jobs')
+                def get_job_name(item):
+                    return item.get('name')
+                sorted_jobs = sorted(final_jobs, key=get_job_name)
 
-            print "\t Summary of Jobs status:"
+                for job in sorted_jobs:
+                    job_name = job.get('name')
+                    numbers_of_result = job.get('numbers')
+                    if numbers_of_result is not None:
+                        print str_numbers % (job_name,
+                                            numbers_of_result.get('modules_total'),
+                                            numbers_of_result.get('modules_done'),
+                                            numbers_of_result.get('number_total'),
+                                            numbers_of_result.get('number_failed'))
+
             print "\t Failures Not Reported:"
             print "\t Failures Reproduced:"
             print "\t Failures Not Reproduced:"

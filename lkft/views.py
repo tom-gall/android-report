@@ -276,13 +276,16 @@ def get_testcases_number_for_job(job):
             except ET.ParseError as e:
                 logger.error('xml.etree.ElementTree.ParseError: %s' % e)
                 logger.info('Please Check %s manually' % result_zip_path)
-    return {
+
+    job['numbers_of_result'] = {
             'number_passed': int(job_number_passed),
             'number_failed': int(job_number_failed),
             'number_total': int(job_number_passed) + int(job_number_failed),
             'modules_total': int(modules_total),
             'modules_done': int(modules_done)
             }
+
+    return job['numbers_of_result']
 
 
 def get_test_result_number_for_build(build, jobs=None):
@@ -302,10 +305,12 @@ def get_test_result_number_for_build(build, jobs=None):
         if job.get('url') in resubmitted_job_urls:
             # ignore jobs which were resubmitted
             logger.info("%s: %s:%s has been resubmitted already" % (build.get('version'), job.get('job_id'), job.get('url')))
+            job['resubmitted'] = True
             continue
 
         if job.get('name') in job_names:
             logger.info("%s %s: %s %s the same name job has been recorded" % (build.get('version'), job.get('name'), job.get('job_id'), job.get('url')))
+            job['duplicated'] = True
             continue
 
         jobs_to_be_checked.append(job)
