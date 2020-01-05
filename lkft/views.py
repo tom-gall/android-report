@@ -277,7 +277,7 @@ def get_testcases_number_for_job(job):
                 logger.error('xml.etree.ElementTree.ParseError: %s' % e)
                 logger.info('Please Check %s manually' % result_zip_path)
 
-    job['numbers_of_result'] = {
+    job['numbers'] = {
             'number_passed': int(job_number_passed),
             'number_failed': int(job_number_failed),
             'number_total': int(job_number_passed) + int(job_number_failed),
@@ -285,7 +285,7 @@ def get_testcases_number_for_job(job):
             'modules_done': int(modules_done)
             }
 
-    return job['numbers_of_result']
+    return job['numbers']
 
 
 def get_test_result_number_for_build(build, jobs=None):
@@ -323,7 +323,6 @@ def get_test_result_number_for_build(build, jobs=None):
         build_number_total = build_number_total + numbers.get('number_total')
         build_modules_total = build_modules_total + numbers.get('modules_total')
         build_modules_done = build_modules_done + numbers.get('modules_done')
-        job['numbers'] = numbers
         job_names.append(job.get('name'))
 
     return {

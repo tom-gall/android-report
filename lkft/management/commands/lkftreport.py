@@ -7,6 +7,8 @@
 
 
 import datetime
+import json
+import os
 import re
 import urllib2
 import yaml
@@ -19,6 +21,8 @@ from lcr import qa_report
 from lcr.settings import QA_REPORT, QA_REPORT_DEFAULT
 
 from lkft.views import get_test_result_number_for_build, get_lkft_build_status
+from lkft.views import extract
+from lkft.views import get_lkft_bugs, get_hardware_from_pname, get_result_file_path, get_kver_with_pname_env
 
 qa_report_def = QA_REPORT[QA_REPORT_DEFAULT]
 qa_report_api = qa_report.QAReportApi(qa_report_def.get('domain'), qa_report_def.get('token'))
@@ -86,6 +90,43 @@ class Command(BaseCommand):
             projects.append(project)
 
         return projects
+
+
+    def classify_bugs_and_failures(self, bugs=[], failures=[]):
+        bugs_reproduced = []
+        bugs_not_reproduced = []
+        new_failures = []
+
+        for module_name in sorted(failures.keys()):
+            failures_in_module = failures.get(module_name)
+            for test_name in sorted(failures_in_module.keys()):
+                failure = failures_in_module.get(test_name)
+
+                for bug in bugs:
+                    if test_name.find(module_name) >=0:
+                        # vts test, module name is the same as the test name.
+                        search_key = test_name
+                    else:
+                        search_key = '%s %s' % (module_name, test_name)
+
+                    if bug.summary.find(search_key) >= 0:
+                        bugs_reproduced.append(bug)
+                        if failure.get('bugs'):
+                            failure['bugs'].append(bug)
+                        else:
+                            failure['bugs'] = [bug]
+
+                if failure.get('bugs') is None or len(failure.get('bugs')) == 0:
+                    new_failures.append(failure)
+
+        bugs_not_reproduced = [ bug for bug in bugs if not (bug in bugs_reproduced) ]
+
+        return {
+                'bugs_reproduced': bugs_reproduced,
+                'bugs_not_reproduced': bugs_not_reproduced,
+                'new_failures': new_failures,
+                }
+
 
     def handle(self, *args, **options):
 
@@ -173,7 +214,47 @@ class Command(BaseCommand):
                         build['resubmitted_or_duplicated_jobs'] = resubmitted_or_duplicated_jobs
                         qa_report_builds.append(build)
                         found_build = True
-                        break
+
+                        project_name = lkft_project.get('name')
+                        bugs = get_lkft_bugs(summary_keyword=project_name, platform=get_hardware_from_pname(project_name))
+                        build['bugs'] = bugs
+
+                        failures = {}
+                        for job in final_jobs:
+                            if job.get('job_status') is None and \
+                                job.get('submitted') and \
+                                not job.get('fetched'):
+                                job['job_status'] = 'Submitted'
+                            if job.get('failure'):
+                                failure = job.get('failure')
+                                new_str = failure.replace('"', '\\"').replace('\'', '"')
+                                try:
+                                    failure_dict = json.loads(new_str)
+                                except ValueError:
+                                    failure_dict = {'error_msg': new_str}
+
+
+                            result_file_path = get_result_file_path(job=job)
+                            if not result_file_path or not os.path.exists(result_file_path):
+                                continue
+
+                            kernel_version = get_kver_with_pname_env(prj_name=project_name, env=job.get('environment'))
+
+                            platform = job.get('environment').split('_')[0]
+
+                            metadata = {
+                                'job_id': job.get('job_id'),
+                                'qa_job_id': qa_report_api.get_qa_job_id_with_url(job_url=job.get('url')),
+                                'result_url': job.get('attachment_url'),
+                                'lava_nick': job.get('lava_config').get('nick'),
+                                'kernel_version': kernel_version,
+                                'platform': platform,
+                                }
+                            extract(result_file_path, failed_testcases_all=failures, metadata=metadata)
+
+                        build['failures'] = failures
+                        classification = self.classify_bugs_and_failures(bugs=bugs, failures=failures)
+                        build['classification'] = classification
 
             kernel_change_report = {
                     'kernel_change': kernel_change,
@@ -229,6 +310,27 @@ class Command(BaseCommand):
                                             numbers_of_result.get('number_total'),
                                             numbers_of_result.get('number_failed'))
 
-            print "\t Failures Not Reported:"
-            print "\t Failures Reproduced:"
-            print "\t Failures Not Reproduced:"
+
+            print "\t Failures and Bugs:"
+            for build in qa_report_builds:
+                qa_report_project = build.get('qa_report_project')
+                print "\t\t %s %s %s" % (qa_report_project.get('full_name'),
+                                            build.get('build_status'),
+                                            build.get('created_at'))
+
+                classification = build.get('classification')
+                bugs_reproduced = classification.get('bugs_reproduced')
+                bugs_not_reproduced = classification.get('bugs_not_reproduced')
+                new_failures = classification.get('new_failures')
+
+                print "\t\t\t Bugs Reproduced:"
+                for bug in bugs_reproduced:
+                    print "\t\t\t\t %s %s %s" % (bug.id, bug.summary, bug.status)
+
+                print "\t\t\t Bugs Not Reproduced:"
+                for bug in bugs_not_reproduced:
+                    print "\t\t\t\t %s %s %s" % (bug.id, bug.summary, bug.status)
+
+                print "\t\t\t Failures Not Reported:"
+                for failure in new_failures:
+                    print "\t\t\t\t %s %s" % (failure.get('module_name'), failure.get('test_name'))
