@@ -304,7 +304,7 @@ class Command(BaseCommand):
                     job_name = job.get('name')
                     numbers_of_result = job.get('numbers')
                     if numbers_of_result is not None:
-                        print str_numbers % (job_name,
+                        print str_numbers % ("%s#%s %s" % (job_name, job.get('job_id'), job.get('job_status')),
                                             numbers_of_result.get('modules_total'),
                                             numbers_of_result.get('modules_done'),
                                             numbers_of_result.get('number_total'),
@@ -323,14 +323,14 @@ class Command(BaseCommand):
                 bugs_not_reproduced = classification.get('bugs_not_reproduced')
                 new_failures = classification.get('new_failures')
 
-                print "\t\t\t Bugs Reproduced:"
+                print "\t\t\t Bugs Reproduced: %s" % (len(bugs_reproduced))
                 for bug in bugs_reproduced:
                     print "\t\t\t\t %s %s %s" % (bug.id, bug.summary, bug.status)
 
-                print "\t\t\t Bugs Not Reproduced:"
+                print "\t\t\t Bugs Not Reproduced: %s" % (len(bugs_not_reproduced))
                 for bug in bugs_not_reproduced:
                     print "\t\t\t\t %s %s %s" % (bug.id, bug.summary, bug.status)
 
-                print "\t\t\t Failures Not Reported:"
+                print "\t\t\t Failures Not Reported: %s" % (len(new_failures))
                 for failure in new_failures:
-                    print "\t\t\t\t %s %s" % (failure.get('module_name'), failure.get('test_name'))
+                    print "\t\t\t\t %s %s: %s" % (failure.get('module_name'), failure.get('test_name'), failure.get('message'))

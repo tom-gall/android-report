@@ -212,6 +212,7 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
                     for failed_test in failed_tests:
                         #test_name = '%s#%s' % (test_case.get("name"), vts_abi_suffix_pat.sub('', failed_test.get("name")))
                         test_name = '%s#%s' % (test_case.get("name"), failed_test.get("name"))
+                        message = failed_test.find('.//Failure').attrib.get('message')
                         stacktrace = failed_test.find('.//Failure/StackTrace').text
                         ## ignore duplicate cases as the jobs are for different modules
                         failed_testcase = failed_tests_module.get(test_name)
@@ -234,6 +235,7 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
                                                                 'test_class': test_case.get("name"),
                                                                 'test_method': failed_test.get("name"),
                                                                 'abi_stacktrace': {abi: stacktrace},
+                                                                'message': message,
                                                                 'qa_job_ids': [ qa_job_id ],
                                                                 'kernel_versions': [ kernel_version ],
                                                                 'platforms': [ platform ],
