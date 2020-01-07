@@ -23,6 +23,11 @@ citrigger_lkft = {
         'mainline-aosp-master-hikey960': 'lkft-hikey960-aosp-master-mainline-gki',
         },
 
+    'trigger-lkft-aosp-mainline': {
+        '5.4-gki-aosp-master-hikey': 'lkft-hikey-aosp-master-5.4',
+        '5.4-gki-aosp-master-hikey960': 'lkft-hikey960-aosp-master-5.4',
+        },
+
     # configs for TI 4.14 and 4.19 kernels
     'trigger-lkft-ti-4.19': {
         '4.19-9.0-x15': 'lkft-x15-android-9.0-4.19',
