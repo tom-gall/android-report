@@ -46,7 +46,7 @@ citrigger_lkft = {
         },
 
     # configs for hikey kernels
-    'trigger-hikey-stable': {
+    'trigger-lkft-hikey-stable': {
         '4.4o-8.1-hikey': 'lkft-hikey-4.4-o',
         '4.4o-9.0-lcr-hikey': 'lkft-hikey-4.4-o',
         '4.4o-10.0-gsi-hikey': 'lkft-hikey-4.4-o',
