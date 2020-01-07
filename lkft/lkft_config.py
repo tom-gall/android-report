@@ -23,7 +23,7 @@ citrigger_lkft = {
         'mainline-aosp-master-hikey960': 'lkft-hikey960-aosp-master-mainline-gki',
         },
 
-    'trigger-lkft-aosp-mainline': {
+    'trigger-lkft-android-common': {
         '5.4-gki-aosp-master-hikey': 'lkft-hikey-aosp-master-5.4',
         '5.4-gki-aosp-master-hikey960': 'lkft-hikey960-aosp-master-5.4',
         },
