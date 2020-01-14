@@ -46,6 +46,15 @@ citrigger_lkft = {
         },
 
     # configs for hikey kernels
+    'trigger-lkft-aosp-hikey': {
+        '4.14-master-hikey': 'lkft-hikey-aosp-master-4.14',
+        '4.14-master-hikey960': 'lkft-hikey-aosp-master-4.14',
+
+        '4.19-master-hikey': 'lkft-hikey-aosp-master-4.19',
+        '4.19-master-hikey960': 'lkft-hikey-aosp-master-4.19',
+        },
+
+    # configs for hikey kernels
     'trigger-lkft-hikey-stable': {
         '4.4o-8.1-hikey': 'lkft-hikey-4.4-o',
         '4.4o-9.0-lcr-hikey': 'lkft-hikey-4.4-o',
