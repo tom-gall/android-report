@@ -26,6 +26,7 @@ citrigger_lkft = {
     'trigger-lkft-android-common': {
         '5.4-gki-aosp-master-hikey': 'lkft-hikey-aosp-master-5.4',
         '5.4-gki-aosp-master-hikey960': 'lkft-hikey960-aosp-master-5.4',
+        '5.4-gki-aosp-master-db845c': 'lkft-db845c-aosp-master-5.4',
         },
 
     # configs for TI 4.14 and 4.19 kernels
