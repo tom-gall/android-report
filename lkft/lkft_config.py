@@ -90,24 +90,53 @@ citrigger_lkft = {
         },
 }
 
-def find_citrigger(lkft_pname=""):
-    if not lkft_pname:
-        return None
-    for trigger_name, lkft_pnames in citrigger_lkft.items():
-        if lkft_pname in lkft_pnames.keys():
-            return trigger_name
-    return None
+
+citrigger_lkft_rcs = {
+    # configs for hikey kernels
+    'trigger-linux-stable-rc': {
+        '4.14-q-10gsi-hikey': 'lkft-hikey-4.14-rc',
+        '4.14-q-10gsi-hikey960': 'lkft-hikey-4.14-rc',
+
+        '4.19-q-10gsi-hikey': 'lkft-hikey-4.19-rc',
+        '4.19-q-10gsi-hikey960': 'lkft-hikey-4.19-rc',
+
+        '4.4-p-10gsi-hikey': 'lkft-hikey-4.4-rc-p',
+        '4.4-p-9LCR-hikey': 'lkft-hikey-4.4-rc-p',
+
+        '4.9-p-10gsi-hikey': 'lkft-hikey-4.9-rc',
+        '4.9-p-10gsi-hikey960': 'lkft-hikey-4.9-rc',
+
+        '5.4-gki-aosp-master-db845c': 'lkft-db845c-5.4-rc',
+        },
+}
 
 
-def find_cibuild(lkft_pname=""):
-    if not lkft_pname:
-        return None
-    if lkft_pname == 'aosp-master-tracking':
-        return 'lkft-aosp-master-tracking'
-    for trigger_name, lkft_pnames in citrigger_lkft.items():
+def get_ci_trigger_info(lkft_p_full_name=""):
+    group_project_names = lkft_p_full_name.split('/')
+    group_name = group_project_names[0]
+    lkft_pname = group_project_names[1]
+    citrigger_info = citrigger_lkft
+    if group_name == "android-lkft-rc":
+        citrigger_info = citrigger_lkft_rcs
+    return (group_name, lkft_pname, citrigger_info)
+
+def find_trigger_and_build(lkft_p_full_name=""):
+    if not lkft_p_full_name:
+        return (None, None)
+
+    (group_name, lkft_pname, citrigger_info) = get_ci_trigger_info(lkft_p_full_name=lkft_p_full_name)
+    for trigger_name, lkft_pnames in citrigger_info.items():
         if lkft_pname in lkft_pnames.keys():
-            return lkft_pnames.get(lkft_pname)
-    return None
+            return (trigger_name, lkft_pnames.get(lkft_pname))
+    return (None, None)
+
+def find_citrigger(lkft_p_full_name=""):
+    (trigger_name, build_name) = find_trigger_and_build(lkft_p_full_name)
+    return trigger_name
+
+def find_cibuild(lkft_p_full_name=""):
+    (trigger_name, build_name) = find_trigger_and_build(lkft_p_full_name)
+    return build_name
 
 def get_hardware_from_pname(pname=None, env=''):
     if not pname:

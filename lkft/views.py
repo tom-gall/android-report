@@ -251,8 +251,8 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
             }
 
 
-def get_last_trigger_build(lkft_pname=''):
-    ci_trigger_name = find_citrigger(lkft_pname=lkft_pname)
+def get_last_trigger_build(lkft_p_full_name=''):
+    ci_trigger_name = find_citrigger(lkft_p_full_name=lkft_p_full_name)
     if not ci_trigger_name:
         return None
     return jenkins_api.get_last_build(cijob_name=ci_trigger_name)
@@ -399,7 +399,7 @@ def get_project_info(project):
         project['last_build'] = last_build
 
     logger.info("%s: Start to get ci trigger build information for project", project.get('name'))
-    last_trigger_build = get_last_trigger_build(project.get('name'))
+    last_trigger_build = get_last_trigger_build(project.get('full_name'))
     if last_trigger_build:
         last_trigger_url = last_trigger_build.get('url')
         last_trigger_build = jenkins_api.get_build_details_with_full_url(build_url=last_trigger_url)
@@ -408,7 +408,7 @@ def get_project_info(project):
         project['last_trigger_build'] = last_trigger_build
 
     logger.info("%s: Start to get ci build information for project", project.get('name'))
-    ci_build_project_name = find_cibuild(lkft_pname=project.get('name'))
+    ci_build_project_name = find_cibuild(lkft_p_full_name=project.get('full_name'))
     if ci_build_project_name:
         ci_build_project = jenkins_api.get_build_details_with_job_url(ci_build_project_name)
 
@@ -464,19 +464,20 @@ def get_project_info(project):
     logger.info("%s: finished to get information for project", project.get('name'))
 
 
-@login_required
-def list_projects(request):
+def get_projects_info(group_name=""):
     import threading
     threads = list()
+    prefix_group = "%s/" % group_name
+
     projects = []
     for project in qa_report_api.get_projects():
         project_full_name = project.get('full_name')
-        if not project_full_name.startswith('android-lkft/') \
-            or project.get('is_archived'):
+        if project.get('is_archived'):
+            continue
+        if not project_full_name.startswith(prefix_group):
             continue
 
         projects.append(project)
-
         t = threading.Thread(target=get_project_info, args=(project,))
         threads.append(t)
         t.start()
@@ -484,24 +485,44 @@ def list_projects(request):
     for t in threads:
         t.join()
 
+    def get_project_name(item):
+        return item.get('name')
+
+    sorted_projects = sorted(projects, key=get_project_name)
+    return sorted_projects
+
+
+def list_group_projects(request, group_name="android-lkft", title_head="LKFT Projects"):
+    sorted_projects = get_projects_info(group_name=group_name)
+
     bugs = get_lkft_bugs()
     open_bugs = []
     for bug in bugs:
         if bug.status == 'VERIFIED' or bug.status== 'RESOLVED':
             continue
-        else:
-            open_bugs.append(bug)
+        open_bugs.append(bug)
 
-    def get_project_name(item):
-        return item.get('name')
-
-    sorted_projects = sorted(projects, key=get_project_name)
     return render(request, 'lkft-projects.html',
                            {
                                 "projects": sorted_projects,
                                 'open_bugs': open_bugs,
+                                'group_name': group_name,
+                                'title_head': title_head,
                             }
                 )
+
+@login_required
+def list_rc_projects(request):
+    group_name = "android-lkft-rc"
+    title_head = "LKFT RC Projects"
+    return list_group_projects(request, group_name=group_name, title_head=title_head)
+
+
+@login_required
+def list_projects(request):
+    group_name = "android-lkft"
+    title_head = "LKFT Projects"
+    return list_group_projects(request, group_name=group_name, title_head=title_head)
 
 
 @login_required

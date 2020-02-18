@@ -5,6 +5,7 @@ from . import views
 basic_pat = '[a-zA-Z0-9][a-zA-Z0-9_.-]+'
 urlpatterns = [
     url(r'^$', views.list_projects, name='home'),
+    url(r'^rc-projects/.*$', views.list_rc_projects, name='list_rc_projects'),
     url(r'^projects/.*$', views.list_projects, name='list_projects'),
     url(r'^builds/.*$', views.list_builds, name='list_builds'),
     url(r'^jobs/.*$', views.list_jobs, name='list_jobs'),
