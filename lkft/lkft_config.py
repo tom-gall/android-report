@@ -111,31 +111,31 @@ citrigger_lkft_rcs = {
 }
 
 
-def get_ci_trigger_info(lkft_p_full_name=""):
+def get_ci_trigger_info(project=None):
+    if not project.get('full_name'):
+        return (None, None, None)
+
     group_project_names = lkft_p_full_name.split('/')
     group_name = group_project_names[0]
-    lkft_pname = group_project_names[1]
+    lkft_pname = project.get('name')
     citrigger_info = citrigger_lkft
     if group_name == "android-lkft-rc":
         citrigger_info = citrigger_lkft_rcs
     return (group_name, lkft_pname, citrigger_info)
 
-def find_trigger_and_build(lkft_p_full_name=""):
-    if not lkft_p_full_name:
-        return (None, None)
-
-    (group_name, lkft_pname, citrigger_info) = get_ci_trigger_info(lkft_p_full_name=lkft_p_full_name)
+def find_trigger_and_build(project):
+    (group_name, lkft_pname, citrigger_info) = get_ci_trigger_info(project=project)
     for trigger_name, lkft_pnames in citrigger_info.items():
         if lkft_pname in lkft_pnames.keys():
             return (trigger_name, lkft_pnames.get(lkft_pname))
     return (None, None)
 
-def find_citrigger(lkft_p_full_name=""):
-    (trigger_name, build_name) = find_trigger_and_build(lkft_p_full_name)
+def find_citrigger(project=None):
+    (trigger_name, build_name) = find_trigger_and_build(project)
     return trigger_name
 
-def find_cibuild(lkft_p_full_name=""):
-    (trigger_name, build_name) = find_trigger_and_build(lkft_p_full_name)
+def find_cibuild(project=None):
+    (trigger_name, build_name) = find_trigger_and_build(project)
     return build_name
 
 def get_hardware_from_pname(pname=None, env=''):

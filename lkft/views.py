@@ -251,8 +251,8 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
             }
 
 
-def get_last_trigger_build(lkft_p_full_name=''):
-    ci_trigger_name = find_citrigger(lkft_p_full_name=lkft_p_full_name)
+def get_last_trigger_build(project=None):
+    ci_trigger_name = find_citrigger(project=project)
     if not ci_trigger_name:
         return None
     return jenkins_api.get_last_build(cijob_name=ci_trigger_name)
@@ -399,7 +399,7 @@ def get_project_info(project):
         project['last_build'] = last_build
 
     logger.info("%s: Start to get ci trigger build information for project", project.get('name'))
-    last_trigger_build = get_last_trigger_build(project.get('full_name'))
+    last_trigger_build = get_last_trigger_build(project)
     if last_trigger_build:
         last_trigger_url = last_trigger_build.get('url')
         last_trigger_build = jenkins_api.get_build_details_with_full_url(build_url=last_trigger_url)
@@ -408,7 +408,7 @@ def get_project_info(project):
         project['last_trigger_build'] = last_trigger_build
 
     logger.info("%s: Start to get ci build information for project", project.get('name'))
-    ci_build_project_name = find_cibuild(lkft_p_full_name=project.get('full_name'))
+    ci_build_project_name = find_cibuild(project)
     if ci_build_project_name:
         ci_build_project = jenkins_api.get_build_details_with_job_url(ci_build_project_name)
 

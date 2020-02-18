@@ -59,6 +59,7 @@
             {% endif %}
             {% if last_ci_build.build_status == 'FAILURE' %}
                <a href="{{last_ci_build.ci_build_project_url}}">{{ last_ci_build.kernel_version}}</a>&nbsp;&nbsp; <p style="background-color: red">{{ last_ci_build.build_status}}</p>
+               <p>Started at {{ last_ci_build.start_timestamp|date:'M. d, Y, H:i'}}, &nbsp;{{ last_ci_build.start_timestamp|timesince}} ago</p>
             {% endif %}
             {% if last_ci_build.build_status == 'ABORTED' %}
                <a href="{{last_ci_build.ci_build_project_url}}">{{ last_ci_build.kernel_version}}</a>&nbsp;&nbsp; <p style="background-color: gray">{{ last_ci_build.build_status}}</p>
