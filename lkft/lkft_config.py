@@ -115,7 +115,7 @@ def get_ci_trigger_info(project=None):
     if not project.get('full_name'):
         return (None, None, None)
 
-    group_project_names = lkft_p_full_name.split('/')
+    group_project_names = project.get('full_name').split('/')
     group_name = group_project_names[0]
     lkft_pname = project.get('name')
     citrigger_info = citrigger_lkft
