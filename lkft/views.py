@@ -461,7 +461,8 @@ def get_project_info(project):
         project['last_build']['build_status'] == "JOBSCOMPLETED":
         last_ci_build = project.get('last_ci_build')
         last_build = project.get('last_build')
-        project['duration'] = last_build.get('last_fetched_timestamp') - last_ci_build.get('start_timestamp')
+        if last_ci_build.get('ci_build_last_start_timestamp'):
+            project['duration'] = last_build.get('last_fetched_timestamp') - last_ci_build.get('start_timestamp')
 
     logger.info("%s: finished to get information for project", project.get('name'))
 
@@ -1076,11 +1077,14 @@ def new_kernel_changes(request, branch, describe, trigger_name, trigger_number):
         err_msg = 'request for branch=%s, describe=%s is already there' % (branch, describe)
         logger.info(err_msg)
     except KernelChange.DoesNotExist:
-        KernelChange.objects.create(branch=branch,
+        kernel_change = KernelChange.objects.create(branch=branch,
                                     describe=describe,
                                     reported=False,
                                     trigger_name=trigger_name,
                                     trigger_number=trigger_number)
+        CiBuild.objects.create(name=trigger_name,
+                                number=trigger_number,
+                                kernel_change=kernel_change)
 
 
     if err_msg is None:

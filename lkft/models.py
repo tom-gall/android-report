@@ -32,7 +32,10 @@ class CiBuildKernelChangeManager(models.Manager):
 class CiBuild(models.Model):
     name = models.CharField(max_length=255)
     number = models.IntegerField()
-    kernel_change = models.ForeignKey(KernelChange, on_delete=None)
+    kernel_change = models.ForeignKey(KernelChange, null=True, on_delete=None)
+    timestamp = models.DateTimeField(null=True)
+    duration = models.IntegerField(default=0) # total_seconds
+    result = models.CharField(max_length=100, null=True, default="NOINFO")
 
     def __str__(self):
         return "%s#%s" % (self.name, self.number)
@@ -42,3 +45,36 @@ class CiBuild(models.Model):
 
     objects = models.Manager()
     objects_kernel_change = CiBuildKernelChangeManager()
+
+
+class ReportBuild(models.Model):
+    # the group that this build belongs to
+    group = models.CharField(max_length=100)
+    # the name of the qareport project
+    name = models.CharField(max_length=100)
+    # the version of the qareport build
+    version = models.CharField(max_length=100)
+
+    kernel_change = models.ForeignKey(KernelChange, on_delete=None)
+    ci_build = models.ForeignKey(CiBuild, on_delete=None, related_name="ci_build")
+    ci_trigger_build = models.ForeignKey(CiBuild, on_delete=None, related_name='trigger_build')
+
+    number_passed = models.IntegerField()
+    number_failed = models.IntegerField()
+    number_total = models.IntegerField()
+    modules_done = models.IntegerField()
+    modules_total = models.IntegerField()
+
+    # the time the trigger build was started
+    started_at = models.DateTimeField(null=True)
+    # the time the last job was fetched
+    fetched_at = models.DateTimeField(null=True)
+
+
+    def __str__(self):
+        return "%s#%s#%s" % (self.group, self.name, self.version)
+
+    def __unicode__(self):
+        return "%s#%s#%s" % (self.group, self.name, self.version)
+
+    objects = models.Manager()

@@ -111,6 +111,16 @@ citrigger_lkft_rcs = {
 }
 
 
+def find_expect_cibuilds(trigger_name=None):
+    if not trigger_name:
+        return None
+    lkft_builds = citrigger_lkft.get(trigger_name)
+    lkft_rc_builds = citrigger_lkft_rcs.get(trigger_name)
+    if lkft_builds is not None:
+        return set(lkft_builds.values())
+    else:
+        return set(lkft_rc_builds.values())
+
 def get_ci_trigger_info(project=None):
     if not project.get('full_name'):
         return (None, None, None)

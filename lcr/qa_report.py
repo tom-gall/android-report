@@ -72,7 +72,6 @@ class JenkinsApi(RESTFullApi):
         # https://ci.linaro.org/job/trigger-lkft-aosp-mainline/api/json
         return 'https://%s/job/%s/api/json/' % (self.domain, detail_url)
 
-
     def get_last_build(self, cijob_name=''):
         if not cijob_name:
             return None
@@ -82,6 +81,14 @@ class JenkinsApi(RESTFullApi):
             return result.get('lastBuild')
         else:
             return None
+
+    def is_build_disabled(self, cibuild_name):
+        build_details = self.get_build_details_with_cibuild_name(cibuild_name)
+        return not build_details.get('buildable')
+
+    def get_build_details_with_cibuild_name(self, cibuild_name):
+        full_api_url = self.get_api_url_prefix(detail_url=cibuild_name)
+        return self.call_with_full_url(request_url=full_api_url)
 
     def get_build_details_with_job_url(self, job_url):
         full_api_url = self.get_api_url_prefix(detail_url=job_url)
@@ -98,6 +105,33 @@ class JenkinsApi(RESTFullApi):
             return "https://%s/job/%s/" % (self.domain, name)
         else:
             return "https://%s/job/%s/%s/" % (self.domain, name, number)
+
+    def get_queued_items(self):
+        # https://ci.linaro.org/queue/api/json?pretty=true
+        queue_api = 'https://%s/queue/api/json/' % (self.domain)
+        result = self.call_with_full_url(request_url=queue_api)
+        if result:
+            queued_items = result.get('items')
+            items_tobe_returned = []
+            for item in queued_items:
+                cibuild_name = item.get('task').get('name')
+                if not cibuild_name.startswith('lkft-'):
+                    continue
+                params_list = item.get('params').strip().split('\n')
+                params_dict = {}
+                for key_val_str in params_list:
+                    (key, value) = key_val_str.split('=')
+                    if key is not None:
+                        params_dict[key] = value
+                if not params_dict.get('KERNEL_DESCRIBE'):
+                    continue
+                item['KERNEL_DESCRIBE'] = params_dict.get('KERNEL_DESCRIBE')
+                item['build_name'] = cibuild_name
+                items_tobe_returned.append(item)
+
+            return items_tobe_returned
+        else:
+            return []
 
 
 class LAVAApi(RESTFullApi):
