@@ -10,7 +10,6 @@ import datetime
 import json
 import os
 import re
-import urllib2
 import yaml
 
 from django.core.management.base import BaseCommand, CommandError
@@ -371,7 +370,7 @@ class Command(BaseCommand):
 
 
         # print out the reports
-        print "########## REPORTS FOR KERNEL CHANGES#################"
+        print("########## REPORTS FOR KERNEL CHANGES#################")
         for kernel_change_report in total_reports:
             kernel_change = kernel_change_report.get('kernel_change')
             trigger_build = kernel_change_report.get('trigger_build')
@@ -381,60 +380,60 @@ class Command(BaseCommand):
             trigger_starttimestamp = trigger_build['start_timestamp']
             finished_timestamp = kernel_change_report.get('finished_timestamp')
             if status == "ALL_COMPLETED":
-                print "%s started at %s, %s ago, took %s" % (kernel_change, trigger_starttimestamp, timesince(trigger_starttimestamp), finished_timestamp - trigger_starttimestamp)
+                print("%s started at %s, %s ago, took %s" % (kernel_change, trigger_starttimestamp, timesince(trigger_starttimestamp), finished_timestamp - trigger_starttimestamp))
             else:
-                print "%s started at %s, %s ago, %s" % (kernel_change, trigger_starttimestamp, timesince(trigger_starttimestamp), status)
+                print("%s started at %s, %s ago, %s" % (kernel_change, trigger_starttimestamp, timesince(trigger_starttimestamp), status))
 
-            print "\t Reports for CI Builds:"
+            print("\t Reports for CI Builds:")
             for build in jenkins_ci_builds:
                 dbci_build = build.get('dbci_build')
                 if build.get('status') == 'INPROGRESS':
-                    print "\t\t %s#%s %s, started at %s, %s ago" % (dbci_build.name, dbci_build.number,
+                    print("\t\t %s#%s %s, started at %s, %s ago" % (dbci_build.name, dbci_build.number,
                                                              build.get('status'),
                                                              build.get('start_timestamp'),
-                                                             timesince(build.get('start_timestamp')))
+                                                             timesince(build.get('start_timestamp'))))
                 else:
-                    print "\t\t %s#%s %s, started at %s, %s ago, took %s" % (dbci_build.name, dbci_build.number,
+                    print("\t\t %s#%s %s, started at %s, %s ago, took %s" % (dbci_build.name, dbci_build.number,
                                                              build.get('status'),
                                                              build.get('start_timestamp'),
                                                              timesince(build.get('start_timestamp')),
-                                                             build.get('duration'))
+                                                             build.get('duration')))
 
             queued_ci_builds = kernel_change_report.get('queued_ci_builds')
             for build in  queued_ci_builds:
-                inqueuesince = qa_report_api.get_aware_datetime_from_timestamp(int(build.get('inQueueSince')/1000))
+                inqueuesince = datetime.datetime.fromtimestamp(int(build.get('inQueueSince')/1000), tz=timezone.utc)
                 #duration = datetime_now - inqueuesince
-                print "\t\t %s: still in queue since %s ago" % (build.get('build_name'), timesince(inqueuesince))
+                print("\t\t %s: still in queue since %s ago" % (build.get('build_name'), timesince(inqueuesince)))
 
             not_reported_ci_builds = kernel_change_report.get('not_reported_ci_builds')
             for build in not_reported_ci_builds:
-                print "\t\t %s: not reported" % (str(build))
+                print("\t\t %s: not reported" % (str(build)))
 
             diabled_ci_builds = kernel_change_report.get('diabled_ci_builds')
             for build in diabled_ci_builds:
-                print "\t\t %s: disabled" % (str(build))
+                print("\t\t %s: disabled" % (str(build)))
 
-            print "\t Summary of Projects Status:"
+            print("\t Summary of Projects Status:")
             for build in qa_report_builds:
                 qa_report_project = build.get('qa_report_project')
                 if build.get('build_status') == "JOBSCOMPLETED":
-                    print "\t\t %s %s, created at %s, %s ago, took %s" % (qa_report_project.get('full_name'),
+                    print("\t\t %s %s, created at %s, %s ago, took %s" % (qa_report_project.get('full_name'),
                                                 build.get('build_status'),
                                                 build.get('created_at'),
                                                 timesince(build.get('created_at')),
-                                                build.get('duration'))
+                                                build.get('duration')))
                 else:
-                    print "\t\t %s %s, created at %s, %s ago" % (qa_report_project.get('full_name'),
+                    print("\t\t %s %s, created at %s, %s ago" % (qa_report_project.get('full_name'),
                                                 build.get('build_status'),
                                                 build.get('created_at'),
-                                                timesince(build.get('created_at')))
+                                                timesince(build.get('created_at'))))
 
                 numbers_of_result = build.get('numbers_of_result')
                 str_numbers = "\t\t\t Summary: modules_total=%s, modules_done=%s, number_total=%s, number_failed=%s"
-                print str_numbers % (numbers_of_result.get('modules_total'),
+                print(str_numbers % (numbers_of_result.get('modules_total'),
                                         numbers_of_result.get('modules_done'),
                                         numbers_of_result.get('number_total'),
-                                        numbers_of_result.get('number_failed'))
+                                        numbers_of_result.get('number_failed')))
                 str_numbers = "\t\t\t %s: modules_total=%s, modules_done=%s, number_total=%s, number_failed=%s"
                 final_jobs = build.get('final_jobs')
                 def get_job_name(item):
@@ -445,33 +444,32 @@ class Command(BaseCommand):
                     job_name = job.get('name')
                     numbers_of_result = job.get('numbers')
                     if numbers_of_result is not None:
-                        print str_numbers % ("%s#%s %s" % (job_name, job.get('job_id'), job.get('job_status')),
+                        print(str_numbers % ("%s#%s %s" % (job_name, job.get('job_id'), job.get('job_status')),
                                             numbers_of_result.get('modules_total'),
                                             numbers_of_result.get('modules_done'),
                                             numbers_of_result.get('number_total'),
-                                            numbers_of_result.get('number_failed'))
+                                            numbers_of_result.get('number_failed')))
 
-
-            print "\t Failures and Bugs:"
+            print("\t Failures and Bugs:")
             for build in qa_report_builds:
                 qa_report_project = build.get('qa_report_project')
-                print "\t\t %s %s %s" % (qa_report_project.get('full_name'),
+                print("\t\t %s %s %s" % (qa_report_project.get('full_name'),
                                             build.get('build_status'),
-                                            build.get('created_at'))
+                                            build.get('created_at')))
 
                 classification = build.get('classification')
                 bugs_reproduced = classification.get('bugs_reproduced')
                 bugs_not_reproduced = classification.get('bugs_not_reproduced')
                 new_failures = classification.get('new_failures')
 
-                print "\t\t\t Bugs Reproduced: %s" % (len(bugs_reproduced))
+                print("\t\t\t Bugs Reproduced: %s" % (len(bugs_reproduced)))
                 for bug in bugs_reproduced:
-                    print "\t\t\t\t %s %s %s" % (bug.id, bug.summary, bug.status)
+                    print("\t\t\t\t %s %s %s" % (bug.id, bug.summary, bug.status))
 
-                print "\t\t\t Bugs Not Reproduced: %s" % (len(bugs_not_reproduced))
+                print("\t\t\t Bugs Not Reproduced: %s" % (len(bugs_not_reproduced)))
                 for bug in bugs_not_reproduced:
-                    print "\t\t\t\t %s %s %s" % (bug.id, bug.summary, bug.status)
+                    print("\t\t\t\t %s %s %s" % (bug.id, bug.summary, bug.status))
 
-                print "\t\t\t Failures Not Reported: %s" % (len(new_failures))
+                print("\t\t\t Failures Not Reported: %s" % (len(new_failures)))
                 for failure in new_failures:
-                    print "\t\t\t\t %s %s: %s" % (failure.get('module_name'), failure.get('test_name'), failure.get('message'))
+                    print("\t\t\t\t %s %s: %s" % (failure.get('module_name'), failure.get('test_name'), failure.get('message')))

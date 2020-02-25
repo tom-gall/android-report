@@ -30,7 +30,11 @@ def download_urllib(url, path):
         else:
             sys.stdout.write("\r %.2f%%" % per)
             sys.stdout.flush()
-    urllib.urlretrieve(url, path, Schedule)
+    try:
+        urllib.urlretrieve(url, path, Schedule)
+    except AttributeError:
+        urllib.request.urlretrieve(url, path, Schedule)
+
     if not check_dict['file_not_exist']:
         logger.info("File is saved to %s" % path)
     return check_dict['file_not_exist']

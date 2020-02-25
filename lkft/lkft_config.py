@@ -104,13 +104,15 @@ citrigger_lkft_rcs = {
 
 def find_expect_cibuilds(trigger_name=None):
     if not trigger_name:
-        return None
+        return set([])
     lkft_builds = citrigger_lkft.get(trigger_name)
     lkft_rc_builds = citrigger_lkft_rcs.get(trigger_name)
     if lkft_builds is not None:
         return set(lkft_builds.values())
-    else:
+    elif lkft_rc_builds is not None:
         return set(lkft_rc_builds.values())
+    else:
+        return set([])
 
 def get_ci_trigger_info(project=None):
     if not project.get('full_name'):
@@ -180,11 +182,19 @@ def get_kver_with_pname_env(prj_name='', env=''):
 
 
 def get_url_content(url=None):
-    import urllib2
     try:
-        response = urllib2.urlopen(url)
-        return response.read()
-    except urllib2.HTTPError:
+        # For Python 3.0 and later
+        from urllib.request import urlopen
+        from urllib.error import HTTPError
+    except ImportError:
+        # Fall back to Python 2's urllib2
+        from urllib2 import urlopen
+        from urllib2 import HTTPError
+
+    try:
+        response = urlopen(url)
+        return response.read().decode('utf-8')
+    except HTTPError:
         pass
 
     return None
