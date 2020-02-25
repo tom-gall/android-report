@@ -1287,8 +1287,6 @@ def list_kernel_changes(request):
 
         kernelchanges.append(kernelchange)
 
-
-    sorted_kernelchanges = sort()
     def get_cmp_value(item):
         return "%s-%s" % (item.get('branch'), item.get("describe"))
 
