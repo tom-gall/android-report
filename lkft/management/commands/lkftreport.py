@@ -101,6 +101,9 @@ class Command(BaseCommand):
             ci_build_names = []
             has_build_inprogress = False
             for dbci_build in dbci_builds:
+                if dbci_build.name == kernel_change.trigger_name:
+                    # ignore the trigger builds
+                    continue
                 if dbci_build.name in ci_build_names:
                     continue
                 else:
@@ -315,9 +318,16 @@ class Command(BaseCommand):
             trigger_build = kernel_change_report.get('trigger_build')
             if not trigger_build.get('building'):
                 # should always be here
-                CiBuild.objects.filter(name=trigger_build.get('name'),
-                                        number=trigger_build.get('number')
-                                    ).update(duration=trigger_build.get('duration').total_seconds(),
+                try:
+                    trigger_dbci_build = CiBuild.objects.get(name=trigger_build.get('name'), number=trigger_build.get('number'))
+                    trigger_dbci_build.duration = trigger_build.get('duration').total_seconds()
+                    trigger_dbci_build.timestamp = trigger_build.get('start_timestamp')
+                    trigger_dbci_build.result = trigger_build.get('result')
+                except CiBuild.DoesNotExist:
+                    CiBuild.objects.create(name=trigger_build.get('name'),
+                                            number=trigger_build.get('number'),
+                                            kernel_change=kernel_change,
+                                            duration=trigger_build.get('duration').total_seconds(),
                                             timestamp=trigger_build.get('start_timestamp'),
                                             result=trigger_build.get('result'))
 
