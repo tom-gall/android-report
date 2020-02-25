@@ -1290,7 +1290,7 @@ def list_kernel_changes(request):
     def get_cmp_value(item):
         return "%s-%s" % (item.get('branch'), item.get("describe"))
 
-    sorted_kernelchanges = sorted(kernelchanges, key=get_cmp_value)
+    sorted_kernelchanges = sorted(kernelchanges, key=get_cmp_value, reverse=True)
     return render(request, 'lkft-kernelchanges.html',
                        {
                             "kernelchanges": sorted_kernelchanges,
