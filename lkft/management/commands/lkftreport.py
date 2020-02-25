@@ -84,6 +84,9 @@ class Command(BaseCommand):
         kernel_changes = KernelChange.objects_needs_report.all()
         for kernel_change in kernel_changes:
             lkft_build_configs = []
+
+            test_numbers = qa_report.TestNumbers()
+
             trigger_url = jenkins_api.get_job_url(name=kernel_change.trigger_name, number=kernel_change.trigger_number)
             trigger_build = jenkins_api.get_build_details_with_full_url(build_url=trigger_url)
             trigger_build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(trigger_build['timestamp'])/1000)
@@ -214,8 +217,12 @@ class Command(BaseCommand):
                         kernel_change_finished_timestamp = build_status['last_fetched_timestamp']
                     target_qareport_build['duration'] = build_status['last_fetched_timestamp'] - target_qareport_build['created_at']
 
-                target_qareport_build['numbers_of_result'] = get_test_result_number_for_build(target_qareport_build, jobs)
+                numbers_of_result = get_test_result_number_for_build(target_qareport_build, jobs)
+                target_qareport_build['numbers_of_result'] = numbers_of_result
                 target_qareport_build['qa_report_project'] = target_qareport_project
+
+                test_numbers.addWithHash(numbers_of_result)
+
                 final_jobs = []
                 resubmitted_or_duplicated_jobs = []
                 for job in jobs:
@@ -300,7 +307,9 @@ class Command(BaseCommand):
                     'queued_ci_builds': queued_ci_builds,
                     'diabled_ci_builds': diabled_ci_builds,
                     'not_reported_ci_builds': not_reported_ci_builds,
+                    'start_timestamp': trigger_build.get('start_timestamp'),
                     'finished_timestamp': kernel_change_finished_timestamp,
+                    'test_numbers': test_numbers,
                 }
 
             total_reports.append(kernel_change_report)
@@ -311,8 +320,23 @@ class Command(BaseCommand):
             if status != 'ALL_COMPLETED':
                 continue
 
+            trigger_build = kernel_change_report.get('trigger_build')
+            finished_timestamp = kernel_change_report.get('finished_timestamp')
+            start_timestamp = kernel_change_report.get('start_timestamp')
+            test_numbers = kernel_change_report.get('test_numbers')
+
             kernel_change = kernel_change_report.get('kernel_change')
             kernel_change.reported = True
+            kernel_change.result = status
+            kernel_change.timestamp = start_timestamp
+            kernel_change.duration = finished_timestamp - start_timestamp
+
+            kernel_change.number_passed = test_numbers.number_passed
+            kernel_change.number_failed = test_numbers.number_failed
+            kernel_change.number_total = test_numbers.number_total
+            kernel_change.modules_done = test_numbers.modules_done
+            kernel_change.modules_total = test_numbers.modules_total
+
             kernel_change.save()
 
             trigger_build = kernel_change_report.get('trigger_build')

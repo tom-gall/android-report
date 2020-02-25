@@ -1132,11 +1132,7 @@ def list_kernel_changes(request):
         trigger_build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(trigger_build['timestamp'])/1000)
         kernel_change_finished_timestamp = trigger_build['start_timestamp']
 
-        number_passed = 0
-        number_failed = 0
-        number_total = 0
-        modules_done = 0
-        modules_total = 0
+        test_numbers = qa_report.TestNumbers()
 
         kernel_change_status = "TRIGGER_BUILD_COMPLETED"
 
@@ -1255,11 +1251,7 @@ def list_kernel_changes(request):
                     kernel_change_finished_timestamp = build_status['last_fetched_timestamp']
 
             numbers_of_result = get_test_result_number_for_build(target_qareport_build, jobs)
-            number_passed = number_passed + numbers_of_result.get('number_passed')
-            number_failed = number_failed + numbers_of_result.get('number_failed')
-            number_total = number_total + numbers_of_result.get('number_total')
-            modules_done = modules_done + numbers_of_result.get('modules_done')
-            modules_total = modules_total + numbers_of_result.get('modules_total')
+            test_numbers.addWithHash(numbers_of_result)
 
         has_error = False
         error_dict = {}
@@ -1287,17 +1279,22 @@ def list_kernel_changes(request):
         kernelchange['finished_timestamp'] = kernel_change_finished_timestamp
         kernelchange['duration'] = kernelchange['finished_timestamp'] - kernelchange['start_timestamp']
         kernelchange['status'] = kernel_change_status
-        kernelchange['number_passed'] = number_passed
-        kernelchange['number_failed'] = number_failed
-        kernelchange['number_total'] = number_total
-        kernelchange['modules_done'] = modules_done
-        kernelchange['modules_total'] = modules_total
+        kernelchange['number_passed'] = test_numbers.number_passed
+        kernelchange['number_failed'] = test_numbers.number_failed
+        kernelchange['number_total'] = test_numbers.number_total
+        kernelchange['modules_done'] = test_numbers.modules_done
+        kernelchange['modules_total'] = test_numbers.modules_total
 
         kernelchanges.append(kernelchange)
 
 
+    sorted_kernelchanges = sort()
+    def get_cmp_value(item):
+        return "%s-%s" % (item.get('branch'), item.get("describe"))
+
+    sorted_kernelchanges = sorted(kernelchanges, key=get_cmp_value)
     return render(request, 'lkft-kernelchanges.html',
                        {
-                            "kernelchanges": kernelchanges,
+                            "kernelchanges": sorted_kernelchanges,
                         }
             )

@@ -14,6 +14,17 @@ class KernelChange(models.Model):
     trigger_name = models.CharField(max_length=255)
     trigger_number = models.IntegerField()
 
+    result = models.CharField(max_length=100, null=True, default="NOINFO")
+    timestamp = models.DateTimeField(null=True)
+    duration = models.IntegerField(default=0) # total_seconds
+
+    number_passed = models.IntegerField(default=0)
+    number_failed = models.IntegerField(default=0)
+    number_total = models.IntegerField(default=0)
+    modules_done = models.IntegerField(default=0)
+    modules_total = models.IntegerField(default=0)
+
+
     def __str__(self):
         return "%s-%s" % (self.branch, self.describe)
 
@@ -59,11 +70,11 @@ class ReportBuild(models.Model):
     ci_build = models.ForeignKey(CiBuild, on_delete=None, related_name="ci_build")
     ci_trigger_build = models.ForeignKey(CiBuild, on_delete=None, related_name='trigger_build')
 
-    number_passed = models.IntegerField()
-    number_failed = models.IntegerField()
-    number_total = models.IntegerField()
-    modules_done = models.IntegerField()
-    modules_total = models.IntegerField()
+    number_passed = models.IntegerField(default=0)
+    number_failed = models.IntegerField(default=0)
+    number_total = models.IntegerField(default=0)
+    modules_done = models.IntegerField(default=0)
+    modules_total = models.IntegerField(default=0)
 
     # the time the trigger build was started
     started_at = models.DateTimeField(null=True)

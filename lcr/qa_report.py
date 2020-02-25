@@ -261,3 +261,25 @@ class QAReportApi(RESTFullApi):
         from django.utils import timezone
 
         return datetime.datetime.fromtimestamp(timestamp_in_secs, tz=timezone.utc)
+
+
+class TestNumbers():
+    number_passed = 0
+    number_failed = 0
+    number_total = 0
+    modules_done = 0
+    modules_total = 0
+
+    def addWithHash(self, numbers_of_result):
+        self.number_passed = self.number_passed + numbers_of_result.get('number_passed')
+        self.number_failed = self.number_failed + numbers_of_result.get('number_failed')
+        self.number_total = self.number_total + numbers_of_result.get('number_total')
+        self.modules_done = self.modules_done + numbers_of_result.get('modules_done')
+        self.modules_total = self.modules_total + numbers_of_result.get('modules_total')
+
+    def addWithTestNumbers(self, testNumbers):
+        self.number_passed = self.number_passed + testNumbers.number_passed
+        self.number_failed = self.number_failed + testNumbers.number_failed
+        self.number_total = self.number_total + testNumbers.number_total
+        self.modules_done = self.modules_done + testNumbers.modules_done
+        self.modules_total = self.modules_total + testNumbers.modules_total
