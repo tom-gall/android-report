@@ -7,6 +7,7 @@ urlpatterns = [
     url(r'^$', views.list_projects, name='home'),
     url(r'^rc-projects/.*$', views.list_rc_projects, name='list_rc_projects'),
     url(r'^projects/.*$', views.list_projects, name='list_projects'),
+    url(r'^kernel-changes/.*$', views.list_kernel_changes, name='list_kernel_changes'),
     url(r'^builds/.*$', views.list_builds, name='list_builds'),
     url(r'^jobs/.*$', views.list_jobs, name='list_jobs'),
     url(r'^file-bug/.*$', views.file_bug, name='file_bug'),

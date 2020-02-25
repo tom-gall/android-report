@@ -28,6 +28,8 @@ from lkft.views import extract
 from lkft.views import get_lkft_bugs, get_hardware_from_pname, get_result_file_path, get_kver_with_pname_env
 from lkft.lkft_config import find_expect_cibuilds
 
+from lkft.lkft_config import get_configs, get_qa_server_project
+
 qa_report_def = QA_REPORT[QA_REPORT_DEFAULT]
 qa_report_api = qa_report.QAReportApi(qa_report_def.get('domain'), qa_report_def.get('token'))
 jenkins_api = qa_report.JenkinsApi('ci.linaro.org', None)
@@ -37,66 +39,6 @@ class Command(BaseCommand):
 
 #    def add_arguments(self, parser):
 #        parser.add_argument('git_describes', nargs='+', type=str)
-
-    def get_url_content(self, url=None):
-        try:
-            response = urllib2.urlopen(url)
-            return response.read()
-        except urllib2.HTTPError:
-            pass
-
-        return None
-
-
-    def get_configs(self, ci_build=None):
-        build_name = ci_build.get('name')
-        configs = []
-        ci_config_file_url = "https://git.linaro.org/ci/job/configs.git/plain/%s.yaml" % build_name
-        content = self.get_url_content(url=ci_config_file_url)
-        if content is not None:
-            pat_configs = re.compile("\n\s+name:\s*ANDROID_BUILD_CONFIG\n\s+default:\s*'(?P<value>[a-zA-Z0-9\ -_.]+)'\s*\n")
-            configs_str = pat_configs.findall(content)
-            if len(configs_str) > 0:
-                for config in ' '.join(configs_str[0].split()).split():
-                    configs.append((config, ci_build))
-
-        return configs
-
-    def get_qa_server_project(self, lkft_build_config_name=None):
-        #TEST_QA_SERVER=https://qa-reports.linaro.org
-        #TEST_QA_SERVER_PROJECT=mainline-gki-aosp-master-hikey960
-        #TEST_QA_SERVER_TEAM=android-lkft-rc
-        url_build_config = "https://android-git.linaro.org/android-build-configs.git/plain/lkft/%s?h=lkft" % lkft_build_config_name
-        content = self.get_url_content(url_build_config)
-        pat_project = re.compile("\nTEST_QA_SERVER_PROJECT=(?P<value>[a-zA-Z0-9\ -_.]+)\n")
-        project_str = pat_project.findall(content)
-        if len(project_str) > 0:
-            project = project_str[0]
-        else:
-            project = None
-
-        pat_team=re.compile("\nTEST_QA_SERVER_TEAM=(?P<value>[a-zA-Z0-9\ -_.]+)\n")
-        team_str = pat_team.findall(content)
-        if len(team_str) > 0:
-            team = team_str[0]
-        else:
-            team = "android-lkft"
-
-        return (team, project)
-
-
-    def get_lkft_qa_report_projects(self):
-        projects = []
-        for project in qa_report_api.get_projects():
-            project_full_name = project.get('full_name')
-            if not project_full_name.startswith('android-lkft/') \
-                or project.get('is_archived'):
-                continue
-
-            projects.append(project)
-
-        return projects
-
 
     def classify_bugs_and_failures(self, bugs=[], failures=[]):
         bugs_reproduced = []
@@ -138,14 +80,14 @@ class Command(BaseCommand):
 
         total_reports = []
 
-        lkft_projects = self.get_lkft_qa_report_projects()
+        lkft_projects = qa_report_api.get_lkft_qa_report_projects()
         queued_ci_items = jenkins_api.get_queued_items()
         kernel_changes = KernelChange.objects_needs_report.all()
         for kernel_change in kernel_changes:
             lkft_build_configs = []
             trigger_url = jenkins_api.get_job_url(name=kernel_change.trigger_name, number=kernel_change.trigger_number)
             trigger_build = jenkins_api.get_build_details_with_full_url(build_url=trigger_url)
-            trigger_build['start_timestamp'] = datetime.datetime.fromtimestamp(int(trigger_build['timestamp'])/1000)
+            trigger_build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(trigger_build['timestamp'])/1000)
             trigger_build['duration'] = datetime.timedelta(milliseconds=trigger_build['duration'])
             trigger_build['name'] = kernel_change.trigger_name
             trigger_build['kernel_change'] = kernel_change
@@ -154,9 +96,6 @@ class Command(BaseCommand):
             kernel_change_status = "TRIGGER_BUILD_COMPLETED"
 
             dbci_builds = CiBuild.objects_kernel_change.get_builds_per_kernel_change(kernel_change=kernel_change).order_by('name', '-number')
-
-            ## TODO: how to check if a ci build is still in queue?
-            ##       check which ci build should be started from the information of the trigger build?
             expect_build_names = find_expect_cibuilds(trigger_name=kernel_change.trigger_name)
 
             jenkins_ci_builds = []
@@ -170,7 +109,7 @@ class Command(BaseCommand):
 
                 build_url = jenkins_api.get_job_url(name=dbci_build.name, number=dbci_build.number)
                 build = jenkins_api.get_build_details_with_full_url(build_url=build_url)
-                build['start_timestamp'] = datetime.datetime.fromtimestamp(int(build['timestamp'])/1000)
+                build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(build['timestamp'])/1000)
                 build['dbci_build'] = dbci_build
 
                 if build.get('building'):
@@ -183,7 +122,7 @@ class Command(BaseCommand):
                 build['status'] = build_status
                 build['name'] = dbci_build.name
                 jenkins_ci_builds.append(build)
-                configs = self.get_configs(ci_build=build)
+                configs = get_configs(ci_build=build)
                 lkft_build_configs.extend(configs)
 
             not_started_ci_builds = expect_build_names - set(ci_build_names)
@@ -228,7 +167,7 @@ class Command(BaseCommand):
                     # no need to check the build/job results as the ci build not finished successfully yet
                     continue
 
-                (project_group, project_name) = self.get_qa_server_project(lkft_build_config_name=lkft_build_config)
+                (project_group, project_name) = get_qa_server_project(lkft_build_config_name=lkft_build_config)
                 target_lkft_project_full_name = "%s/%s" % (project_group, project_name)
 
                 target_qareport_project = None
@@ -253,7 +192,7 @@ class Command(BaseCommand):
                     continue
 
                 created_str = target_qareport_build.get('created_at')
-                target_qareport_build['created_at'] = datetime.datetime.strptime(str(created_str), '%Y-%m-%dT%H:%M:%S.%fZ')
+                target_qareport_build['created_at'] = qa_report_api.get_aware_datetime_from_str(created_str)
                 target_qareport_build['project_name'] = project_name
                 target_qareport_build['project_group'] = project_group
 
@@ -399,13 +338,14 @@ class Command(BaseCommand):
                 dbci_build = jenkins_ci_build.get('dbci_build')
                 result_numbers = qareport_build.get('numbers_of_result')
 
+                trigger_dbci_build = CiBuild.objects.get(name=trigger_build.get('name'), number=trigger_build.get('number'))
                 try:
                     report_build = ReportBuild.objects.get(group=qareport_build.get('project_group'),
                                                             name=qareport_build.get('project_name'),
                                                             version=kernel_change.describe)
                     report_build.kernel_change = kernel_change
                     report_build.ci_build = dbci_build
-                    report_build.ci_trigger_build = CiBuild.objects.get(name=trigger_build.get('name'), number=trigger_build.get('number'))
+                    report_build.ci_trigger_build = trigger_dbci_build
                     report_build.number_passed = result_numbers.get('number_passed')
                     report_build.number_failed = result_numbers.get('number_failed')
                     report_build.number_total = result_numbers.get('number_total')
@@ -414,13 +354,13 @@ class Command(BaseCommand):
                     report_build.started_at = trigger_build.get('start_timestamp')
                     report_build.fetched_at = qareport_build.get('last_fetched_timestamp')
                     report_build.save()
-                except KernelChange.DoesNotExist:
+                except ReportBuild.DoesNotExist:
                     ReportBuild.objects.create(group=qareport_build.get('project_group'),
                                         name=qareport_build.get('project_name'),
                                         version=kernel_change.describe,
                                         kernel_change=kernel_change,
                                         ci_build=dbci_build,
-                                        ci_trigger_build=CiBuild.objects.get(name=trigger_build.get('name'), number=trigger_build.get('number')),
+                                        ci_trigger_build=trigger_dbci_build,
                                         number_passed=result_numbers.get('number_passed'),
                                         number_failed=result_numbers.get('number_failed'),
                                         number_total=result_numbers.get('number_total'),
@@ -462,7 +402,7 @@ class Command(BaseCommand):
 
             queued_ci_builds = kernel_change_report.get('queued_ci_builds')
             for build in  queued_ci_builds:
-                inqueuesince = datetime.datetime.fromtimestamp(int(build.get('inQueueSince')/1000))
+                inqueuesince = qa_report_api.get_aware_datetime_from_timestamp(int(build.get('inQueueSince')/1000))
                 #duration = datetime_now - inqueuesince
                 print "\t\t %s: still in queue since %s ago" % (build.get('build_name'), timesince(inqueuesince))
 

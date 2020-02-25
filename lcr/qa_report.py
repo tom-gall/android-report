@@ -232,3 +232,32 @@ class QAReportApi(RESTFullApi):
 
     def get_qa_job_id_with_url(self, job_url):
         return job_url.strip('/').split('/')[-1]
+
+    def get_lkft_qa_report_projects(self):
+        projects = []
+        for project in self.get_projects():
+            if project.get('is_archived'):
+                continue
+
+            project_full_name = project.get('full_name')
+            if not project_full_name.startswith('android-lkft/') \
+                and not project_full_name.startswith('android-lkft-rc/'):
+                continue
+
+            projects.append(project)
+
+        return projects
+
+    def get_aware_datetime_from_str(self, datetime_str):
+        import datetime
+        import pytz
+        # from python3.7, pytz is not necessary, we could use %z to get the timezone info
+        #https://stackoverflow.com/questions/53291250/python-3-6-datetime-strptime-returns-error-while-python-3-7-works-well
+        navie_datetime = datetime.datetime.strptime(datetime_str, '%Y-%m-%dT%H:%M:%S.%fZ')
+        return pytz.utc.localize(navie_datetime)
+
+    def get_aware_datetime_from_timestamp(self, timestamp_in_secs):
+        import datetime
+        from django.utils import timezone
+
+        return datetime.datetime.fromtimestamp(timestamp_in_secs, tz=timezone.utc)

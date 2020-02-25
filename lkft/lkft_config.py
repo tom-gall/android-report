@@ -186,3 +186,51 @@ def get_kver_with_pname_env(prj_name='', env=''):
         kernel_version = prj_name.split('-')[0]
 
     return kernel_version
+
+
+def get_url_content(url=None):
+    import urllib2
+    try:
+        response = urllib2.urlopen(url)
+        return response.read()
+    except urllib2.HTTPError:
+        pass
+
+    return None
+
+
+def get_configs(ci_build=None):
+    build_name = ci_build.get('name')
+    configs = []
+    ci_config_file_url = "https://git.linaro.org/ci/job/configs.git/plain/%s.yaml" % build_name
+    content = get_url_content(url=ci_config_file_url)
+    if content is not None:
+        pat_configs = re.compile("\n\s+name:\s*ANDROID_BUILD_CONFIG\n\s+default:\s*'(?P<value>[a-zA-Z0-9\ -_.]+)'\s*\n")
+        configs_str = pat_configs.findall(content)
+        if len(configs_str) > 0:
+            for config in ' '.join(configs_str[0].split()).split():
+                configs.append((config, ci_build))
+
+    return configs
+
+def get_qa_server_project(lkft_build_config_name=None):
+    #TEST_QA_SERVER=https://qa-reports.linaro.org
+    #TEST_QA_SERVER_PROJECT=mainline-gki-aosp-master-hikey960
+    #TEST_QA_SERVER_TEAM=android-lkft-rc
+    url_build_config = "https://android-git.linaro.org/android-build-configs.git/plain/lkft/%s?h=lkft" % lkft_build_config_name
+    content = get_url_content(url_build_config)
+    pat_project = re.compile("\nTEST_QA_SERVER_PROJECT=(?P<value>[a-zA-Z0-9\ -_.]+)\n")
+    project_str = pat_project.findall(content)
+    if len(project_str) > 0:
+        project = project_str[0]
+    else:
+        project = None
+
+    pat_team=re.compile("\nTEST_QA_SERVER_TEAM=(?P<value>[a-zA-Z0-9\ -_.]+)\n")
+    team_str = pat_team.findall(content)
+    if len(team_str) > 0:
+        team = team_str[0]
+    else:
+        team = "android-lkft"
+
+    return (team, project)

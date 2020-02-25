@@ -1,0 +1,46 @@
+{% extends '_layouts/base.html' %}
+
+{% block title %} Summary for Kernel Changes {% endblock %}
+
+{% block headline %}<h1>Summary for Kernel Changes</a></h1>{% endblock %}
+
+{% block content %}
+<div>
+<table border="1">
+	<tr>
+		<th>Index</th>
+		<th>Branch</th>
+        <th>Describe</th>
+        <th>Status</th>
+        <th>StartedAt</th>
+        <th>Duration</th>
+        <th>CI Trigger</th>
+        <th>Pass</th>
+        <th>Fail</th>
+        <th>Total</th>
+        <th>Modules Done</th>
+        <th>Modules Total</th>
+</tr>
+{% for kernelchange in kernelchanges %}
+<tr>
+    <td>{{ forloop.counter }}</td>
+    <td>{{kernelchange.branch}}</td>
+    <td>{{kernelchange.describe}}</td>
+    <td>{{kernelchange.status}}</td>
+    <td><p>Started at {{ kernelchange.start_timestamp|date:'M. d, Y, H:i'}}, &nbsp;{{ kernelchange.start_timestamp|timesince}} ago</p></td>
+    {% if kernelchange.status == 'ALL_COMPLETED' %}
+        <td>Took {{kernelchange.duration}} to finish</td>
+    {% else %}
+        <td>--</td>
+    {% endif %}
+    <td><a href="https://ci.linaro.org/job/{{kernelchange.trigger_name}}/{{kernelchange.trigger_number}}">{{kernelchange.trigger_name}}#{{kernelchange.trigger_number}}</td>
+    <td>{{kernelchange.number_passed}}</td>
+    <td>{{kernelchange.number_failed}}</td>
+    <td>{{kernelchange.number_total}}</td>
+    <td>{{kernelchange.modules_done}}</td>
+    <td>{{kernelchange.modules_total}}</td>
+</tr>
+{% endfor %}
+</table>
+</div>
+{% endblock %}
