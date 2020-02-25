@@ -453,7 +453,7 @@ def get_project_info(project):
         project['last_build']['build_status'] == "JOBSCOMPLETED":
         last_ci_build = project.get('last_ci_build')
         last_build = project.get('last_build')
-        if last_ci_build.get('ci_build_last_start_timestamp'):
+        if last_ci_build.get('start_timestamp'):
             project['duration'] = last_build.get('last_fetched_timestamp') - last_ci_build.get('start_timestamp')
 
     logger.info("%s: finished to get information for project", project.get('name'))
