@@ -9,24 +9,14 @@ citrigger_lkft = {
         'aosp-master-tracking-x15':'lkft-aosp-master-x15',
         },
 
-    'trigger-lkft-aosp-mainline': {
-        'mainline-9.0-x15': 'lkft-android-9.0-mainline-x15',
-        'mainline-9.0-x15-auto': 'lkft-android-9.0-mainline-x15',
-        'mainline-aosp-master-x15': 'lkft-x15-aosp-master-mainline',
-
-        'mainline-gki-aosp-master-db845c': 'lkft-db845c-aosp-master-mainline',
-        'mainline-aosp-master-db845c': 'lkft-db845c-aosp-master-mainline',
-
-        'mainline-gki-aosp-master-hikey': 'lkft-hikey-aosp-master-mainline-gki',
-        'mainline-aosp-master-hikey': 'lkft-hikey-aosp-master-mainline-gki',
-        'mainline-gki-aosp-master-hikey960': 'lkft-hikey960-aosp-master-mainline-gki',
-        'mainline-aosp-master-hikey960': 'lkft-hikey960-aosp-master-mainline-gki',
-        },
-
     'trigger-lkft-android-common': {
         '5.4-gki-aosp-master-hikey': 'lkft-hikey-aosp-master-5.4',
         '5.4-gki-aosp-master-hikey960': 'lkft-hikey960-aosp-master-5.4',
         '5.4-gki-aosp-master-db845c': 'lkft-db845c-aosp-master-5.4',
+
+        'mainline-aosp-master-x15': 'lkft-x15-aosp-master-mainline',
+        'mainline-gki-aosp-master-db845c': 'lkft-db845c-aosp-master-mainline',
+        'mainline-gki-aosp-master-hikey960': 'lkft-hikey960-aosp-master-mainline-gki',
         },
 
     # configs for TI 4.14 and 4.19 kernels
@@ -41,6 +31,7 @@ citrigger_lkft = {
     'trigger-lkft-x15-4.14': {
         '4.14-8.1-x15': 'lkft-x15-android-8.1-4.14',
         },
+
     # configs for 4.14 kernels
     'trigger-lkft-hikey-4.14': {
         '4.14-8.1-hikey': 'lkft-hikey-android-8.1-4.14',

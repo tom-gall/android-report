@@ -385,7 +385,7 @@ def get_project_info(project):
     builds = qa_report_api.get_all_builds(project.get('id'), only_first=True)
     if len(builds) > 0:
         last_build = builds[0]
-        last_build['created_at'] = qa_report_api.get_aware_datetime_from_str(last_build.get('fetched_at'))
+        last_build['created_at'] = qa_report_api.get_aware_datetime_from_str(last_build.get('created_at'))
 
         jobs = qa_report_api.get_jobs_for_build(last_build.get("id"))
         last_build['numbers_of_result'] = get_test_result_number_for_build(last_build, jobs)
