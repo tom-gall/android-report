@@ -16,7 +16,6 @@ import requests
 import sys
 import tarfile
 import tempfile
-import xmlrpclib
 import xml.etree.ElementTree as ET
 import zipfile
 
@@ -43,14 +42,6 @@ DIR_ATTACHMENTS = os.path.join(FILES_DIR, 'lkft')
 logger = logging.getLogger(__name__)
 
 TEST_RESULT_XML_NAME = 'test_result.xml'
-
-for nick, config in LAVA_SERVERS.items():
-    server_url = "https://%s:%s@%s/RPC2/" % ( config.get('username'),
-                                              config.get('token'),
-                                              config.get('hostname'))
-    server = xmlrpclib.ServerProxy(server_url)
-    config.update({'server': server})
-
 
 class LinaroAndroidLKFTBug(bugzilla.Bugzilla):
 
