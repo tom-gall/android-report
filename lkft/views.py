@@ -1127,6 +1127,23 @@ def list_kernel_changes(request):
 
     for db_kernelchange in db_kernelchanges:
         kernelchange = {}
+        if db_kernelchange.reported and  db_kernelchange.result == 'ALL_COMPLETED':
+            kernelchange['branch'] = db_kernelchange.branch
+            kernelchange['describe'] = db_kernelchange.describe
+            kernelchange['trigger_name'] = db_kernelchange.trigger_name
+            kernelchange['trigger_number'] = db_kernelchange.trigger_number
+            kernelchange['start_timestamp'] = db_kernelchange.timestamp
+            kernelchange['finished_timestamp'] = None
+            kernelchange['duration'] = datetime.timedelta(seconds=db_kernelchange.duration)
+            kernelchange['status'] = db_kernelchange.result
+            kernelchange['number_passed'] = db_kernelchange.number_passed
+            kernelchange['number_failed'] = db_kernelchange.number_failed
+            kernelchange['number_total'] = db_kernelchange.number_total
+            kernelchange['modules_done'] = db_kernelchange.modules_done
+            kernelchange['modules_total'] = db_kernelchange.modules_total
+            kernelchanges.append(kernelchange)
+            continue
+
         trigger_url = jenkins_api.get_job_url(name=db_kernelchange.trigger_name, number=db_kernelchange.trigger_number)
         trigger_build = jenkins_api.get_build_details_with_full_url(build_url=trigger_url)
         trigger_build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(trigger_build['timestamp'])/1000)

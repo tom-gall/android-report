@@ -329,7 +329,7 @@ class Command(BaseCommand):
             kernel_change.reported = True
             kernel_change.result = status
             kernel_change.timestamp = start_timestamp
-            kernel_change.duration = finished_timestamp - start_timestamp
+            kernel_change.duration = (finished_timestamp - start_timestamp).total_seconds()
 
             kernel_change.number_passed = test_numbers.number_passed
             kernel_change.number_failed = test_numbers.number_failed
@@ -402,7 +402,7 @@ class Command(BaseCommand):
                                         started_at=trigger_build.get('start_timestamp'),
                                         fetched_at=qareport_build.get('last_fetched_timestamp'))
 
-
+        return None
         # print out the reports
         print("########## REPORTS FOR KERNEL CHANGES#################")
         for kernel_change_report in total_reports:
