@@ -1137,7 +1137,7 @@ def list_kernel_changes(request):
         kernel_change_status = "TRIGGER_BUILD_COMPLETED"
 
         dbci_builds = CiBuild.objects_kernel_change.get_builds_per_kernel_change(kernel_change=db_kernelchange).order_by('name', '-number')
-        expect_build_names = find_expect_cibuilds(trigger_name=db_kernelchange.trigger_name)
+        expect_build_names = find_expect_cibuilds(trigger_name=db_kernelchange.trigger_name, branch_name=db_kernelchange.branch)
 
         lkft_build_configs = []
         jenkins_ci_builds = []

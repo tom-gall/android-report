@@ -102,17 +102,60 @@ citrigger_lkft_rcs = {
 }
 
 
-def find_expect_cibuilds(trigger_name=None):
+trigger_branch_builds_info = {
+    'trigger-lkft-android-common':{
+        'android-5.4': ['lkft-hikey-aosp-master-5.4',
+                        'lkft-hikey960-aosp-master-5.4',
+                        'lkft-db845c-aosp-master-5.4'],
+
+        'android-mainline': ['lkft-x15-aosp-master-mainline',
+                            'lkft-db845c-aosp-master-mainline',
+                            'lkft-hikey960-aosp-master-mainline-gki'],
+    },
+
+    # configs for hikey kernels
+    'trigger-linux-stable-rc': {
+        'linux-4.4.y': ['lkft-hikey-4.4-rc-p'],
+        'linux-4.9.y': ['lkft-hikey-4.9-rc'],
+        'linux-4.14.y': ['lkft-hikey-4.14-rc'],
+        'linux-4.19.y': ['lkft-hikey-4.19-rc'],
+        'linux-5.4.y': ['lkft-db845c-5.4-rc'],
+        },
+
+    # configs for hikey kernels
+    'trigger-lkft-hikey-stable': {
+        'android-4.4-o-hikey': ['lkft-hikey-4.4-o'],
+        'android-4.4-p-hikey': ['lkft-hikey-4.4-p'],
+        'android-4.9-o-hikey': ['lkft-hikey-4.9-o'],
+        'android-4.9-p-hikey': ['lkft-hikey-aosp-4.9-premerge-ci'],
+        'android-4.9-q-hikey': ['lkft-hikey-10.0-4.9-q'],
+        'android-4.14-p-hikey': ['lkft-hikey-aosp-4.14-premerge-ci'],
+        'android-4.14-q-hikey': ['lkft-hikey-10.0-4.14-q'],
+        'android-4.19-q-hikey': ['lkft-hikey-android-10.0-gsi-4.19']
+        },
+
+    # configs for 4.14 kernels
+    'trigger-lkft-hikey-4.14': {
+        'android-hikey-linaro-4.14': ['lkft-hikey-android-8.1-4.14'],
+        },
+
+    # configs for hikey kernels
+    'trigger-lkft-aosp-hikey': {
+        'android-hikey-linaro-4.14': ['lkft-hikey-aosp-master-4.14'],
+        'android-hikey-linaro-4.19': ['lkft-hikey-aosp-master-4.19'],
+        },
+}
+
+def find_expect_cibuilds(trigger_name=None, branch_name=None):
     if not trigger_name:
         return set([])
-    lkft_builds = citrigger_lkft.get(trigger_name)
-    lkft_rc_builds = citrigger_lkft_rcs.get(trigger_name)
-    if lkft_builds is not None:
-        return set(lkft_builds.values())
-    elif lkft_rc_builds is not None:
-        return set(lkft_rc_builds.values())
-    else:
+    branches = trigger_branch_builds_info.get(trigger_name)
+    if branches is None:
         return set([])
+    builds = branches.get(branch_name)
+    if builds is None:
+        return set([])
+    return set(builds)
 
 def get_ci_trigger_info(project=None):
     if not project.get('full_name'):

@@ -98,7 +98,7 @@ class Command(BaseCommand):
             kernel_change_status = "TRIGGER_BUILD_COMPLETED"
 
             dbci_builds = CiBuild.objects_kernel_change.get_builds_per_kernel_change(kernel_change=kernel_change).order_by('name', '-number')
-            expect_build_names = find_expect_cibuilds(trigger_name=kernel_change.trigger_name)
+            expect_build_names = find_expect_cibuilds(trigger_name=kernel_change.trigger_name, branch_name=kernel_change.branch)
 
             jenkins_ci_builds = []
             ci_build_names = []
