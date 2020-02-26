@@ -1121,7 +1121,7 @@ def new_build(request, branch, describe, name, number):
 def list_kernel_changes(request):
     queued_ci_items = jenkins_api.get_queued_items()
     lkft_projects = qa_report_api.get_lkft_qa_report_projects()
-    db_kernelchanges = KernelChange.objects.all()
+    db_kernelchanges = KernelChange.objects.all().order_by('branch', '-describe')
 
     kernelchanges = []
 
@@ -1304,12 +1304,8 @@ def list_kernel_changes(request):
 
         kernelchanges.append(kernelchange)
 
-    def get_cmp_value(item):
-        return "%s-%s" % (item.get('branch'), item.get("describe"))
-
-    sorted_kernelchanges = sorted(kernelchanges, key=get_cmp_value, reverse=True)
     return render(request, 'lkft-kernelchanges.html',
                        {
-                            "kernelchanges": sorted_kernelchanges,
+                            "kernelchanges": kernelchanges,
                         }
             )
