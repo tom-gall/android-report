@@ -1125,7 +1125,12 @@ def list_kernel_changes(request):
 
     kernelchanges = []
 
+    check_branches = []
     for db_kernelchange in db_kernelchanges:
+        if db_kernelchange.branch in check_branches:
+            continue
+        else:
+            check_branches.append(db_kernelchange.branch)
         kernelchange = {}
         if db_kernelchange.reported and  db_kernelchange.result == 'ALL_COMPLETED':
             kernelchange['branch'] = db_kernelchange.branch
