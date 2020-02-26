@@ -93,7 +93,7 @@ class Command(BaseCommand):
             trigger_build['duration'] = datetime.timedelta(milliseconds=trigger_build['duration'])
             trigger_build['name'] = kernel_change.trigger_name
             trigger_build['kernel_change'] = kernel_change
-            kernel_change_finished_timestamp = trigger_build['start_timestamp']
+            kernel_change_finished_timestamp = trigger_build['start_timestamp'] + trigger_build['duration']
 
             kernel_change_status = "TRIGGER_BUILD_COMPLETED"
 
