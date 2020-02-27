@@ -15,6 +15,10 @@ import os
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_FILE_DIR = os.path.join(BASE_DIR, "datafiles")
+# Directoy used to store cts vts result files
+FILES_DIR = os.path.join(DATA_FILE_DIR, "/files/cts-vts")
+
 
 ######################################################################
 ############INFO TO BE UPDATED########################################
@@ -61,7 +65,7 @@ LAVA_SERVERS = {
 DATABASES = { ## TO BE UPDATED
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        'NAME': os.path.join(DATA_FILE_DIR, 'db.sqlite3'),
     }
     #'default': {
     #    'ENGINE': 'django.db.backends.postgresql_psycopg2',
@@ -87,9 +91,6 @@ if ENABLE_APP_REPORT:
 ########################################################################
 ### PLEASE DO NOT CHANGE ANYTHIN IN THE BELOW ##########################
 ########################################################################
-
-# Directoy used to store cts vts result files
-FILES_DIR = os.path.join(BASE_DIR, "files/cts-vts")
 
 QA_REPORT_DEFAULT = 'production'
 
@@ -223,7 +224,7 @@ LOGGING = {
         'logfile': {
             'level':'DEBUG',
             'class':'logging.handlers.RotatingFileHandler',
-            'filename': BASE_DIR + "/logfile",
+            'filename': DATA_FILE_DIR + "/logfiles/logfile",
             'maxBytes': 50000,
             'backupCount': 2,
             'formatter': 'standard',
