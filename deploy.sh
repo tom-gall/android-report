@@ -76,6 +76,8 @@ else
 fi
 
 cd lcr-report
+mkdir -p datafiles/logfiles/
+sudo chown -R :www-data datafiles
 rm -fr db.sqlite3
 python manage.py migrate
 python manage.py createsuperuser
