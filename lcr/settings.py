@@ -17,7 +17,7 @@ import os
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_FILE_DIR = os.path.join(BASE_DIR, "datafiles")
 # Directoy used to store cts vts result files
-FILES_DIR = os.path.join(DATA_FILE_DIR, "/files/cts-vts")
+FILES_DIR = os.path.join(DATA_FILE_DIR, "files/cts-vts")
 
 
 ######################################################################
@@ -225,7 +225,7 @@ LOGGING = {
         'logfile': {
             'level':'DEBUG',
             'class':'logging.handlers.RotatingFileHandler',
-            'filename': DATA_FILE_DIR + "/logfiles/logfile",
+            'filename': os.path.join(DATA_FILE_DIR, "logfiles/logfile"),
             'maxBytes': 50000,
             'backupCount': 2,
             'formatter': 'standard',
