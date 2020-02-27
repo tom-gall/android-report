@@ -1199,7 +1199,7 @@ def list_kernel_changes(request):
                 is_queued_build = False
                 for queued_item in queued_ci_items:
                     if cibuild_name == queued_item.get('build_name') and \
-                        kernel_change.describe == queued_item.get('KERNEL_DESCRIBE'):
+                        db_kernelchange.describe == queued_item.get('KERNEL_DESCRIBE'):
                             is_queued_build = True
                             queued_ci_builds.append(queued_item)
                 if is_queued_build:
