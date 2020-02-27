@@ -20,7 +20,7 @@ from . import accountviews
 from . import settings
 
 urlpatterns = [
-#    url(r'^', include('report.urls')),
+    url(r'^', include('lkft.urls')),
     url(r'^lkft/', include('lkft.urls')),
     url(r'^admin/', admin.site.urls),
 
