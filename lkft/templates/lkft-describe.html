@@ -1,0 +1,85 @@
+{% extends '_layouts/base.html' %}
+
+{% block title %} {{kernel_change.describe}} {% endblock %}
+
+{% block headline %}<h1>Kernel Change: {{kernel_change.describe}}</a></h1>{% endblock %}
+
+{% block content %}
+<div>
+<h1>Trigger Build</h1>
+<table border="1">
+    <tr>
+        <th>Name</th>
+        <th>Number</th>
+        <th>Status</th>
+        <th>StartedAt</th>
+        <th>Duration</th>
+</tr>
+<tr>
+    <td><a href="https://ci.linaro.org/job/{{trigger_build.name}}/">{{trigger_build.name}}</a></td>
+    <td align='right'><a href="https://ci.linaro.org/job/{{trigger_build.name}}/{{trigger_build.number}}/">{{trigger_build.number}}</a></td>
+    <td>{{trigger_build.result}}</td>
+    <td><p>Started at {{ trigger_build.timestamp|date:'M. d, Y, H:i'}}, <br/>{{ trigger_build.timestamp|timesince}} ago</p></td>
+    <td align='right'>{{trigger_build.duration}}</td>
+</tr>
+</table>
+</div>
+
+<div>
+<h1>CI Builds</h1>
+<table border="1">
+    <tr>
+        <th>Index</th>
+        <th>Name</th>
+        <th>Number</th>
+        <th>Status</th>
+        <th>QueuedTime</th>
+        <th>StartedAt</th>
+        <th>Duration</th>
+</tr>
+{% for cibuild in ci_builds %}
+<tr>
+    <td>{{ forloop.counter }}</td>
+    <td><a href="https://ci.linaro.org/job/{{cibuild.name}}/">{{cibuild.name}}</a></td>
+    <td align='right'><a href="https://ci.linaro.org/job/{{cibuild.name}}/{{cibuild.number}}/">{{cibuild.number}}</a></td>
+    <td>{{cibuild.result}}</td>
+    <td align='right'>{{cibuild.queued_duration}}</td>
+    <td><p>Started at {{ cibuild.timestamp|date:'M. d, Y, H:i'}}, <br/>{{ cibuild.timestamp|timesince}} ago</p></td>
+    <td align='right'>{{cibuild.duration}}</td>
+</tr>
+{% endfor %}
+</table>
+</div>
+
+<div>
+<h1>Test Results</h1>
+<table border="1">
+    <tr>
+        <th>Index</th>
+        <th>Group</th>
+        <th>Name</th>
+        <th>StartedAt</th>
+        <th>Duration</th>
+        <th>Pass</th>
+        <th>Fail</th>
+        <th>Total</th>
+        <th>Modules Done</th>
+        <th>Modules Total</th>
+</tr>
+{% for report_build in report_builds %}
+<tr>
+    <td>{{ forloop.counter }}</td>
+    <td><a href="https://qa-reports.linaro.org/{{report_build.group}}/">{{report_build.group}}</a></td>
+    <td><a href="https://qa-reports.linaro.org/{{report_build.group}}/{{report_build.name}}/">{{report_build.name}}</a></td>
+    <td><p>Started at {{ report_build.started_at|date:'M. d, Y, H:i'}},<br/>{{ report_build.started_at|timesince}} ago</p></td>
+    <td align='right'>{{report_build.duration}}</td>
+    <td align='right'>{{report_build.number_passed}}</td>
+    <td align='right'>{{report_build.number_failed}}</td>
+    <td align='right'>{{report_build.number_total}}</td>
+    <td align='right'>{{report_build.modules_done}}</td>
+    <td align='right'>{{report_build.modules_total}}</td>
+</tr>
+{% endfor %}
+</table>
+</div>
+{% endblock %}

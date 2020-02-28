@@ -43,7 +43,7 @@ class CiBuildKernelChangeManager(models.Manager):
 class CiBuild(models.Model):
     name = models.CharField(max_length=255)
     number = models.IntegerField()
-    kernel_change = models.ForeignKey(KernelChange, null=True, on_delete=None)
+    kernel_change = models.ForeignKey(KernelChange, null=True, on_delete=models.CASCADE)
     timestamp = models.DateTimeField(null=True)
     duration = models.IntegerField(default=0) # total_seconds
     result = models.CharField(max_length=100, null=True, default="NOINFO")
@@ -66,9 +66,9 @@ class ReportBuild(models.Model):
     # the version of the qareport build
     version = models.CharField(max_length=100)
 
-    kernel_change = models.ForeignKey(KernelChange, on_delete=None)
-    ci_build = models.ForeignKey(CiBuild, on_delete=None, related_name="ci_build")
-    ci_trigger_build = models.ForeignKey(CiBuild, on_delete=None, related_name='trigger_build')
+    kernel_change = models.ForeignKey(KernelChange, on_delete=models.CASCADE)
+    ci_build = models.ForeignKey(CiBuild, on_delete=models.CASCADE, related_name="ci_build")
+    ci_trigger_build = models.ForeignKey(CiBuild, on_delete=models.CASCADE, related_name='trigger_build')
 
     number_passed = models.IntegerField(default=0)
     number_failed = models.IntegerField(default=0)

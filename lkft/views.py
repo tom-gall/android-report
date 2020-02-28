@@ -31,7 +31,7 @@ from lkft.lkft_config import find_citrigger, find_cibuild, get_hardware_from_pna
 from lkft.lkft_config import find_expect_cibuilds
 from lkft.lkft_config import get_configs, get_qa_server_project
 
-from .models import KernelChange, CiBuild
+from .models import KernelChange, CiBuild, ReportBuild
 
 qa_report_def = QA_REPORT[QA_REPORT_DEFAULT]
 qa_report_api = qa_report.QAReportApi(qa_report_def.get('domain'), qa_report_def.get('token'))
@@ -1117,20 +1117,13 @@ def new_build(request, branch, describe, name, number):
         return HttpResponse("ERROR:%s" % err_msg,
                             status=200)
 
-
-def list_kernel_changes(request):
+def get_kernel_changes_info(db_kernelchanges=[]):
     queued_ci_items = jenkins_api.get_queued_items()
     lkft_projects = qa_report_api.get_lkft_qa_report_projects()
-    db_kernelchanges = KernelChange.objects.all().order_by('branch', '-describe')
 
     kernelchanges = []
 
-    check_branches = []
     for db_kernelchange in db_kernelchanges:
-        if db_kernelchange.branch in check_branches:
-            continue
-        else:
-            check_branches.append(db_kernelchange.branch)
         kernelchange = {}
         if db_kernelchange.reported and  db_kernelchange.result == 'ALL_COMPLETED':
             kernelchange['branch'] = db_kernelchange.branch
@@ -1309,8 +1302,81 @@ def list_kernel_changes(request):
 
         kernelchanges.append(kernelchange)
 
+    return kernelchanges
+
+
+@login_required
+def list_kernel_changes(request):
+    db_kernelchanges = KernelChange.objects.all().order_by('branch', '-describe')
+    check_branches = []
+    for db_kernelchange in db_kernelchanges:
+        if db_kernelchange.branch in check_branches:
+            continue
+        else:
+            check_branches.append(db_kernelchange.branch)
+
+    kernelchanges = get_kernel_changes_info(db_kernelchanges=check_branches)
+
     return render(request, 'lkft-kernelchanges.html',
                        {
                             "kernelchanges": kernelchanges,
+                        }
+            )
+
+@login_required
+def list_branch_kernel_changes(request, branch):
+    db_kernelchanges = KernelChange.objects.all().filter(branch=branch).order_by('-describe')
+    kernelchanges = get_kernel_changes_info(db_kernelchanges=db_kernelchanges)
+
+    return render(request, 'lkft-kernelchanges.html',
+                       {
+                            "kernelchanges": kernelchanges,
+                        }
+            )
+@login_required
+def list_describe_kernel_changes(request, branch, describe):
+    db_kernel_change = KernelChange.objects.get(branch=branch, describe=describe)
+    db_report_builds = ReportBuild.objects.filter(kernel_change=db_kernel_change).order_by('group', 'name')
+    db_ci_builds = CiBuild.objects.filter(kernel_change=db_kernel_change).exclude(name=db_kernel_change.trigger_name).order_by('name', 'number')
+    db_trigger_build = CiBuild.objects.get(name=db_kernel_change.trigger_name, kernel_change=db_kernel_change)
+
+    trigger_build = {}
+    trigger_build['name'] = db_trigger_build.name
+    trigger_build['number'] = db_trigger_build.number
+    trigger_build['timestamp'] = db_trigger_build.timestamp
+    trigger_build['result'] = db_trigger_build.result
+    trigger_build['duration'] = datetime.timedelta(seconds=db_trigger_build.duration)
+
+    ci_builds = []
+    for db_ci_build in db_ci_builds:
+        ci_build = {}
+        ci_build['name'] = db_ci_build.name
+        ci_build['number'] = db_ci_build.number
+        ci_build['timestamp'] = db_ci_build.timestamp
+        ci_build['result'] = db_ci_build.result
+        ci_build['duration'] = datetime.timedelta(seconds=db_ci_build.duration)
+        ci_build['queued_duration'] = db_ci_build.timestamp - db_trigger_build.timestamp
+        ci_builds.append(ci_build)
+
+    report_builds = []
+    for db_report_build in db_report_builds:
+        report_build = {}
+        report_build['group'] = db_report_build.group
+        report_build['name'] = db_report_build.name
+        report_build['started_at'] = db_report_build.started_at
+        report_build['number_passed'] = db_report_build.number_passed
+        report_build['number_failed'] = db_report_build.number_failed
+        report_build['number_total'] = db_report_build.number_total
+        report_build['modules_done'] = db_report_build.modules_done
+        report_build['modules_total'] = db_report_build.modules_total
+        report_build['duration'] = db_report_build.fetched_at - db_report_build.started_at
+        report_builds.append(report_build)
+
+    return render(request, 'lkft-describe.html',
+                       {
+                            "kernel_change": db_kernel_change,
+                            'report_builds': report_builds,
+                            'trigger_build': trigger_build,
+                            'ci_builds': ci_builds,
                         }
             )

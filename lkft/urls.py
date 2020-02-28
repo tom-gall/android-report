@@ -7,7 +7,11 @@ urlpatterns = [
     url(r'^$', views.list_projects, name='home'),
     url(r'^rc-projects/.*$', views.list_rc_projects, name='list_rc_projects'),
     url(r'^projects/.*$', views.list_projects, name='list_projects'),
-    url(r'^kernel-changes/.*$', views.list_kernel_changes, name='list_kernel_changes'),
+    url(r'^kernel-changes/$', views.list_kernel_changes, name='list_kernel_changes'),
+    # newchanges/$branch/
+    url(r'^kernel-changes/(%s)/$' % (basic_pat), views.list_branch_kernel_changes, name='list_branch_kernel_changes'),
+    # newchanges/$branch/$describe/
+    url(r'^kernel-changes/(%s)/(%s)/$' % (basic_pat, basic_pat), views.list_describe_kernel_changes, name='list_describe_kernel_changes'),
     url(r'^builds/.*$', views.list_builds, name='list_builds'),
     url(r'^jobs/.*$', views.list_jobs, name='list_jobs'),
     url(r'^file-bug/.*$', views.file_bug, name='file_bug'),

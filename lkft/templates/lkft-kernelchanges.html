@@ -1,8 +1,8 @@
 {% extends '_layouts/base.html' %}
 
-{% block title %} Summary for Kernel Changes {% endblock %}
+{% block title %} Kernel Changes {% endblock %}
 
-{% block headline %}<h1>Summary for Kernel Changes</a></h1>{% endblock %}
+{% block headline %}<h1>Kernel Changes</a></h1>{% endblock %}
 
 {% block content %}
 <div>
@@ -24,21 +24,21 @@
 {% for kernelchange in kernelchanges %}
 <tr>
     <td>{{ forloop.counter }}</td>
-    <td>{{kernelchange.branch}}</td>
-    <td>{{kernelchange.describe}}</td>
+    <td><a href="/lkft/kernel-changes/{{kernelchange.branch}}/">{{kernelchange.branch}}</a></td>
+    <td><a href="/lkft/kernel-changes/{{kernelchange.branch}}/{{kernelchange.describe}}/">{{kernelchange.describe}}</a></td>
     <td>{{kernelchange.status}}</td>
     <td><p>Started at {{ kernelchange.start_timestamp|date:'M. d, Y, H:i'}}, &nbsp;{{ kernelchange.start_timestamp|timesince}} ago</p></td>
     {% if kernelchange.status == 'ALL_COMPLETED' %}
-        <td>Took {{kernelchange.duration}} to finish</td>
+        <td align='right'>Took {{kernelchange.duration}} to finish</td>
     {% else %}
-        <td>--</td>
+        <td align='right'>--</td>
     {% endif %}
-    <td><a href="https://ci.linaro.org/job/{{kernelchange.trigger_name}}/{{kernelchange.trigger_number}}">{{kernelchange.trigger_name}}#{{kernelchange.trigger_number}}</td>
-    <td>{{kernelchange.number_passed}}</td>
-    <td>{{kernelchange.number_failed}}</td>
-    <td>{{kernelchange.number_total}}</td>
-    <td>{{kernelchange.modules_done}}</td>
-    <td>{{kernelchange.modules_total}}</td>
+    <td><a href="https://ci.linaro.org/job/{{kernelchange.trigger_name}}/{{kernelchange.trigger_number}}">{{kernelchange.trigger_name}}#{{kernelchange.trigger_number}}</a></td>
+    <td align='right'>{{kernelchange.number_passed}}</td>
+    <td align='right'>{{kernelchange.number_failed}}</td>
+    <td align='right'>{{kernelchange.number_total}}</td>
+    <td align='right'>{{kernelchange.modules_done}}</td>
+    <td align='right'>{{kernelchange.modules_total}}</td>
 </tr>
 {% endfor %}
 </table>
