@@ -1355,7 +1355,8 @@ def list_describe_kernel_changes(request, branch, describe):
         ci_build['timestamp'] = db_ci_build.timestamp
         ci_build['result'] = db_ci_build.result
         ci_build['duration'] = datetime.timedelta(seconds=db_ci_build.duration)
-        ci_build['queued_duration'] = db_ci_build.timestamp - db_trigger_build.timestamp
+        if db_ci_build.timestamp and db_trigger_build.timestamp:
+            ci_build['queued_duration'] = db_ci_build.timestamp - db_trigger_build.timestamp
         ci_builds.append(ci_build)
 
     report_builds = []
