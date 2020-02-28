@@ -1310,10 +1310,10 @@ def list_kernel_changes(request):
     db_kernelchanges = KernelChange.objects.all().order_by('branch', '-describe')
     check_branches = []
     for db_kernelchange in db_kernelchanges:
-        if db_kernelchange.branch in check_branches:
+        if db_kernelchange in check_branches:
             continue
         else:
-            check_branches.append(db_kernelchange.branch)
+            check_branches.append(db_kernelchange)
 
     kernelchanges = get_kernel_changes_info(db_kernelchanges=check_branches)
 
@@ -1369,7 +1369,9 @@ def list_describe_kernel_changes(request, branch, describe):
         report_build['number_total'] = db_report_build.number_total
         report_build['modules_done'] = db_report_build.modules_done
         report_build['modules_total'] = db_report_build.modules_total
-        report_build['duration'] = db_report_build.fetched_at - db_report_build.started_at
+        if db_report_build.fetched_at and db_report_build.started_at:
+            report_build['duration'] = db_report_build.fetched_at - db_report_build.started_at
+
         report_builds.append(report_build)
 
     return render(request, 'lkft-describe.html',
