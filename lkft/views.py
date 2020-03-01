@@ -1309,10 +1309,12 @@ def get_kernel_changes_info(db_kernelchanges=[]):
 def list_kernel_changes(request):
     db_kernelchanges = KernelChange.objects.all().order_by('branch', '-describe')
     check_branches = []
+    unique_branch_names = []
     for db_kernelchange in db_kernelchanges:
-        if db_kernelchange in check_branches:
+        if db_kernelchange.branch in unique_branch_names:
             continue
         else:
+            unique_branch_names.append(db_kernelchange.branch)
             check_branches.append(db_kernelchange)
 
     kernelchanges = get_kernel_changes_info(db_kernelchanges=check_branches)

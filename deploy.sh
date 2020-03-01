@@ -83,7 +83,7 @@ python manage.py migrate
 python manage.py createsuperuser
 echo "Please access the site via http://127.0.0.1:9000/lkft"
 echo "And you still need to update the bugzilla, qa-report tokens to resubmit job or create bugs"
-python manage.py runserver 0.0.0.0:9000
+python manage.py runserver 9000
 # By running makemigrations, you’re telling Django that you’ve made some changes to your models (in this case,
 # you’ve made new ones) and that you’d like the changes to be stored as a migration.
 # python manage.py makemigrations report
