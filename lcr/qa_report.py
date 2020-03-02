@@ -14,6 +14,15 @@ class DotDict(dict):
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
 
+class UrlNotFoundException(Exception):
+    '''
+        Specific Expection for UrlNotFound Error
+    '''
+    response = None
+
+    def __init__(self, response):
+        self.response = response
+
 
 class RESTFullApi():
     def __init__(self, domain, api_token):
@@ -36,7 +45,9 @@ class RESTFullApi():
         if returnResponse:
             return r
 
-        if not r.ok:
+        if not r.ok and r.status_code == 404:
+            raise UrlNotFoundException(r)
+        elif not r.ok:
             raise Exception(r.url, r.reason, r.status_code)
 
         if r.content:

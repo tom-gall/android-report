@@ -93,7 +93,12 @@ class Command(BaseCommand):
             trigger_build['duration'] = datetime.timedelta(milliseconds=trigger_build['duration'])
             trigger_build['name'] = kernel_change.trigger_name
             trigger_build['kernel_change'] = kernel_change
-            kernel_change_finished_timestamp = trigger_build['start_timestamp'] + trigger_build['duration']
+            if trigger_build.get('building'):
+                trigger_build['status'] = 'INPROGRESS'
+                kernel_change_finished_timestamp = trigger_build['start_timestamp']
+            else:
+                trigger_build['status']  = trigger_build.get('result') # null or SUCCESS, FAILURE, ABORTED
+                kernel_change_finished_timestamp = trigger_build['start_timestamp'] + trigger_build['duration']
 
             kernel_change_status = "TRIGGER_BUILD_COMPLETED"
 
@@ -317,55 +322,51 @@ class Command(BaseCommand):
         ## cache to database
         for kernel_change_report in total_reports:
             status = kernel_change_report.get('kernel_change_status')
-            if status != 'ALL_COMPLETED':
-                continue
-
             trigger_build = kernel_change_report.get('trigger_build')
+
+            # Try to cache Trigger build information to database
+            try:
+                trigger_dbci_build = CiBuild.objects.get(name=trigger_build.get('name'), number=trigger_build.get('number'))
+                trigger_dbci_build.duration = trigger_build.get('duration').total_seconds()
+                trigger_dbci_build.timestamp = trigger_build.get('start_timestamp')
+                trigger_dbci_build.result = trigger_build.get('status')
+                trigger_dbci_build.save()
+            except CiBuild.DoesNotExist:
+                CiBuild.objects.create(name=trigger_build.get('name'),
+                                        number=trigger_build.get('number'),
+                                        kernel_change=kernel_change,
+                                        duration=trigger_build.get('duration').total_seconds(),
+                                        timestamp=trigger_build.get('start_timestamp'),
+                                        result=trigger_build.get('status'))
+
+
+            # Try to cache CI build information to database
+            jenkins_ci_builds = kernel_change_report.get('jenkins_ci_builds')
+            for ci_build in jenkins_ci_builds:
+                CiBuild.objects.filter(name=ci_build.get('name'),
+                                     number=ci_build.get('number')
+                                 ).update(duration=ci_build.get('duration').total_seconds(),
+                                     timestamp=ci_build.get('start_timestamp'),
+                                     result=ci_build.get('status'))
+
+            # Try to cache kernel change result informtion to database
             finished_timestamp = kernel_change_report.get('finished_timestamp')
             start_timestamp = kernel_change_report.get('start_timestamp')
             test_numbers = kernel_change_report.get('test_numbers')
 
             kernel_change = kernel_change_report.get('kernel_change')
-            kernel_change.reported = True
+            kernel_change.reported = (status == 'ALL_COMPLETED')
             kernel_change.result = status
             kernel_change.timestamp = start_timestamp
             kernel_change.duration = (finished_timestamp - start_timestamp).total_seconds()
-
             kernel_change.number_passed = test_numbers.number_passed
             kernel_change.number_failed = test_numbers.number_failed
             kernel_change.number_total = test_numbers.number_total
             kernel_change.modules_done = test_numbers.modules_done
             kernel_change.modules_total = test_numbers.modules_total
-
             kernel_change.save()
 
-            trigger_build = kernel_change_report.get('trigger_build')
-            if not trigger_build.get('building'):
-                # should always be here
-                try:
-                    trigger_dbci_build = CiBuild.objects.get(name=trigger_build.get('name'), number=trigger_build.get('number'))
-                    trigger_dbci_build.duration = trigger_build.get('duration').total_seconds()
-                    trigger_dbci_build.timestamp = trigger_build.get('start_timestamp')
-                    trigger_dbci_build.result = trigger_build.get('result')
-                except CiBuild.DoesNotExist:
-                    CiBuild.objects.create(name=trigger_build.get('name'),
-                                            number=trigger_build.get('number'),
-                                            kernel_change=kernel_change,
-                                            duration=trigger_build.get('duration').total_seconds(),
-                                            timestamp=trigger_build.get('start_timestamp'),
-                                            result=trigger_build.get('result'))
-
-            jenkins_ci_builds = kernel_change_report.get('jenkins_ci_builds')
-            for ci_build in jenkins_ci_builds:
-                if build.get('building'):
-                    # there should be no such case
-                    continue
-                CiBuild.objects.filter(name=ci_build.get('name'),
-                                     number=ci_build.get('number')
-                                 ).update(duration=ci_build.get('duration').total_seconds(),
-                                     timestamp=ci_build.get('start_timestamp'),
-                                     result=ci_build.get('result'))
-
+            # Try to cache report build informtion to database
             for qareport_build in kernel_change_report.get('qa_report_builds'):
                 jenkins_ci_build = qareport_build.get('ci_build')
                 dbci_build = jenkins_ci_build.get('dbci_build')
