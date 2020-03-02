@@ -127,8 +127,8 @@ class Command(BaseCommand):
                     has_build_inprogress = True
                 else:
                     build_status = build.get('result') # null or SUCCESS, FAILURE, ABORTED
-                    build['duration'] = datetime.timedelta(milliseconds=build['duration'])
 
+                build['duration'] = datetime.timedelta(milliseconds=build['duration'])
                 build['status'] = build_status
                 build['name'] = dbci_build.name
                 jenkins_ci_builds.append(build)
