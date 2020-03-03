@@ -1338,7 +1338,7 @@ def list_branch_kernel_changes(request, branch):
 @login_required
 def list_describe_kernel_changes(request, branch, describe):
     db_kernel_change = KernelChange.objects.get(branch=branch, describe=describe)
-    db_report_builds = ReportBuild.objects.filter(kernel_change=db_kernel_change).order_by('group', 'name')
+    db_report_builds = ReportBuild.objects.filter(kernel_change=db_kernel_change).order_by('qa_project__group', 'qa_project__name')
     db_ci_builds = CiBuild.objects.filter(kernel_change=db_kernel_change).exclude(name=db_kernel_change.trigger_name).order_by('name', 'number')
     db_trigger_build = CiBuild.objects.get(name=db_kernel_change.trigger_name, kernel_change=db_kernel_change)
 
@@ -1358,20 +1358,20 @@ def list_describe_kernel_changes(request, branch, describe):
         ci_build['result'] = db_ci_build.result
         ci_build['duration'] = datetime.timedelta(seconds=db_ci_build.duration)
         if db_ci_build.timestamp and db_trigger_build.timestamp:
-            ci_build['queued_duration'] = db_ci_build.timestamp - db_trigger_build.timestamp
+            ci_build['queued_duration'] = db_ci_build.timestamp - db_trigger_build.timestamp  - trigger_build['duration']
         ci_builds.append(ci_build)
 
     report_builds = []
     for db_report_build in db_report_builds:
         report_build = {}
-        report_build['group'] = db_report_build.group
-        report_build['name'] = db_report_build.name
+        report_build['qa_project'] = db_report_build.qa_project
         report_build['started_at'] = db_report_build.started_at
         report_build['number_passed'] = db_report_build.number_passed
         report_build['number_failed'] = db_report_build.number_failed
         report_build['number_total'] = db_report_build.number_total
         report_build['modules_done'] = db_report_build.modules_done
         report_build['modules_total'] = db_report_build.modules_total
+        report_build['qa_build_id'] = db_report_build.qa_build_id
         if db_report_build.fetched_at and db_report_build.started_at:
             report_build['duration'] = db_report_build.fetched_at - db_report_build.started_at
 

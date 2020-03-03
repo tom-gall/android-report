@@ -58,14 +58,30 @@ class CiBuild(models.Model):
     objects_kernel_change = CiBuildKernelChangeManager()
 
 
-class ReportBuild(models.Model):
+class ReportProject(models.Model):
     # the group that this build belongs to
     group = models.CharField(max_length=100)
     # the name of the qareport project
     name = models.CharField(max_length=100)
+    # the slug of the qareport project
+    slug = models.CharField(max_length=100)
+
+    project_id = models.IntegerField(default=0)
+
+    def __str__(self):
+        return "%s#%s" % (self.group, self.name)
+
+    def __unicode__(self):
+        return "%s#%s" % (self.group, self.name)
+
+    objects = models.Manager()
+
+
+class ReportBuild(models.Model):
     # the version of the qareport build
     version = models.CharField(max_length=100)
 
+    qa_project = models.ForeignKey(ReportProject, on_delete=models.CASCADE, null=True)
     kernel_change = models.ForeignKey(KernelChange, on_delete=models.CASCADE)
     ci_build = models.ForeignKey(CiBuild, on_delete=models.CASCADE, related_name="ci_build")
     ci_trigger_build = models.ForeignKey(CiBuild, on_delete=models.CASCADE, related_name='trigger_build')
@@ -81,11 +97,13 @@ class ReportBuild(models.Model):
     # the time the last job was fetched
     fetched_at = models.DateTimeField(null=True)
 
+    # The id of the qa-report build id
+    qa_build_id = models.IntegerField(default=0)
 
     def __str__(self):
-        return "%s#%s#%s" % (self.group, self.name, self.version)
+        return "%s#%s" % (self.qa_project, self.version)
 
     def __unicode__(self):
-        return "%s#%s#%s" % (self.group, self.name, self.version)
+        return "%s#%s" % (self.qa_project, self.version)
 
     objects = models.Manager()

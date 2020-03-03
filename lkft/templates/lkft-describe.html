@@ -52,7 +52,7 @@
 </div>
 
 <div>
-<h1>Test Results</h1>
+<h1>QA Report Builds</h1>
 <table border="1">
     <tr>
         <th>Index</th>
@@ -69,15 +69,15 @@
 {% for report_build in report_builds %}
 <tr>
     <td>{{ forloop.counter }}</td>
-    <td><a href="https://qa-reports.linaro.org/{{report_build.group}}/">{{report_build.group}}</a></td>
-    <td><a href="https://qa-reports.linaro.org/{{report_build.group}}/{{report_build.name}}/">{{report_build.name}}</a></td>
+    <td><a href="https://qa-reports.linaro.org/{{report_build.qa_project.group}}/">{{report_build.qa_project.group}}</a></td>
+    <td><a href="https://qa-reports.linaro.org/{{report_build.qa_project.group}}/{{report_build.qa_project.name}}/">{{report_build.qa_project.name}}</a></td>
     <td><p>Started at {{ report_build.started_at|date:'M. d, Y, H:i'}},<br/>{{ report_build.started_at|timesince}} ago</p></td>
     <td align='right'>{{report_build.duration}}</td>
-    <td align='right'>{{report_build.number_passed}}</td>
-    <td align='right'>{{report_build.number_failed}}</td>
-    <td align='right'>{{report_build.number_total}}</td>
-    <td align='right'>{{report_build.modules_done}}</td>
-    <td align='right'>{{report_build.modules_total}}</td>
+    <td align='right'><a href="/lkft/jobs/?build_id={{report_build.qa_build_id}}">{{report_build.number_passed}}</a></td>
+    <td align='right'><a href="/lkft/jobs/?build_id={{report_build.qa_build_id}}">{{report_build.number_failed}}</a></td>
+    <td align='right'><a href="/lkft/jobs/?build_id={{report_build.qa_build_id}}">{{report_build.number_total}}</a></td>
+    <td align='right'><a href="/lkft/jobs/?build_id={{report_build.qa_build_id}}">{{report_build.modules_done}}</a></td>
+    <td align='right'><a href="/lkft/jobs/?build_id={{report_build.qa_build_id}}">{{report_build.modules_total}}</a></td>
 </tr>
 {% endfor %}
 </table>

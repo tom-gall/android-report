@@ -16,7 +16,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 from django.utils.timesince import timesince
 
-from lkft.models import KernelChange, CiBuild, ReportBuild
+from lkft.models import KernelChange, CiBuild, ReportBuild, ReportProject
 
 from lcr import qa_report
 
@@ -88,7 +88,11 @@ class Command(BaseCommand):
             test_numbers = qa_report.TestNumbers()
 
             trigger_url = jenkins_api.get_job_url(name=kernel_change.trigger_name, number=kernel_change.trigger_number)
-            trigger_build = jenkins_api.get_build_details_with_full_url(build_url=trigger_url)
+            try:
+                trigger_build = jenkins_api.get_build_details_with_full_url(build_url=trigger_url)
+            except qa_report.UrlNotFoundException:
+                print("the build does not exist any more: %s" % trigger_url)
+                continue
             trigger_build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(trigger_build['timestamp'])/1000)
             trigger_build['duration'] = datetime.timedelta(milliseconds=trigger_build['duration'])
             trigger_build['name'] = kernel_change.trigger_name
@@ -205,6 +209,8 @@ class Command(BaseCommand):
                 target_qareport_build['created_at'] = qa_report_api.get_aware_datetime_from_str(created_str)
                 target_qareport_build['project_name'] = project_name
                 target_qareport_build['project_group'] = project_group
+                target_qareport_build['project_slug'] = target_qareport_project.get('slug')
+                target_qareport_build['project_id'] = target_qareport_project.get('id')
 
                 jobs = qa_report_api.get_jobs_for_build(target_qareport_build.get("id"))
                 build_status = get_lkft_build_status(target_qareport_build, jobs)
@@ -373,9 +379,21 @@ class Command(BaseCommand):
                 result_numbers = qareport_build.get('numbers_of_result')
 
                 trigger_dbci_build = CiBuild.objects.get(name=trigger_build.get('name'), number=trigger_build.get('number'))
+
+                qa_project_group = qareport_build.get('project_group')
+                qa_project_name = qareport_build.get('project_name')
+                qa_project_slug = qareport_build.get('project_slug')
+                qa_project_id = qareport_build.get('project_id')
                 try:
-                    report_build = ReportBuild.objects.get(group=qareport_build.get('project_group'),
-                                                            name=qareport_build.get('project_name'),
+                    qa_project = ReportProject.objects.get(group=qa_project_group, name=qa_project_name)
+                except ReportProject.DoesNotExist:
+                    qa_project = ReportProject.objects.create(group=qa_project_group,
+                                                name=qa_project_name,
+                                                slug=qa_project_slug,
+                                                project_id=qa_project_id)
+
+                try:
+                    report_build = ReportBuild.objects.get(qa_project=qa_project,
                                                             version=kernel_change.describe)
                     report_build.kernel_change = kernel_change
                     report_build.ci_build = dbci_build
@@ -387,10 +405,10 @@ class Command(BaseCommand):
                     report_build.modules_total = result_numbers.get('modules_total')
                     report_build.started_at = trigger_build.get('start_timestamp')
                     report_build.fetched_at = qareport_build.get('last_fetched_timestamp')
+                    report_build.qa_build_id = qareport_build.get('id')
                     report_build.save()
                 except ReportBuild.DoesNotExist:
-                    ReportBuild.objects.create(group=qareport_build.get('project_group'),
-                                        name=qareport_build.get('project_name'),
+                    ReportBuild.objects.create(qa_project=qa_project,
                                         version=kernel_change.describe,
                                         kernel_change=kernel_change,
                                         ci_build=dbci_build,
@@ -401,7 +419,8 @@ class Command(BaseCommand):
                                         modules_done=result_numbers.get('modules_done'),
                                         modules_total=result_numbers.get('modules_total'),
                                         started_at=trigger_build.get('start_timestamp'),
-                                        fetched_at=qareport_build.get('last_fetched_timestamp'))
+                                        fetched_at=qareport_build.get('last_fetched_timestamp'),
+                                        qa_build_id=qareport_build.get('id'))
 
         return None
         # print out the reports
