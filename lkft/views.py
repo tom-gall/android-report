@@ -204,7 +204,12 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
                     failed_number = failed_number + len(failed_tests)
                     for failed_test in failed_tests:
                         #test_name = '%s#%s' % (test_case.get("name"), vts_abi_suffix_pat.sub('', failed_test.get("name")))
-                        test_name = '%s#%s' % (test_case.get("name"), failed_test.get("name"))
+                        mod_name = test_case.get("name")
+                        test_name = failed_test.get("name")
+                        if test_name.endswith('_64bit') or test_name.endswith('_32bit'):
+                            test_name = '%s#%s' % (mod_name, test_name)
+                        else: 
+                            test_name = '%s#%s#%s' % (mod_name, test_name, abi)
                         message = failed_test.find('.//Failure').attrib.get('message')
                         stacktrace = failed_test.find('.//Failure/StackTrace').text
                         ## ignore duplicate cases as the jobs are for different modules
