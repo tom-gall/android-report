@@ -86,6 +86,8 @@ class ReportBuild(models.Model):
     ci_build = models.ForeignKey(CiBuild, on_delete=models.CASCADE, related_name="ci_build")
     ci_trigger_build = models.ForeignKey(CiBuild, on_delete=models.CASCADE, related_name='trigger_build')
 
+    status = models.CharField(max_length=100, null=True, default="NOINFO")
+
     number_passed = models.IntegerField(default=0)
     number_failed = models.IntegerField(default=0)
     number_total = models.IntegerField(default=0)

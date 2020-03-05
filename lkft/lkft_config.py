@@ -101,7 +101,11 @@ citrigger_lkft_rcs = {
         },
 }
 
-
+'''
+    trigger :{
+        branch: [ci_build, ci_build]
+    }
+'''
 trigger_branch_builds_info = {
     'trigger-lkft-android-common':{
         'android-5.4': ['lkft-hikey-aosp-master-5.4',
@@ -140,9 +144,9 @@ trigger_branch_builds_info = {
         },
 
     # configs for hikey kernels
-    'trigger-lkft-aosp-hikey': {
-        'android-hikey-linaro-4.14': ['lkft-hikey-aosp-master-4.14'],
-        'android-hikey-linaro-4.19': ['lkft-hikey-aosp-master-4.19'],
+    'trigger-lkft-linaro-hikey': {
+        'android-hikey-linaro-4.14-lkft': ['lkft-hikey-aosp-master-4.14-lkft'],
+        'android-hikey-linaro-4.19-lkft': ['lkft-hikey-aosp-master-4.19-lkft'],
         },
 }
 

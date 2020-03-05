@@ -406,6 +406,7 @@ class Command(BaseCommand):
                     report_build.started_at = trigger_build.get('start_timestamp')
                     report_build.fetched_at = qareport_build.get('last_fetched_timestamp')
                     report_build.qa_build_id = qareport_build.get('id')
+                    report_build.status = qareport_build.get('build_status')
                     report_build.save()
                 except ReportBuild.DoesNotExist:
                     ReportBuild.objects.create(qa_project=qa_project,
@@ -420,6 +421,7 @@ class Command(BaseCommand):
                                         modules_total=result_numbers.get('modules_total'),
                                         started_at=trigger_build.get('start_timestamp'),
                                         fetched_at=qareport_build.get('last_fetched_timestamp'),
+                                        status=qareport_build.get('build_status'),
                                         qa_build_id=qareport_build.get('id'))
 
         return None
