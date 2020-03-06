@@ -5,6 +5,4 @@ register = template.Library()
 
 @register.filter('escapesharp')
 def escapesharp(text):
-    if isinstance(text, str):
-        return text.replace('#', '%23')
-    return None
+    return str(text).replace('#', '%23')
