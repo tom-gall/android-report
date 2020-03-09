@@ -34,6 +34,9 @@ def download_urllib(url, path):
         urllib.urlretrieve(url, path, Schedule)
     except AttributeError:
         urllib.request.urlretrieve(url, path, Schedule)
+    except HTTPError:
+        logger.info("File is found: %s" % url)
+        pass
 
     if not check_dict['file_not_exist']:
         logger.info("File is saved to %s" % path)
