@@ -1,8 +1,10 @@
+{% load static%}
+
 <!DOCTYPE>
 <html>
 <head>
     <title>{% block title %}LCR Report Management System{% endblock title %}</title>
-    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{% static "report/css/bootstrap.min.css" %}">
     <style>
         body {
             padding-bottom: 20px;
@@ -84,7 +86,7 @@
             {% endblock footer %}
         </div>
     </footer>
-    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+    <script src="{% static "report/jquery.min.js" %}"></script>
     {% block js %}{% endblock js %}
 </body>
 </html>
