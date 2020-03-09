@@ -5,6 +5,13 @@ import sys
 import logging
 import requests
 
+try:
+    from urllib import urlretrieve
+    from urllib2 import HTTPError
+except ImportError:
+    from urllib.request import urlretrieve
+    from urllib.error import HTTPError
+
 logger = logging.getLogger(__name__)
 
 def download_urllib(url, path):
@@ -31,12 +38,14 @@ def download_urllib(url, path):
             sys.stdout.write("\r %.2f%%" % per)
             sys.stdout.flush()
     try:
-        urllib.urlretrieve(url, path, Schedule)
-    except AttributeError:
-        urllib.request.urlretrieve(url, path, Schedule)
-    except HTTPError:
-        logger.info("File is found: %s" % url)
-        pass
+        urlretrieve(url, path, Schedule)
+        if not check_dict['file_not_exist']:
+            logger.info("File is found: %s" % url)
+    except HTTPError as error:
+        if error.code == 404:
+            logger.info("File is found: %s" % url)
+        else:
+            raise error
 
     if not check_dict['file_not_exist']:
         logger.info("File is saved to %s" % path)
