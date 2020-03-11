@@ -31,7 +31,7 @@ from lkft.lkft_config import find_citrigger, find_cibuild, get_hardware_from_pna
 from lkft.lkft_config import find_expect_cibuilds
 from lkft.lkft_config import get_configs, get_qa_server_project
 
-from .models import KernelChange, CiBuild, ReportBuild
+from .models import KernelChange, CiBuild, ReportBuild, ReportProject
 
 qa_report_def = QA_REPORT[QA_REPORT_DEFAULT]
 qa_report_api = qa_report.QAReportApi(qa_report_def.get('domain'), qa_report_def.get('token'))
@@ -289,11 +289,7 @@ def get_testcases_number_for_job(job):
 
 
 def get_test_result_number_for_build(build, jobs=None):
-    build_number_passed = 0
-    build_number_failed = 0
-    build_number_total = 0
-    build_modules_total = 0
-    build_modules_done = 0
+    test_numbers = qa_report.TestNumbers()
 
     if not jobs:
         jobs = qa_report_api.get_jobs_for_build(build.get("id"))
@@ -318,19 +314,15 @@ def get_test_result_number_for_build(build, jobs=None):
     download_attachments_save_result(jobs=jobs_to_be_checked)
     for job in jobs_to_be_checked:
         numbers = get_testcases_number_for_job(job)
-        build_number_passed = build_number_passed + numbers.get('number_passed')
-        build_number_failed = build_number_failed + numbers.get('number_failed')
-        build_number_total = build_number_total + numbers.get('number_total')
-        build_modules_total = build_modules_total + numbers.get('modules_total')
-        build_modules_done = build_modules_done + numbers.get('modules_done')
+        test_numbers.addWithHash(numbers)
         job_names.append(job.get('name'))
 
     return {
-        'number_passed': build_number_passed,
-        'number_failed': build_number_failed,
-        'number_total': build_number_total,
-        'modules_done': build_modules_done,
-        'modules_total': build_modules_total,
+        'number_passed': test_numbers.number_passed,
+        'number_failed': test_numbers.number_failed,
+        'number_total': test_numbers.number_total,
+        'modules_done': test_numbers.modules_done,
+        'modules_total': test_numbers.modules_total,
         }
 
 def get_lkft_build_status(build, jobs):
@@ -530,37 +522,61 @@ def list_builds(request):
     project_id = request.GET.get('project_id', None)
     project =  qa_report_api.get_project(project_id)
     builds = qa_report_api.get_all_builds(project_id)
+
+    try:
+        db_reportproject = ReportProject.objects.get(project_id=project_id)
+    except ReportProject.DoesNotExist:
+        db_reportproject = None
+
     number_of_build_with_jobs = 0
+    builds_result = []
     for build in builds:
-        build_number_passed = 0
-        build_number_failed = 0
-        build_number_total = 0
-        build_modules_total = 0
-        build_modules_done = 0
+        number_of_build_with_jobs = number_of_build_with_jobs + 1
+        if number_of_build_with_jobs > BUILD_WITH_JOBS_NUMBER:
+            continue
 
-        jobs = qa_report_api.get_jobs_for_build(build.get("id"))
-        if number_of_build_with_jobs < BUILD_WITH_JOBS_NUMBER:
-            build_numbers = get_test_result_number_for_build(build, jobs)
-            build_number_passed = build_number_passed + build_numbers.get('number_passed')
-            build_number_failed = build_number_failed + build_numbers.get('number_failed')
-            build_number_total = build_number_total + build_numbers.get('number_total')
-            build_modules_total = build_modules_total + build_numbers.get('modules_total')
-            build_modules_done = build_modules_done + build_numbers.get('modules_done')
-            number_of_build_with_jobs = number_of_build_with_jobs + 1
+        db_report_build = None
+        if db_reportproject:
+            try:
+                db_report_build = ReportBuild.objects.get(version=build.get('version'), qa_project=db_reportproject)
+            except ReportBuild.DoesNotExist:
+                pass
 
-        build['numbers'] = {
-                            'number_passed': build_number_passed,
-                            'number_failed': build_number_failed,
-                            'number_total': build_number_total,
-                            'modules_done': build_modules_done,
-                            'modules_total': build_modules_total,
-                            }
-        build['created_at'] = qa_report_api.get_aware_datetime_from_str(build.get('created_at'))
-        build['jobs'] = jobs
+        if db_report_build:
+            build['numbers'] = {
+                'number_passed': db_report_build.number_passed,
+                'number_failed': db_report_build.number_failed,
+                'number_total': db_report_build.number_total,
+                'modules_done': db_report_build.modules_done,
+                'modules_total': db_report_build.modules_total,
+                }
+            build['created_at'] = db_report_build.started_at
+            build['build_status'] = db_report_build.status
+        else:
+            ## For cases that the build information still not cached into database yet
+            build_numbers = qa_report.TestNumbers()
+            jobs = qa_report_api.get_jobs_for_build(build.get("id"))
+            temp_build_numbers = get_test_result_number_for_build(build, jobs)
+            build_numbers.addWithHash(temp_build_numbers)
+            build['created_at'] = qa_report_api.get_aware_datetime_from_str(build.get('created_at'))
+
+            build['numbers'] = {
+                                'number_passed': build_numbers.number_passed,
+                                'number_failed': build_numbers.number_failed,
+                                'number_total': build_numbers.number_total,
+                                'modules_done': build_numbers.modules_done,
+                                'modules_total': build_numbers.modules_total,
+                                }
+            if build.get('finished'):
+                build['build_status'] = 'JOBSCOMPLETED'
+            else:
+                build['build_status'] = 'JOBSINPROGRESS'
+
+        builds_result.append(build)
 
     return render(request, 'lkft-builds.html',
                            {
-                                "builds": builds,
+                                "builds": builds_result,
                                 'project': project,
                             })
 

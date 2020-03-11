@@ -7,21 +7,23 @@
 {% block content %}
 <div>
 <table border="1">
-	<tr>
-		<th>Index</th>
-		<th>Build No.</th>
-		<th>Created Time</th>
-		<th>Pass</th>
-		<th>Fail</th>
-		<th>Total</th>
-		<th>ModulesDone</th>
-		<th>ModulesTotal</th>
+    <tr>
+        <th>Index</th>
+        <th>Build No.</th>
+        <th>Status</th>
+        <th>Created Time</th>
+        <th>Pass</th>
+        <th>Fail</th>
+        <th>Total</th>
+        <th>ModulesDone</th>
+<th>ModulesTotal</th>
 {% for build in builds %}
 <tr>
-	<td> {{ forloop.counter }}</td>
+    <td> {{ forloop.counter }}</td>
     <td>
         <a href="/lkft/jobs?build_id={{build.id}}">{{build.version}}</a>
     </td>
+    <td> {{ build.build_status }}</td>
     <td>
         {{ build.created_at|date:'M. d, Y, H:i'}}, &nbsp;{{ build.created_at|timesince}}
     </td>

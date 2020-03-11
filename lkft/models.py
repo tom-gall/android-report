@@ -14,6 +14,10 @@ class KernelChange(models.Model):
     trigger_name = models.CharField(max_length=255)
     trigger_number = models.IntegerField()
 
+    # TRIGGER_BUILD_COMPLETED
+    # CI_BUILDS_IN_QUEUE / CI_BUILDS_NOT_REPORTED / CI_BUILDS_IN_PROGRESS / CI_BUILDS_COMPLETED
+    # HAS_QA_PROJECT_NOT_FOUND / HAS_QA_BUILD_NOT_FOUND / HAS_JOBS_NOT_SUBMITTED / HAS_JOBS_IN_PROGRESS
+    # ALL_COMPLETED
     result = models.CharField(max_length=100, null=True, default="NOINFO")
     timestamp = models.DateTimeField(null=True)
     duration = models.IntegerField(default=0) # total_seconds
@@ -86,6 +90,7 @@ class ReportBuild(models.Model):
     ci_build = models.ForeignKey(CiBuild, on_delete=models.CASCADE, related_name="ci_build")
     ci_trigger_build = models.ForeignKey(CiBuild, on_delete=models.CASCADE, related_name='trigger_build')
 
+    # JOBSNOTSUBMITTED / JOBSINPROGRESS / JOBSCOMPLETED
     status = models.CharField(max_length=100, null=True, default="NOINFO")
 
     number_passed = models.IntegerField(default=0)
