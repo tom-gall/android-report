@@ -1003,6 +1003,24 @@ def resubmit_job(request):
         res = qa_report_api.forceresubmit(qa_job_id)
         if res.ok:
             succeed_qa_job_urls.append(qa_job_url)
+            qa_build =  qa_report_api.get_build(build_id)
+            qa_project =  qa_report_api.get_project_with_url(qa_build.get('project'))
+
+            try:
+                db_reportproject = ReportProject.objects.get(project_id=qa_project.get('id'))
+                db_report_build = ReportBuild.objects.get(version=qa_build.get('version'), qa_project=db_reportproject)
+                db_report_build.status = 'JOBSINPROGRESS'
+                db_report_build.save()
+
+                db_report_build.kernel_change.reported = False
+                db_report_build.kernel_change.save()
+
+            except ReportProject.DoesNotExist:
+                logger.info("db_reportproject not found for project_id=%s" % qa_project.get('id'))
+                pass
+            except ReportBuild.DoesNotExist:
+                logger.info("db_report_build not found for project_id=%s, version=build.get('version')" % (qa_project.get('id'), build.get('version')))
+                pass
         else:
             failed_qa_jobs[qa_job_url] = res
 
