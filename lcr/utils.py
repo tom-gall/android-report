@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import sys
 import logging
+import os
 import requests
+import sys
 
 try:
     from urllib import urlretrieve
@@ -16,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 def download_urllib(url, path):
     check_dict = {'file_not_exist': False}
-    import urllib
     def Schedule(a,b,c):
         '''
         a: the number downloaded of blocks
@@ -38,9 +38,14 @@ def download_urllib(url, path):
             sys.stdout.write("\r %.2f%%" % per)
             sys.stdout.flush()
     try:
-        urlretrieve(url, path, Schedule)
-        if not check_dict['file_not_exist']:
-            logger.info("File is found: %s" % url)
+        cmd_wget = "wget -c %s -O %s" % (url, path)
+        logger.debug("download command:%s" % cmd_wget)
+        ret = os.system(cmd_wget)
+        if ret != 0:
+            logger.info("Failed to download file: %s" % url)
+        #urlretrieve(url, path, Schedule)
+        #if not check_dict['file_not_exist']:
+        #    logger.info("File is found: %s" % url)
     except HTTPError as error:
         if error.code == 404:
             logger.info("File is found: %s" % url)
