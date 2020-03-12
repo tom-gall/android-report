@@ -82,6 +82,11 @@ class Command(BaseCommand):
         lkft_projects = qa_report_api.get_lkft_qa_report_projects()
         queued_ci_items = jenkins_api.get_queued_items()
         kernel_changes = KernelChange.objects_needs_report.all()
+
+        # add the same project might have several kernel changes not finished yet
+        project_builds = {} # cache builds for the project
+        project_platform_bugs = {} #cache bugs for the project and the platform
+
         for kernel_change in kernel_changes:
             lkft_build_configs = []
 
@@ -195,7 +200,12 @@ class Command(BaseCommand):
                     continue
 
                 target_qareport_build = None
-                builds = qa_report_api.get_all_builds(target_qareport_project.get('id'))
+                target_qareport_project_id = target_qareport_project.get('id')
+                builds = project_builds.get(target_qareport_project_id)
+                if builds is None:
+                    builds = qa_report_api.get_all_builds(target_qareport_project_id)
+                    project_builds[target_qareport_project_id] = builds
+
                 for build in builds:
                     if build.get('version') == kernel_change.describe:
                         target_qareport_build = build
@@ -249,7 +259,13 @@ class Command(BaseCommand):
                 qa_report_builds.append(target_qareport_build)
 
                 project_name = target_qareport_project.get('name')
-                bugs = get_lkft_bugs(summary_keyword=project_name, platform=get_hardware_from_pname(project_name))
+                platform_name = get_hardware_from_pname(project_name)
+                project_platform_key = "%s#%s" % (project_name, platform_name)
+                bugs = project_platform_bugs.get(project_platform_key)
+                if bugs is None:
+                    bugs = get_lkft_bugs(summary_keyword=project_name, platform=platform_name)
+                    project_platform_bugs[project_platform_key] = bugs
+
                 build['bugs'] = bugs
 
                 failures = {}
