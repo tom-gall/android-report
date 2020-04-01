@@ -51,7 +51,7 @@ source ${virenv_dir}/bin/activate
 pip install Django==1.11.8
 pip install pyaml
 pip install lava-tool
-pip install django-crispy-forms
+pip install django-crispy-forms=1.8.1
 #pip install psycopg2
 pip install psycopg2-binary
 pip install python-ldap # will install the 3.0 version
