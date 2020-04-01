@@ -682,13 +682,15 @@ def list_jobs(request):
 
             failures_list.append(failure)
 
-            for bug in bugs:
-                if test_name.find(module_name) >=0:
-                    # vts test, module name is the same as the test name.
-                    search_key = test_name
-                else:
-                    search_key = '%s %s' % (module_name, test_name)
+            if test_name.find(module_name) >=0:
+                # vts test, module name is the same as the test name.
+                search_key = test_name
+            else:
+                search_key = '%s %s' % (module_name, test_name)
 
+            search_key = search_key.replace('#arm64-v8a', '').replace('#armeabi-v7a', '')
+
+            for bug in bugs:
                 if bug.summary.find(search_key) >= 0:
                     bugs_reproduced.append(bug)
                     if failure.get('bugs'):
