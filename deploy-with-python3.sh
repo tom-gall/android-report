@@ -52,7 +52,7 @@ pip install Django==1.11.8 pyaml django-crispy-forms python-ldap django-auth-lda
 #pip install Django==1.11.8
 #pip install Django==3.0.8
 pip install pyaml
-pip install django-crispy-forms=1.8.1
+pip install django-crispy-forms==1.8.1
 pip install python-ldap # will install the 3.0 version
 # https://django-auth-ldap.readthedocs.io/en/latest/install.html
 pip install django-auth-ldap # needs python-ldap >= 3.0
