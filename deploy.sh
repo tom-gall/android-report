@@ -51,7 +51,7 @@ source ${virenv_dir}/bin/activate
 pip install Django==1.11.8
 pip install pyaml
 pip install lava-tool
-pip install django-crispy-forms
+pip install django-crispy-forms==1.8.1
 #pip install psycopg2
 pip install psycopg2-binary
 pip install python-ldap # will install the 3.0 version
@@ -71,7 +71,8 @@ cd ${work_root}
 if [ -d lcr-report ]; then
     cd lcr-report && git pull && cd -
 else
-    git clone https://git.linaro.org/people/yongqin.liu/public/lcr-report.git lcr-report
+    git clone https://github.com/liuyq/android-report.git lcr-report
+#   git clone https://git.linaro.org/people/yongqin.liu/public/lcr-report.git lcr-report
 
 fi
 
