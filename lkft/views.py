@@ -1021,7 +1021,7 @@ def resubmit_job(request):
                 logger.info("db_reportproject not found for project_id=%s" % qa_project.get('id'))
                 pass
             except ReportBuild.DoesNotExist:
-                logger.info("db_report_build not found for project_id=%s, version=build.get('version')" % (qa_project.get('id'), build.get('version')))
+                logger.info("db_report_build not found for project_id=%s, version=qa_build.get('version')" % (qa_project.get('id'), qa_build.get('version')))
                 pass
         else:
             failed_qa_jobs[qa_job_url] = res
@@ -1127,7 +1127,6 @@ def new_kernel_changes(request, branch, describe, trigger_name, trigger_number):
 
 
 def new_build(request, branch, describe, name, number):
-
     remote_addr = request.META.get("REMOTE_ADDR")
     remote_host = request.META.get("REMOTE_HOST")
     logger.info('request from %s %s' % (remote_host, remote_addr))
