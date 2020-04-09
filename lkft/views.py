@@ -682,13 +682,15 @@ def list_jobs(request):
 
             failures_list.append(failure)
 
-            for bug in bugs:
-                if test_name.find(module_name) >=0:
-                    # vts test, module name is the same as the test name.
-                    search_key = test_name
-                else:
-                    search_key = '%s %s' % (module_name, test_name)
+            if test_name.find(module_name) >=0:
+                # vts test, module name is the same as the test name.
+                search_key = test_name
+            else:
+                search_key = '%s %s' % (module_name, test_name)
 
+            search_key = search_key.replace('#arm64-v8a', '').replace('#armeabi-v7a', '')
+
+            for bug in bugs:
                 if bug.summary.find(search_key) >= 0:
                     bugs_reproduced.append(bug)
                     if failure.get('bugs'):
@@ -1019,7 +1021,7 @@ def resubmit_job(request):
                 logger.info("db_reportproject not found for project_id=%s" % qa_project.get('id'))
                 pass
             except ReportBuild.DoesNotExist:
-                logger.info("db_report_build not found for project_id=%s, version=build.get('version')" % (qa_project.get('id'), build.get('version')))
+                logger.info("db_report_build not found for project_id=%s, version=qa_build.get('version')" % (qa_project.get('id'), qa_build.get('version')))
                 pass
         else:
             failed_qa_jobs[qa_job_url] = res
@@ -1125,7 +1127,6 @@ def new_kernel_changes(request, branch, describe, trigger_name, trigger_number):
 
 
 def new_build(request, branch, describe, name, number):
-
     remote_addr = request.META.get("REMOTE_ADDR")
     remote_host = request.META.get("REMOTE_HOST")
     logger.info('request from %s %s' % (remote_host, remote_addr))

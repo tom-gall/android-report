@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import json
 import logging
 import requests
 
@@ -24,13 +25,20 @@ class UrlNotFoundException(Exception):
         self.response = response
 
 
+class ParameterInvalidException(Exception):
+    """
+    Exception when wrong Parameters passed
+    """
+    pass
+
+
 class RESTFullApi():
     def __init__(self, domain, api_token):
         self.domain = domain
         self.api_token = api_token
 
-    def call_with_full_url(self, request_url='', method='GET', returnResponse=False):
-        headers = { 
+    def call_with_full_url(self, request_url='', method='GET', returnResponse=False, post_data=None):
+        headers = {
                 'Content-Type': 'application/json',
                 }
         if self.api_token:
@@ -40,14 +48,15 @@ class RESTFullApi():
         if method == 'GET':
             r = requests.get(request_url, headers=headers)
         else:
-            r = requests.post(request_url, headers=headers)
+            headers['Content-Type'] = 'application/x-www-form-urlencoded'
+            r = requests.post(request_url, headers=headers, data=post_data)
 
         if returnResponse:
             return r
 
         if not r.ok and r.status_code == 404:
             raise UrlNotFoundException(r)
-        elif not r.ok:
+        elif not r.ok or r.status_code != 200:
             raise Exception(r.url, r.reason, r.status_code)
 
         if r.content:
@@ -56,9 +65,9 @@ class RESTFullApi():
         else:
             return r
 
-    def call_with_api_url(self, api_url='', method='GET', returnResponse=False):
+    def call_with_api_url(self, api_url='', method='GET', returnResponse=False, post_data=None):
         full_url = '%s/%s' % (self.get_api_url_prefix().strip('/'), api_url.strip('/'))
-        return self.call_with_full_url(request_url=full_url, method=method, returnResponse=returnResponse)
+        return self.call_with_full_url(request_url=full_url, method=method, returnResponse=returnResponse, post_data=post_data)
 
     def get_list_results(self, api_url='', only_first=False):
         result = self.call_with_api_url(api_url=api_url)
@@ -157,7 +166,10 @@ class LAVAApi(RESTFullApi):
 
 class QAReportApi(RESTFullApi):
     def get_api_url_prefix(self):
-        return 'https://%s/' % self.domain.strip('/')
+        if self.domain.startswith('http'):
+            return '%s/' % self.domain.strip('/')
+        else:
+            return 'https://%s/' % self.domain.strip('/')
 
 
     def get_projects(self):
@@ -225,6 +237,32 @@ class QAReportApi(RESTFullApi):
             logger.info("qa report build for project(%s) with build no(%s) not found" % (project_name, build_version))
             return []
         return self.get_jobs_for_build(build.get('id'))
+
+
+    def create_build(self, team, project, build_version):
+        api_url = "api/createbuild/%s/%s/%s" % (team, project, build_version)
+        return self.call_with_api_url(api_url=api_url, method='POST', returnResponse=True)
+
+
+    def submit_test_result(self, team, project, build_version, environment, tests_data_dict={}):
+        '''
+        tests_data_dict': {
+            "test_suite1/test_case1": "fail",
+            "test_suite1/test_case2": "pass",
+            "test_suite2/test_case1": "fail",
+            "test_suite2/test_case2": "pass",
+        }
+        '''
+
+        if type(tests_data_dict) != dict:
+            raise ParameterInvalidException("tests_data_dict must be a dictionary for test cases")
+
+        post_data={
+            'tests': json.dumps(tests_data_dict)
+        }
+        api_url = "api/submit/%s/%s/%s/%s" % (team, project, build_version, environment)
+        return self.call_with_api_url(api_url=api_url, method='POST', returnResponse=True, post_data=post_data)
+
 
     def forceresubmit(self, qa_job_id):
         api_url = 'api/forceresubmit/%s' % qa_job_id
