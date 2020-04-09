@@ -272,10 +272,29 @@ def do_boilerplate():
     print "Generated : " + now.strftime("%d/%m/%Y %H:%M:%S")
     print " "
 
+def versiontoMME(versionString):
+    versionDict = { 'Major':0,
+                    'Minor':0,
+                    'Extra':0, }
+
+    if versionString.startswith('v'):
+        versionString = versionString[1:]
+    # print versionString
+    tokens = re.split( r'[.-]', versionString)
+    # print tokens
+    if tokens[0].isnumeric() and tokens[1].isnumeric() and tokens[2].isnumeric():
+        versionDict['Major'] = tokens[0]
+        versionDict['Minor'] = tokens[1]
+        versionDict['Extra'] = tokens[2]
+
+    return versionDict
+
 def find_best_two_runs(builds, project_name, project):
     goodruns = []
     bailaftertwo = 0
     number_of_build_with_jobs = 0
+    baseVersionDict = None
+    nextVersionDict = None
 
     for build in builds:
         if bailaftertwo == 2:
@@ -308,13 +327,13 @@ def find_best_two_runs(builds, project_name, project):
         failures = {}
         resubmitted_job_urls = []
        
-        jobisagoodboy=1 
+        jobisacceptable=1 
         for job in jobs:
            if job.get('job_status') is None and \
               job.get('submitted') and \
               not job.get('fetched'):
               job['job_status'] = 'Submitted'
-              jobisagoodboy = 0
+              jobisacceptable = 0
 
            if job.get('failure'):
               failure = job.get('failure')
@@ -327,8 +346,8 @@ def find_best_two_runs(builds, project_name, project):
               resubmitted_job_urls.append(job.get('parent_job'))
 
            if job['job_status'] == 'Submitted':
-              jobisagoodboy = 0
-           if jobisagoodboy == 0:
+              jobisacceptable = 0
+           if jobisacceptable == 0:
               build['run_status'] = 'Submitted'
 
            # print "job " + job.get('job_id') + " " + job['job_status']
@@ -350,12 +369,19 @@ def find_best_two_runs(builds, project_name, project):
                }
            numbers = extract(result_file_path, failed_testcases_all=failures, metadata=metadata)
            job['numbers'] = numbers
-        
+
         if 'run_status' in build:
             # print "found run status" + "build " + str(build.get("id")) + " NOT selected"
             continue
         else:
             # print "run status NOT found" + "build " + str(build.get("id")) + " selected"
+            if bailaftertwo == 0 :
+                baseVersionDict = versiontoMME(build['version'])
+            #    print "baseset"
+            elif bailaftertwo == 1 :
+                nextVersionDict = versiontoMME(build['version'])
+                if nextVersionDict['Extra'] == baseVersionDict['Extra'] :
+                    continue
             goodruns.append(build)
             bailaftertwo += 1
 
@@ -419,7 +445,7 @@ def report_results(run, regressions, combo, priorrun):
     print project_info['branch']
     
 
-    print "Kernel: "+ run['version']
+    print "Kernel:" + run['version'] + "  Prior:" + priorrun['version']
     if len(regressions) > 0:
         print "Result: FAIL - " + str (len(regressions)) + " Regressions"
     else:
