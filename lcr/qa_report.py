@@ -244,7 +244,8 @@ class QAReportApi(RESTFullApi):
         return self.call_with_api_url(api_url=api_url, method='POST', returnResponse=True)
 
 
-    def submit_test_result(self, team, project, build_version, environment, tests_data_dict={}):
+    def submit_test_result(self, team, project, build_version, environment,
+            tests_data_dict={}, metadata_dict={}, metrics_dict={}):
         '''
         tests_data_dict': {
             "test_suite1/test_case1": "fail",
@@ -252,13 +253,25 @@ class QAReportApi(RESTFullApi):
             "test_suite2/test_case1": "fail",
             "test_suite2/test_case2": "pass",
         }
+        metadata_dict = {
+            'job_id': '12345',  # job_id is mandatory here, and need to be string
+            'test_metadata': 'xxxx',
+        }
         '''
 
-        if type(tests_data_dict) != dict:
-            raise ParameterInvalidException("tests_data_dict must be a dictionary for test cases")
+        if type(tests_data_dict) != dict or not tests_data_dict:
+            raise ParameterInvalidException("tests_data_dict must be a dictionary for test cases, and should not be empty")
+
+        if type(metadata_dict) != dict:
+            raise ParameterInvalidException("metadata_dict must be a dictionary for test cases")
+
+        if type(metrics_dict) != dict:
+            raise ParameterInvalidException("metrics_dict must be a dictionary for test cases")
 
         post_data={
-            'tests': json.dumps(tests_data_dict)
+            'tests': json.dumps(tests_data_dict),
+            'metadata': json.dumps(metadata_dict),
+            'metrics': json.dumps(metrics_dict),
         }
         api_url = "api/submit/%s/%s/%s/%s" % (team, project, build_version, environment)
         return self.call_with_api_url(api_url=api_url, method='POST', returnResponse=True, post_data=post_data)
