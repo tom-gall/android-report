@@ -222,7 +222,7 @@
 <table class="testdetails">
 <tbody>
 <tr>
-    <td class="module" colspan="9">
+    <td class="module" colspan="10">
         <a name="{{module_name}}">{{module_name}} has {{ module_failures|length }} failures</a>
     </td>
 </tr>
@@ -240,7 +240,7 @@
 </tr>
 {% for testcase_name, failure in module_failures.items %}
 <tr>
-	<td> {{ forloop.counter }}</td>
+    <td> {{ forloop.counter }}</td>
     <td class="testname">{{failure.test_name}}</td>
     <td class="testname" nowrap>
         {% with failure.platforms as platforms %}
