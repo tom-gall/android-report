@@ -187,7 +187,7 @@
         {% elif failure.module_name == "CtsOnGsiTrebleFrameworkVintfTest" %}
         <a href="https://qa-reports.linaro.org/android-lkft/{{ project.name }}/tests/vts-test/{{abi}}.{{failure.module_name}}/{{failure.test_class}}.{{failure.test_method}}">{{ abi }}</a>
         {% else %}
-        <a href="https://qa-reports.linaro.org/android-lkft/{{ project.name }}/tests/cts-lkft-{{abi}}/{{abi}}.{{failure.module_name}}/{{failure.test_class}}.{{failure.test_method}}">{{ abi }}</a>
+        <a href="https://qa-reports.linaro.org/android-lkft/{{ project.name }}/tests/cts-lkft/{{abi}}.{{failure.module_name}}/{{failure.test_class}}.{{failure.test_method}}">{{ abi }}</a>
         {% endif %}
         {% endfor %}
         {% endwith %}
