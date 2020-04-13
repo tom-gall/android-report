@@ -25,7 +25,7 @@ from lcr.settings import FILES_DIR, LAVA_SERVERS, BUGZILLA_API_KEY, BUILD_WITH_J
 from lcr.settings import QA_REPORT, QA_REPORT_DEFAULT
 
 from lcr import qa_report, bugzilla
-from lcr.qa_report import DotDict
+from lcr.qa_report import DotDict, UrlNotFoundException
 from lcr.utils import download_urllib
 from lkft.lkft_config import find_citrigger, find_cibuild, get_hardware_from_pname, get_version_from_pname, get_kver_with_pname_env
 from lkft.lkft_config import find_expect_cibuilds
@@ -1182,10 +1182,14 @@ def get_kernel_changes_info(db_kernelchanges=[]):
             kernelchanges.append(kernelchange)
             continue
 
-        trigger_url = jenkins_api.get_job_url(name=db_kernelchange.trigger_name, number=db_kernelchange.trigger_number)
-        trigger_build = jenkins_api.get_build_details_with_full_url(build_url=trigger_url)
-        trigger_build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(trigger_build['timestamp'])/1000)
-        kernel_change_finished_timestamp = trigger_build['start_timestamp']
+        try:
+            trigger_url = jenkins_api.get_job_url(name=db_kernelchange.trigger_name, number=db_kernelchange.trigger_number)
+            trigger_build = jenkins_api.get_build_details_with_full_url(build_url=trigger_url)
+            kernel_change_start_timestamp = qa_report_api.get_aware_datetime_from_timestamp(int(trigger_build['timestamp'])/1000)
+        except UrlNotFoundException as e:
+            kernel_change_start_timestamp = db_kernelchange.timestamp
+
+        kernel_change_finished_timestamp = kernel_change_start_timestamp
 
         test_numbers = qa_report.TestNumbers()
 
@@ -1195,7 +1199,6 @@ def get_kernel_changes_info(db_kernelchanges=[]):
         expect_build_names = find_expect_cibuilds(trigger_name=db_kernelchange.trigger_name, branch_name=db_kernelchange.branch)
 
         lkft_build_configs = []
-        jenkins_ci_builds = []
         ci_build_names = []
         has_build_inprogress = False
         for dbci_build in dbci_builds:
@@ -1204,21 +1207,28 @@ def get_kernel_changes_info(db_kernelchanges=[]):
             else:
                 ci_build_names.append(dbci_build.name)
 
-            build_url = jenkins_api.get_job_url(name=dbci_build.name, number=dbci_build.number)
-            build = jenkins_api.get_build_details_with_full_url(build_url=build_url)
-            build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(build['timestamp'])/1000)
+
+            try:
+                build_url = jenkins_api.get_job_url(name=dbci_build.name, number=dbci_build.number)
+                build = jenkins_api.get_build_details_with_full_url(build_url=build_url)
+                build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(build['timestamp'])/1000)
+            except UrlNotFoundException as e:
+                build = {
+                    'start_timestamp': dbci_build.timestamp,
+                }
             build['dbci_build'] = dbci_build
 
             if build.get('building'):
                 build_status = 'INPROGRESS'
                 has_build_inprogress = True
+            elif build.get('result') is None:
+                build_status = "CI_BUILD_DELETED"
             else:
                 build_status = build.get('result') # null or SUCCESS, FAILURE, ABORTED
                 build['duration'] = datetime.timedelta(milliseconds=build['duration'])
 
             build['status'] = build_status
             build['name'] = dbci_build.name
-            jenkins_ci_builds.append(build)
             configs = get_configs(ci_build=build)
             lkft_build_configs.extend(configs)
 
@@ -1330,7 +1340,7 @@ def get_kernel_changes_info(db_kernelchanges=[]):
         kernelchange['describe'] = db_kernelchange.describe
         kernelchange['trigger_name'] = db_kernelchange.trigger_name
         kernelchange['trigger_number'] = db_kernelchange.trigger_number
-        kernelchange['start_timestamp'] = trigger_build['start_timestamp']
+        kernelchange['start_timestamp'] = kernel_change_start_timestamp
         kernelchange['finished_timestamp'] = kernel_change_finished_timestamp
         kernelchange['duration'] = kernelchange['finished_timestamp'] - kernelchange['start_timestamp']
         kernelchange['status'] = kernel_change_status
