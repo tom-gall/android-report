@@ -607,6 +607,24 @@ def get_lkft_bugs(summary_keyword=None, platform=None):
     return sorted_bugs
 
 
+def find_bug_for_failure(failure, patterns=[], bugs=[]):
+    found_bug = None
+    for pattern in patterns:
+        if found_bug is not None:
+            break
+        for bug in bugs:
+            if pattern.search(bug.summary):
+                if failure.get('bugs'):
+                    failure['bugs'].append(bug)
+                else:
+                    failure['bugs'] = [bug]
+                found_bug = bug
+            if found_bug is not None:
+                break
+
+    return found_bug
+
+
 @login_required
 def list_jobs(request):
     build_id = request.GET.get('build_id', None)
@@ -687,16 +705,15 @@ def list_jobs(request):
                 search_key = test_name
             else:
                 search_key = '%s %s' % (module_name, test_name)
+            search_key_exact = search_key.replace('#arm64-v8a', '').replace('#armeabi-v7a', '')
 
-            search_key = search_key.replace('#arm64-v8a', '').replace('#armeabi-v7a', '')
-
-            for bug in bugs:
-                if bug.summary.find(search_key) >= 0:
-                    bugs_reproduced.append(bug)
-                    if failure.get('bugs'):
-                        failure['bugs'].append(bug)
-                    else:
-                        failure['bugs'] = [bug]
+            pattern_testcase = re.compile(r'\b({0})\s+failed\b'.format(search_key_exact.replace('[', '\[').replace(']', '\]')))
+            pattern_testclass = re.compile(r'\b({0})\s+failed\b'.format(failure.get('test_class').replace('[', '\[').replace(']', '\]')))
+            pattern_module = re.compile(r'\b({0})\s+failed\b'.format(module_name.replace('[', '\[').replace(']', '\]')))
+            patterns = [pattern_testcase, pattern_testclass, pattern_module]
+            found_bug = find_bug_for_failure(failure, patterns=patterns, bugs=bugs)
+            if found_bug is not None:
+                bugs_reproduced.append(found_bug)
 
     android_version = get_version_from_pname(pname=project.get('name'))
     open_bugs = []
@@ -917,10 +934,10 @@ def file_bug(request):
             stacktrace_msg = failures.get(abis[0])
 
         if test_name.find(module_name) >=0:
-            form_initial['summary'] = '%s: %s' % (project.get('name'), test_name)
+            form_initial['summary'] = '%s: %s failed' % (project.get('name'), test_name)
             description = '%s' % (test_name)
         else:
-            form_initial['summary'] = '%s: %s %s' % (project.get('name'), module_name, test_name)
+            form_initial['summary'] = '%s: %s %s failed' % (project.get('name'), module_name, test_name)
             description = '%s %s' % ( module_name, test_name)
 
         history_urls = []
