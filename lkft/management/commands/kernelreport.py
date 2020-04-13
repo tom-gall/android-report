@@ -200,10 +200,29 @@ projectids = {
 def do_boilerplate():
     print "Nothing for now"
 
+def versiontoMME(versionString):
+    versionDict = { 'Major':0,
+                    'Minor':0,
+                    'Extra':0, }
+
+    if versionString.startswith('v'):
+        versionString = versionString[1:]
+    # print versionString
+    tokens = re.split( r'[.-]', versionString)
+    # print tokens
+    if tokens[0].isnumeric() and tokens[1].isnumeric() and tokens[2].isnumeric():
+        versionDict['Major'] = tokens[0]
+        versionDict['Minor'] = tokens[1]
+        versionDict['Extra'] = tokens[2]
+
+    return versionDict
+
 def find_best_two_runs(builds, project_name, project):
     goodruns = []
     bailaftertwo = 0
     number_of_build_with_jobs = 0
+    baseVersionDict = None
+    nextVersionDict = None
 
     for build in builds:
         if bailaftertwo == 2:
@@ -236,13 +255,13 @@ def find_best_two_runs(builds, project_name, project):
         failures = {}
         resubmitted_job_urls = []
        
-        jobisagoodboy=1 
+        jobisacceptable=1 
         for job in jobs:
            if job.get('job_status') is None and \
               job.get('submitted') and \
               not job.get('fetched'):
               job['job_status'] = 'Submitted'
-              jobisagoodboy = 0
+              jobisaacceptable = 0
 
            if job.get('failure'):
               failure = job.get('failure')
@@ -255,8 +274,8 @@ def find_best_two_runs(builds, project_name, project):
               resubmitted_job_urls.append(job.get('parent_job'))
 
            if job['job_status'] == 'Submitted':
-              jobisagoodboy = 0
-           if jobisagoodboy == 0:
+              jobisacceptable = 0
+           if jobisacceptable == 0:
               build['run_status'] = 'Submitted'
 
            # print "job " + job.get('job_id') + " " + job['job_status']
@@ -284,6 +303,13 @@ def find_best_two_runs(builds, project_name, project):
             continue
         else:
             # print "run status NOT found" + "build " + str(build.get("id")) + " selected"
+            if bailaftertwo == 0 :
+                baseVersionDict = versiontoMME(build['version'])
+                # print "baseset"
+            elif bailaftertwo == 1 :
+                nextVersionDict = versiontoMME(build['version'])
+                if nextVersionDict['Extra'] == baseVersionDict['Extra'] :
+                    continue
             goodruns.append(build)
             bailaftertwo += 1
 
