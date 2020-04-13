@@ -269,10 +269,14 @@ class QAReportApi(RESTFullApi):
             raise ParameterInvalidException("metrics_dict must be a dictionary for test cases")
 
         post_data={
-            'tests': json.dumps(tests_data_dict),
-            'metadata': json.dumps(metadata_dict),
-            'metrics': json.dumps(metrics_dict),
+            'tests': json.dumps(tests_data_dict)
         }
+        if metadata_dict:
+            post_data[metadata] = json.dumps(metadata_dict),
+
+        if metrics_dict:
+            post_data['metrics'] = json.dumps(metrics_dict),
+
         api_url = "api/submit/%s/%s/%s/%s" % (team, project, build_version, environment)
         return self.call_with_api_url(api_url=api_url, method='POST', returnResponse=True, post_data=post_data)
 
