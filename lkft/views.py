@@ -932,11 +932,11 @@ def file_bug(request):
             stacktrace_msg = failures.get(abis[0])
 
         if test_name.find(module_name) >=0:
-            form_initial['summary'] = '%s: %s failed' % (project.get('name'), test_name)
+            form_initial['summary'] = '%s: %s failed' % (project.get('name'), test_name.replace('#arm64-v8a', '').replace('#armeabi-v7a', ''))
             description = '%s' % (test_name)
         else:
-            form_initial['summary'] = '%s: %s %s failed' % (project.get('name'), module_name, test_name)
-            description = '%s %s' % ( module_name, test_name)
+            form_initial['summary'] = '%s: %s %s failed' % (project.get('name'), module_name, test_name.replace('#arm64-v8a', '').replace('#armeabi-v7a', ''))
+            description = '%s %s' % ( module_name, test_name.replace('#arm64-v8a', '').replace('#armeabi-v7a', ''))
 
         history_urls = []
         for abi in abis:
