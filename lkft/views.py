@@ -719,12 +719,10 @@ def list_jobs(request):
     open_bugs = []
     bugs_not_reproduced = []
     for bug in bugs:
-        if bug.status == 'VERIFIED' or bug.status == 'RESOLVED':
+        if bug.status == 'VERIFIED' or (bug.status == 'RESOLVED' and bug.resolution != 'WONTFIX'):
             continue
-
         if bug.version != android_version:
             continue
-
         if bug in bugs_reproduced:
             open_bugs.append(bug)
         else:
@@ -951,7 +949,7 @@ def file_bug(request):
                                                              test_res_dir,
                                                              abi,
                                                              module_name,
-                                                             test_name.replace('#', '.'))
+                                                             test_name.replace('#arm64-v8a', '').replace('#armeabi-v7a', '').replace('#', '.'))
             history_urls.append(history_url)
 
         description += '\n\nABIs:\n%s' % (' '.join(abis))
