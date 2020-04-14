@@ -180,12 +180,22 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
     total_number = 0
     passed_number = 0
     failed_number = 0
+    modules_done = 0
+    modules_total = 0
 
     # no affect for cts result and non vts-hal test result
     vts_abi_suffix_pat = re.compile(r"_32bit$|_64bit$")
     with zipfile.ZipFile(result_zip_path, 'r') as f_zip_fd:
         try:
             root = ET.fromstring(f_zip_fd.read(TEST_RESULT_XML_NAME))
+
+            summary_node = root.find('Summary')
+            passed_number = int(summary_node.attrib['pass'])
+            failed_number = int(summary_node.attrib['failed'])
+            total_number = passed_number + failed_number
+            modules_done = int(summary_node.attrib['modules_done'])
+            modules_total = int(summary_node.attrib['modules_total'])
+
             for elem in root.findall('Module'):
                 abi = elem.attrib['abi']
                 module_name = elem.attrib['name']
@@ -198,10 +208,7 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
                 # test classes
                 test_cases = elem.findall('.//TestCase')
                 for test_case in test_cases:
-                    total_number = total_number + len(test_case.findall('.//Test'))
-                    passed_number = passed_number + len(test_case.findall('.//Test[@result="pass"]'))
                     failed_tests = test_case.findall('.//Test[@result="fail"]')
-                    failed_number = failed_number + len(failed_tests)
                     for failed_test in failed_tests:
                         #test_name = '%s#%s' % (test_case.get("name"), vts_abi_suffix_pat.sub('', failed_test.get("name")))
                         mod_name = test_case.get("name")
@@ -245,7 +252,9 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
     return {
                 'total_number': total_number,
                 'passed_number': passed_number,
-                'failed_number': failed_number
+                'failed_number': failed_number,
+                'modules_done': modules_done,
+                'modules_total': modules_total,
             }
 
 
