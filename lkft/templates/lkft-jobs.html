@@ -113,6 +113,7 @@
     <th>Bug Id</th>
     <th>Summary</th>
     <th>Status</th>
+    <th>Assignee</th>
 </tr>
 {% for bug in open_bugs %}
     {% ifnotequal  bug.status 'RESOLVED' %}
@@ -121,6 +122,7 @@
         <td><a href="{{bugzilla_show_bug_prefix}}{{ bug.id }}">{{ bug.id }}</a></td>
         <td>{{ bug.summary }}</td>
         <td>{{ bug.status }}</td>
+        <td>{{ bug.assigned_to }}</td>
     </tr>
     {% endifnotequal %}
 {% endfor %}
