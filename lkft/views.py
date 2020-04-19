@@ -1045,7 +1045,7 @@ def resubmit_job(request):
                 logger.info("db_reportproject not found for project_id=%s" % qa_project.get('id'))
                 pass
             except ReportBuild.DoesNotExist:
-                logger.info("db_report_build not found for project_id=%s, version=qa_build.get('version')" % (qa_project.get('id'), qa_build.get('version')))
+                logger.info("db_report_build not found for project_id=%s, version=%s" % (qa_project.get('id'), qa_build.get('version')))
                 pass
         else:
             failed_qa_jobs[qa_job_url] = res
