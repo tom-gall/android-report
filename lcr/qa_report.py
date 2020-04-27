@@ -257,6 +257,10 @@ class QAReportApi(RESTFullApi):
             'job_id': '12345',  # job_id is mandatory here, and need to be string
             'test_metadata': 'xxxx',
         }
+        metrics_dict = {
+            'metrics_suite1/test_metric1': [1, 2, 3, 4, 5],
+            'metrics_suite1/test_metric21': 10,
+        }
         '''
 
         if type(tests_data_dict) != dict or not tests_data_dict:
