@@ -2,3 +2,5 @@
 files
 logfile*
 db.sqlite3
+datafiles
+static

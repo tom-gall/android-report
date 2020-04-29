@@ -203,6 +203,10 @@ def get_hardware_from_pname(pname=None, env=''):
         return 'BeagleBoard-X15'
     elif pname.find('am65x') >= 0:
         return 'AM65X'
+    elif pname.find('db845c') >= 0:
+        return 'Dragonboard 845c'
+    else:
+        return 'Other'
 
 def get_version_from_pname(pname=None):
     if pname.find('10.0') >= 0:

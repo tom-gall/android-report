@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+from django.utils import timezone
+
 from django.db import models
 
 class KernelChangeManager(models.Manager):
@@ -19,7 +21,7 @@ class KernelChange(models.Model):
     # HAS_QA_PROJECT_NOT_FOUND / HAS_QA_BUILD_NOT_FOUND / HAS_JOBS_NOT_SUBMITTED / HAS_JOBS_IN_PROGRESS
     # ALL_COMPLETED
     result = models.CharField(max_length=100, null=True, default="NOINFO")
-    timestamp = models.DateTimeField(null=True)
+    timestamp = models.DateTimeField(null=True, default=timezone.now)
     duration = models.IntegerField(default=0) # total_seconds
 
     number_passed = models.IntegerField(default=0)
@@ -48,8 +50,9 @@ class CiBuild(models.Model):
     name = models.CharField(max_length=255)
     number = models.IntegerField()
     kernel_change = models.ForeignKey(KernelChange, null=True, on_delete=models.CASCADE)
-    timestamp = models.DateTimeField(null=True)
+    timestamp = models.DateTimeField(null=True, default=timezone.now)
     duration = models.IntegerField(default=0) # total_seconds
+    # CI_BUILD_DELETED / INPROGRESS / SUCCESS / FAILURE / ABORTED
     result = models.CharField(max_length=100, null=True, default="NOINFO")
 
     def __str__(self):

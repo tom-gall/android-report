@@ -26,6 +26,8 @@
     <th> Passed </th>
     <th> Failed </th>
     <th> Total </th>
+    <th> ModulesDone </th>
+    <th> ModulesTotal </th>
     <th> Report Bug </th>
 </tr>
 {% for job in final_jobs %}
@@ -51,13 +53,17 @@
     <td> &nbsp;</td>
     {% endif %}
     {% if job.numbers %}
-    <td>{{job.numbers.passed_number}}</td>
-    <td>{{job.numbers.failed_number}}</td>
-    <td>{{job.numbers.total_number}}</td>
+    <td align="right">{{job.numbers.passed_number}}</td>
+    <td align="right">{{job.numbers.failed_number}}</td>
+    <td align="right">{{job.numbers.total_number}}</td>
+    <td align="right">{{job.numbers.modules_done}}</td>
+    <td align="right">{{job.numbers.modules_total}}</td>
     {% else %}
-    <td> - </td>
-    <td> - </td>
-    <td> - </td>
+    <td align="right"> - </td>
+    <td align="right"> - </td>
+    <td align="right"> - </td>
+    <td align="right"> - </td>
+    <td align="right"> - </td>
     {% endif %}
     <td><a target='_blank' href="{{job.new_bug_url}}">Report Bug</a></td>
 </tr>
@@ -98,7 +104,7 @@
 <hr/>
 
 <div>
-<h2>Bug Status:</h2>
+<h2>Bug Status(<a href="https://bugs.linaro.org/buglist.cgi?quicksearch={{project.name}}">List on Bugzilla</a>):</h2>
 {% if open_bugs %}
 <h2>Reproduced Bugs:</h2>
 <table border=2>
@@ -107,6 +113,7 @@
     <th>Bug Id</th>
     <th>Summary</th>
     <th>Status</th>
+    <th>Assignee</th>
 </tr>
 {% for bug in open_bugs %}
     {% ifnotequal  bug.status 'RESOLVED' %}
@@ -115,6 +122,7 @@
         <td><a href="{{bugzilla_show_bug_prefix}}{{ bug.id }}">{{ bug.id }}</a></td>
         <td>{{ bug.summary }}</td>
         <td>{{ bug.status }}</td>
+        <td>{{ bug.assigned_to }}</td>
     </tr>
     {% endifnotequal %}
 {% endfor %}
@@ -187,7 +195,7 @@
         {% elif failure.module_name == "CtsOnGsiTrebleFrameworkVintfTest" %}
         <a href="https://qa-reports.linaro.org/android-lkft/{{ project.name }}/tests/vts-test/{{abi}}.{{failure.module_name}}/{{failure.test_class}}.{{failure.test_method}}">{{ abi }}</a>
         {% else %}
-        <a href="https://qa-reports.linaro.org/android-lkft/{{ project.name }}/tests/cts-lkft-{{abi}}/{{abi}}.{{failure.module_name}}/{{failure.test_class}}.{{failure.test_method}}">{{ abi }}</a>
+        <a href="https://qa-reports.linaro.org/android-lkft/{{ project.name }}/tests/cts-lkft/{{abi}}.{{failure.module_name}}/{{failure.test_class}}.{{failure.test_method}}">{{ abi }}</a>
         {% endif %}
         {% endfor %}
         {% endwith %}
@@ -222,7 +230,7 @@
 <table class="testdetails">
 <tbody>
 <tr>
-    <td class="module" colspan="9">
+    <td class="module" colspan="10">
         <a name="{{module_name}}">{{module_name}} has {{ module_failures|length }} failures</a>
     </td>
 </tr>
@@ -240,7 +248,7 @@
 </tr>
 {% for testcase_name, failure in module_failures.items %}
 <tr>
-	<td> {{ forloop.counter }}</td>
+    <td> {{ forloop.counter }}</td>
     <td class="testname">{{failure.test_name}}</td>
     <td class="testname" nowrap>
         {% with failure.platforms as platforms %}

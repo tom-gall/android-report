@@ -25,7 +25,7 @@ from lcr.settings import FILES_DIR, LAVA_SERVERS, BUGZILLA_API_KEY, BUILD_WITH_J
 from lcr.settings import QA_REPORT, QA_REPORT_DEFAULT
 
 from lcr import qa_report, bugzilla
-from lcr.qa_report import DotDict
+from lcr.qa_report import DotDict, UrlNotFoundException
 from lcr.utils import download_urllib
 from lkft.lkft_config import find_citrigger, find_cibuild, get_hardware_from_pname, get_version_from_pname, get_kver_with_pname_env
 from lkft.lkft_config import find_expect_cibuilds
@@ -180,12 +180,22 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
     total_number = 0
     passed_number = 0
     failed_number = 0
+    modules_done = 0
+    modules_total = 0
 
     # no affect for cts result and non vts-hal test result
     vts_abi_suffix_pat = re.compile(r"_32bit$|_64bit$")
     with zipfile.ZipFile(result_zip_path, 'r') as f_zip_fd:
         try:
             root = ET.fromstring(f_zip_fd.read(TEST_RESULT_XML_NAME))
+
+            summary_node = root.find('Summary')
+            passed_number = int(summary_node.attrib['pass'])
+            failed_number = int(summary_node.attrib['failed'])
+            total_number = passed_number + failed_number
+            modules_done = int(summary_node.attrib['modules_done'])
+            modules_total = int(summary_node.attrib['modules_total'])
+
             for elem in root.findall('Module'):
                 abi = elem.attrib['abi']
                 module_name = elem.attrib['name']
@@ -198,10 +208,7 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
                 # test classes
                 test_cases = elem.findall('.//TestCase')
                 for test_case in test_cases:
-                    total_number = total_number + len(test_case.findall('.//Test'))
-                    passed_number = passed_number + len(test_case.findall('.//Test[@result="pass"]'))
                     failed_tests = test_case.findall('.//Test[@result="fail"]')
-                    failed_number = failed_number + len(failed_tests)
                     for failed_test in failed_tests:
                         #test_name = '%s#%s' % (test_case.get("name"), vts_abi_suffix_pat.sub('', failed_test.get("name")))
                         mod_name = test_case.get("name")
@@ -245,7 +252,9 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
     return {
                 'total_number': total_number,
                 'passed_number': passed_number,
-                'failed_number': failed_number
+                'failed_number': failed_number,
+                'modules_done': modules_done,
+                'modules_total': modules_total,
             }
 
 
@@ -607,6 +616,24 @@ def get_lkft_bugs(summary_keyword=None, platform=None):
     return sorted_bugs
 
 
+def find_bug_for_failure(failure, patterns=[], bugs=[]):
+    found_bug = None
+    for pattern in patterns:
+        if found_bug is not None:
+            break
+        for bug in bugs:
+            if pattern.search(bug.summary):
+                if failure.get('bugs'):
+                    failure['bugs'].append(bug)
+                else:
+                    failure['bugs'] = [bug]
+                found_bug = bug
+            if found_bug is not None:
+                break
+
+    return found_bug
+
+
 @login_required
 def list_jobs(request):
     build_id = request.GET.get('build_id', None)
@@ -687,27 +714,24 @@ def list_jobs(request):
                 search_key = test_name
             else:
                 search_key = '%s %s' % (module_name, test_name)
+            search_key_exact = search_key.replace('#arm64-v8a', '').replace('#armeabi-v7a', '')
 
-            search_key = search_key.replace('#arm64-v8a', '').replace('#armeabi-v7a', '')
-
-            for bug in bugs:
-                if bug.summary.find(search_key) >= 0:
-                    bugs_reproduced.append(bug)
-                    if failure.get('bugs'):
-                        failure['bugs'].append(bug)
-                    else:
-                        failure['bugs'] = [bug]
+            pattern_testcase = re.compile(r'\b({0})\s+failed\b'.format(search_key_exact.replace('[', '\[').replace(']', '\]')))
+            pattern_testclass = re.compile(r'\b({0})\s+failed\b'.format(failure.get('test_class').replace('[', '\[').replace(']', '\]')))
+            pattern_module = re.compile(r'\b({0})\s+failed\b'.format(module_name.replace('[', '\[').replace(']', '\]')))
+            patterns = [pattern_testcase, pattern_testclass, pattern_module]
+            found_bug = find_bug_for_failure(failure, patterns=patterns, bugs=bugs)
+            if found_bug is not None:
+                bugs_reproduced.append(found_bug)
 
     android_version = get_version_from_pname(pname=project.get('name'))
     open_bugs = []
     bugs_not_reproduced = []
     for bug in bugs:
-        if bug.status == 'VERIFIED' or bug.status == 'RESOLVED':
+        if bug.status == 'VERIFIED' or (bug.status == 'RESOLVED' and bug.resolution != 'WONTFIX'):
             continue
-
         if bug.version != android_version:
             continue
-
         if bug in bugs_reproduced:
             open_bugs.append(bug)
         else:
@@ -917,11 +941,11 @@ def file_bug(request):
             stacktrace_msg = failures.get(abis[0])
 
         if test_name.find(module_name) >=0:
-            form_initial['summary'] = '%s: %s' % (project.get('name'), test_name)
+            form_initial['summary'] = '%s: %s failed' % (project.get('name'), test_name.replace('#arm64-v8a', '').replace('#armeabi-v7a', ''))
             description = '%s' % (test_name)
         else:
-            form_initial['summary'] = '%s: %s %s' % (project.get('name'), module_name, test_name)
-            description = '%s %s' % ( module_name, test_name)
+            form_initial['summary'] = '%s: %s %s failed' % (project.get('name'), module_name, test_name.replace('#arm64-v8a', '').replace('#armeabi-v7a', ''))
+            description = '%s %s' % ( module_name, test_name.replace('#arm64-v8a', '').replace('#armeabi-v7a', ''))
 
         history_urls = []
         for abi in abis:
@@ -934,7 +958,7 @@ def file_bug(request):
                                                              test_res_dir,
                                                              abi,
                                                              module_name,
-                                                             test_name.replace('#', '.'))
+                                                             test_name.replace('#arm64-v8a', '').replace('#armeabi-v7a', '').replace('#', '.'))
             history_urls.append(history_url)
 
         description += '\n\nABIs:\n%s' % (' '.join(abis))
@@ -1021,7 +1045,7 @@ def resubmit_job(request):
                 logger.info("db_reportproject not found for project_id=%s" % qa_project.get('id'))
                 pass
             except ReportBuild.DoesNotExist:
-                logger.info("db_report_build not found for project_id=%s, version=qa_build.get('version')" % (qa_project.get('id'), qa_build.get('version')))
+                logger.info("db_report_build not found for project_id=%s, version=%s" % (qa_project.get('id'), qa_build.get('version')))
                 pass
         else:
             failed_qa_jobs[qa_job_url] = res
@@ -1182,10 +1206,14 @@ def get_kernel_changes_info(db_kernelchanges=[]):
             kernelchanges.append(kernelchange)
             continue
 
-        trigger_url = jenkins_api.get_job_url(name=db_kernelchange.trigger_name, number=db_kernelchange.trigger_number)
-        trigger_build = jenkins_api.get_build_details_with_full_url(build_url=trigger_url)
-        trigger_build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(trigger_build['timestamp'])/1000)
-        kernel_change_finished_timestamp = trigger_build['start_timestamp']
+        try:
+            trigger_url = jenkins_api.get_job_url(name=db_kernelchange.trigger_name, number=db_kernelchange.trigger_number)
+            trigger_build = jenkins_api.get_build_details_with_full_url(build_url=trigger_url)
+            kernel_change_start_timestamp = qa_report_api.get_aware_datetime_from_timestamp(int(trigger_build['timestamp'])/1000)
+        except UrlNotFoundException as e:
+            kernel_change_start_timestamp = db_kernelchange.timestamp
+
+        kernel_change_finished_timestamp = kernel_change_start_timestamp
 
         test_numbers = qa_report.TestNumbers()
 
@@ -1195,7 +1223,6 @@ def get_kernel_changes_info(db_kernelchanges=[]):
         expect_build_names = find_expect_cibuilds(trigger_name=db_kernelchange.trigger_name, branch_name=db_kernelchange.branch)
 
         lkft_build_configs = []
-        jenkins_ci_builds = []
         ci_build_names = []
         has_build_inprogress = False
         for dbci_build in dbci_builds:
@@ -1204,21 +1231,28 @@ def get_kernel_changes_info(db_kernelchanges=[]):
             else:
                 ci_build_names.append(dbci_build.name)
 
-            build_url = jenkins_api.get_job_url(name=dbci_build.name, number=dbci_build.number)
-            build = jenkins_api.get_build_details_with_full_url(build_url=build_url)
-            build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(build['timestamp'])/1000)
+
+            try:
+                build_url = jenkins_api.get_job_url(name=dbci_build.name, number=dbci_build.number)
+                build = jenkins_api.get_build_details_with_full_url(build_url=build_url)
+                build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(build['timestamp'])/1000)
+            except UrlNotFoundException as e:
+                build = {
+                    'start_timestamp': dbci_build.timestamp,
+                }
             build['dbci_build'] = dbci_build
 
             if build.get('building'):
                 build_status = 'INPROGRESS'
                 has_build_inprogress = True
+            elif build.get('result') is None:
+                build_status = "CI_BUILD_DELETED"
             else:
                 build_status = build.get('result') # null or SUCCESS, FAILURE, ABORTED
                 build['duration'] = datetime.timedelta(milliseconds=build['duration'])
 
             build['status'] = build_status
             build['name'] = dbci_build.name
-            jenkins_ci_builds.append(build)
             configs = get_configs(ci_build=build)
             lkft_build_configs.extend(configs)
 
@@ -1330,7 +1364,7 @@ def get_kernel_changes_info(db_kernelchanges=[]):
         kernelchange['describe'] = db_kernelchange.describe
         kernelchange['trigger_name'] = db_kernelchange.trigger_name
         kernelchange['trigger_number'] = db_kernelchange.trigger_number
-        kernelchange['start_timestamp'] = trigger_build['start_timestamp']
+        kernelchange['start_timestamp'] = kernel_change_start_timestamp
         kernelchange['finished_timestamp'] = kernel_change_finished_timestamp
         kernelchange['duration'] = kernelchange['finished_timestamp'] - kernelchange['start_timestamp']
         kernelchange['status'] = kernel_change_status
