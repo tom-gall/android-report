@@ -66,6 +66,8 @@ rawkernels = {
    '5.4':[ 
             '5.4-gki-aosp-master-hikey960',
             '5.4-gki-aosp-master-db845c',
+            '5.4-stable-gki-aosp-master-hikey960',
+            '5.4-stable-gki-aosp-master-db845c',
             ],
 }
 
@@ -195,6 +197,16 @@ projectids = {
                      'hardware': 'db845c',
                      'OS' : 'AOSP',
                      'branch' : 'Android-5.4',},
+   '5.4-stable-gki-aosp-master-hikey960':
+                    {'project_id': 296, 
+                     'hardware': 'hikey960',
+                     'OS' : 'AOSP',
+                     'branch' : 'Android-5.4-stable',},
+   '5.4-stable-gki-aosp-master-db845c':
+                    {'project_id': 295,
+                     'hardware': 'db845c',
+                     'OS' : 'AOSP',
+                     'branch' : 'Android-5.4-stable',},
 }
 
 def do_boilerplate():
@@ -232,7 +244,17 @@ def find_best_two_runs(builds, project_name, project):
         build_number_total = 0
         build_modules_total = 0
         build_modules_done = 0
+        build['created_at'] = qa_report_api.get_aware_datetime_from_str(build.get('created_at'))
         jobs = qa_report_api.get_jobs_for_build(build.get("id"))
+        build_status = get_lkft_build_status(build, jobs)
+        if build_status['has_unsubmitted']:
+            #print "has unsubmitted"
+            continue
+        elif build_status['is_inprogress']:
+            #print "in progress"
+            continue
+           
+        # print "ok great should be complete" 
         if number_of_build_with_jobs < BUILD_WITH_JOBS_NUMBER:
             build_numbers = get_test_result_number_for_build(build, jobs)
             build_number_passed = build_number_passed + build_numbers.get('number_passed')
@@ -241,6 +263,7 @@ def find_best_two_runs(builds, project_name, project):
             build_modules_total = build_modules_total + build_numbers.get('modules_total')
             build_modules_done = build_modules_done + build_numbers.get('modules_done')
             number_of_build_with_jobs = number_of_build_with_jobs + 1
+            #print "numbers passed in build" + str(build_number_passed)
         number_of_build_with_jobs = number_of_build_with_jobs + 1
         build['numbers'] = {
                            'number_passed': build_number_passed,
@@ -249,9 +272,12 @@ def find_best_two_runs(builds, project_name, project):
                            'modules_done': build_modules_done,
                            'modules_total': build_modules_total,
                            }
-        build['created_at'] = qa_report_api.get_aware_datetime_from_str(build.get('created_at'))
         build['jobs'] = jobs
+        #if build_number_passed == 0:
+        #    continue
+
         download_attachments_save_result(jobs=jobs)
+            
         failures = {}
         resubmitted_job_urls = []
        
@@ -418,7 +444,6 @@ class Command(BaseCommand):
             project =  qa_report_api.get_project(project_id)
             builds = qa_report_api.get_all_builds(project_id)
             project_name = project.get('name')
-            # builds = qa_report_api.get_all_builds(project_id)
             goodruns = find_best_two_runs(builds, project_name, project)
             add_unique_kernel(unique_kernels, goodruns[0]['version'])
             regressions = find_regressions(goodruns)
