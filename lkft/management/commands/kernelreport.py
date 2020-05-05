@@ -58,6 +58,8 @@ rawkernels = {
             '4.14p-10.0-gsi-hikey960',
             '4.14q-10.0-gsi-hikey',
             '4.14q-10.0-gsi-hikey960',
+            '4.14-stable-master-hikey-lkft',
+            '4.14-stable-master-hikey960-lkft',
             ],
    '4.19':[ 
             '4.19q-10.0-gsi-hikey',
@@ -177,6 +179,16 @@ projectids = {
                      'hardware': 'hikey960',
                      'OS' : 'Android10',
                      'branch' : 'Android-4.14-q',},
+   '4.14-stable-master-hikey-lkft':
+                    {'project_id': 297, 
+                     'hardware': 'hikey',
+                     'OS' : 'AOSP',
+                     'branch': 'Android-4.14-stable',},
+   '4.14-stable-master-hikey960-lkft':
+                    {'project_id': 298, 
+                     'hardware': 'hikey960',
+                     'OS' : 'AOSP',
+                     'branch': 'Android-4.14-stable',},
    '4.19q-10.0-gsi-hikey':
                     {'project_id': 210, 
                      'hardware': 'hikey',
