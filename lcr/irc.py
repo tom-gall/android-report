@@ -6,7 +6,7 @@ import sys
 import threading
 import time
 
-from settings import IRC_CONFIG
+from lcr.settings import IRC_CONFIG
 
 class IRC:
 

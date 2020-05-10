@@ -23,6 +23,7 @@ from django.contrib.auth.decorators import login_required
 
 from lcr.settings import FILES_DIR, LAVA_SERVERS, BUGZILLA_API_KEY, BUILD_WITH_JOBS_NUMBER
 from lcr.settings import QA_REPORT, QA_REPORT_DEFAULT
+from lcr.irc import IRC
 
 from lcr import qa_report, bugzilla
 from lcr.qa_report import DotDict, UrlNotFoundException
@@ -1126,6 +1127,9 @@ def new_kernel_changes(request, branch, describe, trigger_name, trigger_number):
     remote_host = request.META.get("REMOTE_HOST")
     logger.info('request from remote_host=%s,remote_addr=%s' % (remote_host, remote_addr))
     logger.info('request for branch=%s, describe=%s, trigger_name=%s, trigger_number=%s' % (branch, describe, trigger_name, trigger_number))
+
+    irc = IRC().getInstance()
+    irc.send("New kernel changes found: branch=%s, describe=%s, %s" % (branch, describe, "https://ci.linaro.org/job/%s/%s" % (trigger_name, trigger_number)))
 
     err_msg = None
     try:
