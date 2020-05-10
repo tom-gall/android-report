@@ -25,7 +25,7 @@ class IRC:
     def getInstance():
         """ Static access method. """
         if IRC.__instance == None:
-            IRC()
+            return IRC()
         return IRC.__instance
 
     def __init__(self):
