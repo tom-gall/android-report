@@ -23,6 +23,19 @@ FILES_DIR = os.path.join(DATA_FILE_DIR, "files/cts-vts")
 ######################################################################
 ############INFO TO BE UPDATED########################################
 ######################################################################
+IRC_CONFIG = {
+    'enable': False,
+    'configs': {
+        'server': "chat.freenode.net", # Provide a valid server IP/Hostname
+        #port = 6697
+        'port': 6667,
+        'channel': "#liuyq-test",
+        'botnick':"lkft-android-bot",
+        'botnickpass': "botnickpass",
+        'botpass': "botpass"
+    }
+}
+
 db_name = "" ## TO BE UPDATED
 db_username = "" ## TO BE UPDATED
 db_passwd = "" ## TO BE UPDATED
