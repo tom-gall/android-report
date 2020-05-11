@@ -1128,7 +1128,7 @@ def new_kernel_changes(request, branch, describe, trigger_name, trigger_number):
     logger.info('request from remote_host=%s,remote_addr=%s' % (remote_host, remote_addr))
     logger.info('request for branch=%s, describe=%s, trigger_name=%s, trigger_number=%s' % (branch, describe, trigger_name, trigger_number))
 
-    irc = IRC().getInstance()
+    irc = IRC.getInstance()
     irc.send("New kernel changes found: branch=%s, describe=%s, %s" % (branch, describe, "https://ci.linaro.org/job/%s/%s" % (trigger_name, trigger_number)))
 
     err_msg = None
