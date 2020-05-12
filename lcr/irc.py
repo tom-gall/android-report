@@ -1,12 +1,20 @@
 #!/usr/bin/env python3
 
 # https://www.techbeamers.com/create-python-irc-bot/
+# https://linuxacademy.com/blog/linux-academy/creating-an-irc-bot-with-python3/
+# https://tools.ietf.org/html/rfc1459
+# https://freenode.net/kb/answer/registration
+import datetime
+import logging
 import socket
 import sys
 import threading
 import time
 
+
 from lcr.settings import IRC_CONFIG
+
+logger = logging.getLogger(__name__)
 
 class IRC:
 
@@ -17,7 +25,6 @@ class IRC:
     channel = None
     botnick = None
     botpass = None
-    botnickpass = None
 
     func_listener = {}
 
@@ -47,8 +54,11 @@ class IRC:
                 self.channel = configs.get('channel')
                 self.botnick = configs.get('botnick')
                 self.botpass = configs.get('botpass')
-                self.botnickpass = configs.get('botnickpass')
                 self.connect()
+
+                self.addFunctions(func_dict={
+                        'PING': self.func_pong,
+                        })
 
                 t = threading.Thread(target=self.dealWithFunctions, args=())
                 t.start()
@@ -56,16 +66,21 @@ class IRC:
         IRC.__instance = self
 
 
+    def func_pong(self, irc=None, text=""):
+        # to workaround the ping from server
+        if irc.irc_socket:
+            irc.irc_socket.send(bytes("PONG", "UTF-8"))
+
     def dealWithFunctions(self):
         while True:
             text = self.get_response()
             for key_word, irc_func in self.getFuncions().items():
                 #if resp.find('PING') != -1:
-                if text and key_word in text:
+                if text and (text.find(key_word) != -1):
                     irc_func(self, text)
             time.sleep(1)
 
-
+    # TODO need to be thread safe
     def addFunctions(self, func_dict={}):
         self.func_listener.update(func_dict)
 
@@ -88,32 +103,63 @@ class IRC:
             self.irc_socket.send(bytes(msg_out, "UTF-8"))
 
 
-    def connectWithConfigs(self, server, port, channel, botnick, botpass, botnickpass):
+    def connectWithConfigs(self, server, port, channel, botnick, botpass):
         if self.irc_socket is None:
             return None
 
         # Connect to the server
-        print("Connecting to: " + self.server)
+        logger.info("Connecting to: " + self.server)
         self.irc_socket.connect((self.server, int(self.port)))
 
         # Perform user authentication
         self.irc_socket.send(bytes("USER " + self.botnick + " " + self.botnick +" " + self.botnick + " :python\n", "UTF-8"))
-        print("after send command USER to: " + self.server)
+        logger.info("after send command USER to: " + self.server)
         self.irc_socket.send(bytes("NICK " + self.botnick + "\n", "UTF-8"))
-        print("after send command NICK to: " + self.server)
-        #self.irc.send(bytes("NICKSERV IDENTIFY " + self.botnickpass + " " + self.botpass + "\n", "UTF-8"))
-        time.sleep(5)
+        logger.info("after send command NICK to: " + self.server)
+        self.irc_socket.send(bytes("NICKSERV IDENTIFY " + self.botpass + "\n", "UTF-8"))
 
+        str_idenfified = "You are now identified for"
+        identified = False
+        sleep_time = 0
+        while not identified:
+            if sleep_time > 25:
+                logger.info("Failed to identify for the account of %s after %d seconds" % (self.botnick, sleep_time))
+                break
+            text = self.irc_socket.recv(2040).decode("UTF-8")
+            if text.find(str_idenfified) != -1:
+                logger.info("found identified message")
+                identified = True
+            else:
+                logger.debug("%d: not found identified message" % sleep_time)
+                time.sleep(3)
+                sleep_time = sleep_time + 3
+
+        # continue to try, but the result won't be as expected
         # join the channel
+        logger.info("Try to join: " + self.channel)
         self.irc_socket.send(bytes("JOIN " + self.channel + "\n", "UTF-8"))
-        time.sleep(10)
-        print("joined to: " + self.channel)
+        str_joined = ":End of /NAMES list"
+        joined = False
+        sleep_time = 0
+        while not joined:
+            if sleep_time > 25:
+                logger.info("Failed to join %s " % self.channel)
+                break
+            text = self.irc_socket.recv(2040).decode("UTF-8")
+            if text.find(str_joined) != -1:
+                logger.info("found joined message")
+                joined = True
+            else:
+                logger.debug("%d not found joined message" % sleep_time)
+                time.sleep(3)
+                sleep_time = sleep_time + 3
+        logger.info("joined to: " + self.channel)
 
 
     def connect(self):
         if self.irc_socket is None:
             return None
-        self.connectWithConfigs(self.server, self.port, self.channel, self.botnick, self.botpass, self.botnickpass)
+        self.connectWithConfigs(self.server, self.port, self.channel, self.botnick, self.botpass)
 
 
     # only deal with the message to this irc nick and channel
@@ -125,6 +171,9 @@ class IRC:
         # Get the response
         resp = self.irc_socket.recv(2040).decode("UTF-8")
 
+        if resp.find("PING :") != -1:
+            return resp
+
         # :liuyq!liuyq@gateway/shell/linaro/x-ykpaytiswxaohqwr PRIVMSG #liuyq-test :lkft-android-bot PING
         if not "PRIVMSG" in resp \
                 or not self.channel in resp \
@@ -135,25 +184,15 @@ class IRC:
 
 
 def func_hello(irc=None, text=""):
-    import datetime
     if irc is not None and text:
         # :liuyq!liuyq@gateway/shell/linaro/x-ykpaytiswxaohqwr PRIVMSG #liuyq-test :lkft-android-bot PING
         irc.send('Hello %s, the time is %s now:' % (text.split('!')[0].strip(':'), str(datetime.datetime.now())))
 
-
-def func_ping(irc=None, text=""):
-    if irc is not None and text:
-        user = text.split('!')[0].strip(':')
-        # :liuyq!liuyq@gateway/shell/linaro/x-ykpaytiswxaohqwr PRIVMSG #liuyq-test :lkft-android-bot PING
-        irc.send('PONG ' + user)
-
-
 def main():
-    irc = IRC().getInstance()
+    irc = IRC.getInstance()
 
     func_listener = {
         'hello': func_hello,
-        'ping': func_ping,
     }
 
     irc.addFunctions(func_listener)
