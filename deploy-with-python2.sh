@@ -37,28 +37,29 @@ sudo python get-pip.py
 sudo apt-get update
 #sudo apt-get install python-django-auth-ldap
 ## dependency for python-ldap
-sudo apt-get install libsasl2-dev python-dev python3-dev libldap2-dev libssl-dev gcc libjpeg-dev libpq-dev
+sudo apt-get install libsasl2-dev python-dev libldap2-dev libssl-dev
 #sudo apt-get install libtiff5-dev libjpeg8-dev zlib1g-dev libfreetype6-dev liblcms2-dev libwebp-dev libharfbuzz-dev libfribidi-dev tcl8.6-dev tk8.6-dev python-tk
 # https://virtualenv.pypa.io/en/stable/
 sudo pip install virtualenv
-virtualenv --python=python3 ${virenv_dir}
+virtualenv ${virenv_dir}
 source ${virenv_dir}/bin/activate
 
 #(ENV)$ deactivate
 #$ rm -r /path/to/ENV
 
 #https://docs.djangoproject.com/en/1.11/topics/install/#installing-official-release
-pip install Django==1.11.17 pyaml django-crispy-forms python-ldap django-auth-ldap requests reportlab psycopg2
-#pip install Django==1.11.8
-#pip install Django==3.0.8
-#pip install pyaml
-#pip install django-crispy-forms==1.8.1
-#pip install python-ldap # will install the 3.0 version
+pip install Django==1.11.8
+pip install pyaml
+pip install lava-tool
+pip install django-crispy-forms=1.8.1
+#pip install psycopg2
+pip install psycopg2-binary
+pip install python-ldap # will install the 3.0 version
 # https://django-auth-ldap.readthedocs.io/en/latest/install.html
-#pip install django-auth-ldap # needs python-ldap >= 3.0
+pip install django-auth-ldap # needs python-ldap >= 3.0
 #pip install bugzilla
-#pip install requests
-#pip install reportlab
+pip install requests
+pip install reportlab
 ## pip install Pillow
 ## pip install rst2pdf
 
