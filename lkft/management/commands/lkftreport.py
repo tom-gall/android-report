@@ -126,18 +126,27 @@ class Command(BaseCommand):
                 else:
                     ci_build_names.append(dbci_build.name)
 
-                build_url = jenkins_api.get_job_url(name=dbci_build.name, number=dbci_build.number)
-                build = jenkins_api.get_build_details_with_full_url(build_url=build_url)
-                build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(build['timestamp'])/1000)
+                try:
+                    build_url = jenkins_api.get_job_url(name=dbci_build.name, number=dbci_build.number)
+                    build = jenkins_api.get_build_details_with_full_url(build_url=build_url)
+                    build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(build['timestamp'])/1000)
+                except qa_report.UrlNotFoundException:
+                    build = {
+                        'start_timestamp': dbci_build.timestamp,
+                    }
                 build['dbci_build'] = dbci_build
 
                 if build.get('building'):
                     build_status = 'INPROGRESS'
                     has_build_inprogress = True
+                    build['duration'] = datetime.timedelta(milliseconds=0)
+                elif build.get('result') is None:
+                    build_status = "CI_BUILD_DELETED"
+                    build['duration'] = datetime.timedelta(milliseconds=0)
                 else:
                     build_status = build.get('result') # null or SUCCESS, FAILURE, ABORTED
+                    build['duration'] = datetime.timedelta(milliseconds=build['duration'])
 
-                build['duration'] = datetime.timedelta(milliseconds=build['duration'])
                 build['status'] = build_status
                 build['name'] = dbci_build.name
                 jenkins_ci_builds.append(build)
