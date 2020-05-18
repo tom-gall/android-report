@@ -1382,8 +1382,7 @@ def get_kernel_changes_info(db_kernelchanges=[]):
     return kernelchanges
 
 
-@login_required
-def list_kernel_changes(request):
+def get_kernel_changes_for_all_branches():
     db_kernelchanges = KernelChange.objects.all().order_by('branch', '-trigger_number')
     check_branches = []
     unique_branch_names = []
@@ -1394,8 +1393,12 @@ def list_kernel_changes(request):
             unique_branch_names.append(db_kernelchange.branch)
             check_branches.append(db_kernelchange)
 
-    kernelchanges = get_kernel_changes_info(db_kernelchanges=check_branches)
+    return get_kernel_changes_info(db_kernelchanges=check_branches)
 
+
+@login_required
+def list_kernel_changes(request):
+    kernelchanges = get_kernel_changes_for_all_branches()
     return render(request, 'lkft-kernelchanges.html',
                        {
                             "kernelchanges": kernelchanges,
@@ -1463,3 +1466,29 @@ def list_describe_kernel_changes(request, branch, describe):
                             'ci_builds': ci_builds,
                         }
             )
+
+########################################
+### Register for IRC functions
+########################################
+def func_irc_list_kernel_changes(irc=None, text=None):
+    if irc is None:
+        return
+    kernelchanges = get_kernel_changes_for_all_branches()
+    ircMsgs = []
+    for kernelchange in kernelchanges:
+        irc_msg = "branch:%s, describe=%s, %s, modules_done=%s" % (kernelchange.get('branch'),
+                        kernelchange.get('describe'),
+                        kernelchange.get('status'),
+                        kernelchange.get('modules_done'))
+        ircMsgs.append(irc_msg)
+
+    irc.send(ircMsgs)
+
+irc_notify_funcs = {
+    'listkernelchanges': func_irc_list_kernel_changes,
+}
+
+irc.addFunctions(irc_notify_funcs)
+
+########################################
+########################################
