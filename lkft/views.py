@@ -37,7 +37,7 @@ from .models import KernelChange, CiBuild, ReportBuild, ReportProject
 qa_report_def = QA_REPORT[QA_REPORT_DEFAULT]
 qa_report_api = qa_report.QAReportApi(qa_report_def.get('domain'), qa_report_def.get('token'))
 jenkins_api = qa_report.JenkinsApi('ci.linaro.org', None)
-
+irc = IRC.getInstance()
 
 DIR_ATTACHMENTS = os.path.join(FILES_DIR, 'lkft')
 logger = logging.getLogger(__name__)
@@ -1128,7 +1128,6 @@ def new_kernel_changes(request, branch, describe, trigger_name, trigger_number):
     logger.info('request from remote_host=%s,remote_addr=%s' % (remote_host, remote_addr))
     logger.info('request for branch=%s, describe=%s, trigger_name=%s, trigger_number=%s' % (branch, describe, trigger_name, trigger_number))
 
-    irc = IRC.getInstance()
     irc.send("New kernel changes found: branch=%s, describe=%s, %s" % (branch, describe, "https://ci.linaro.org/job/%s/%s" % (trigger_name, trigger_number)))
 
     err_msg = None
