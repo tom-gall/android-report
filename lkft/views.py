@@ -1187,8 +1187,10 @@ def new_build(request, branch, describe, name, number):
 def get_kernel_changes_info(db_kernelchanges=[]):
     queued_ci_items = jenkins_api.get_queued_items()
     lkft_projects = qa_report_api.get_lkft_qa_report_projects()
-
     kernelchanges = []
+    # add the same project might have several kernel changes not finished yet
+    project_builds = {} # cache builds for the project
+    project_platform_bugs = {} #cache bugs for the project and the platform
 
     for db_kernelchange in db_kernelchanges:
         kernelchange = {}
@@ -1209,22 +1211,37 @@ def get_kernel_changes_info(db_kernelchanges=[]):
             kernelchanges.append(kernelchange)
             continue
 
+        trigger_url = jenkins_api.get_job_url(name=db_kernelchange.trigger_name, number=db_kernelchange.trigger_number)
         try:
-            trigger_url = jenkins_api.get_job_url(name=db_kernelchange.trigger_name, number=db_kernelchange.trigger_number)
             trigger_build = jenkins_api.get_build_details_with_full_url(build_url=trigger_url)
             kernel_change_start_timestamp = qa_report_api.get_aware_datetime_from_timestamp(int(trigger_build['timestamp'])/1000)
-        except UrlNotFoundException as e:
-            kernel_change_start_timestamp = db_kernelchange.timestamp
-
-        kernel_change_finished_timestamp = kernel_change_start_timestamp
+            trigger_build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(trigger_build['timestamp'])/1000)
+        except qa_report.UrlNotFoundException as e:
+            trigger_build = {
+                    'start_timestamp': db_kernelchange.timestamp,
+                }
+        trigger_build['name'] = db_kernelchange.trigger_name
+        trigger_build['kernel_change'] = db_kernelchange
+        if trigger_build.get('result') is None:
+            kernel_change_finished_timestamp = kernel_change_start_timestamp
+            trigger_build['status'] = 'TRIGGER_BUILD_DELETED'
+            trigger_build['duration'] = datetime.timedelta(milliseconds=0)
+        elif trigger_build.get('building'):
+            trigger_build['status'] = 'INPROGRESS'
+            kernel_change_finished_timestamp = trigger_build['start_timestamp']
+            trigger_build['duration'] = datetime.timedelta(milliseconds=0)
+        else:
+            trigger_build['status']  = trigger_build.get('result') # null or SUCCESS, FAILURE, ABORTED
+            trigger_build['duration'] = datetime.timedelta(milliseconds=trigger_build['duration'])
+            kernel_change_finished_timestamp = trigger_build['start_timestamp'] + trigger_build['duration']
 
         test_numbers = qa_report.TestNumbers()
-
         kernel_change_status = "TRIGGER_BUILD_COMPLETED"
 
         dbci_builds = CiBuild.objects_kernel_change.get_builds_per_kernel_change(kernel_change=db_kernelchange).order_by('name', '-number')
         expect_build_names = find_expect_cibuilds(trigger_name=db_kernelchange.trigger_name, branch_name=db_kernelchange.branch)
 
+        jenkins_ci_builds = []
         lkft_build_configs = []
         ci_build_names = []
         has_build_inprogress = False
@@ -1234,12 +1251,11 @@ def get_kernel_changes_info(db_kernelchanges=[]):
             else:
                 ci_build_names.append(dbci_build.name)
 
-
             try:
                 build_url = jenkins_api.get_job_url(name=dbci_build.name, number=dbci_build.number)
                 build = jenkins_api.get_build_details_with_full_url(build_url=build_url)
                 build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(build['timestamp'])/1000)
-            except UrlNotFoundException as e:
+            except qa_report.UrlNotFoundException as e:
                 build = {
                     'start_timestamp': dbci_build.timestamp,
                 }
@@ -1248,14 +1264,17 @@ def get_kernel_changes_info(db_kernelchanges=[]):
             if build.get('building'):
                 build_status = 'INPROGRESS'
                 has_build_inprogress = True
+                build['duration'] = datetime.timedelta(milliseconds=0)
             elif build.get('result') is None:
                 build_status = "CI_BUILD_DELETED"
+                build['duration'] = datetime.timedelta(milliseconds=0)
             else:
                 build_status = build.get('result') # null or SUCCESS, FAILURE, ABORTED
                 build['duration'] = datetime.timedelta(milliseconds=build['duration'])
 
             build['status'] = build_status
             build['name'] = dbci_build.name
+            jenkins_ci_builds.append(build)
             configs = get_configs(ci_build=build)
             lkft_build_configs.extend(configs)
 
@@ -1315,7 +1334,12 @@ def get_kernel_changes_info(db_kernelchanges=[]):
                 continue
 
             target_qareport_build = None
-            builds = qa_report_api.get_all_builds(target_qareport_project.get('id'))
+            target_qareport_project_id = target_qareport_project.get('id')
+            builds = project_builds.get(target_qareport_project_id)
+            if builds is None:
+                builds = qa_report_api.get_all_builds(target_qareport_project_id)
+                project_builds[target_qareport_project_id] = builds
+
             for build in builds:
                 if build.get('version') == db_kernelchange.describe:
                     target_qareport_build = build
@@ -1327,6 +1351,11 @@ def get_kernel_changes_info(db_kernelchanges=[]):
 
             created_str = target_qareport_build.get('created_at')
             target_qareport_build['created_at'] = qa_report_api.get_aware_datetime_from_str(created_str)
+            target_qareport_build['project_name'] = project_name
+            target_qareport_build['project_group'] = project_group
+            target_qareport_build['project_slug'] = target_qareport_project.get('slug')
+            target_qareport_build['project_id'] = target_qareport_project.get('id')
+
             jobs = qa_report_api.get_jobs_for_build(target_qareport_build.get("id"))
             build_status = get_lkft_build_status(target_qareport_build, jobs)
             if build_status['has_unsubmitted']:
@@ -1341,8 +1370,12 @@ def get_kernel_changes_info(db_kernelchanges=[]):
                 if kernel_change_finished_timestamp is None or \
                     kernel_change_finished_timestamp < build_status['last_fetched_timestamp']:
                     kernel_change_finished_timestamp = build_status['last_fetched_timestamp']
+                target_qareport_build['duration'] = build_status['last_fetched_timestamp'] - target_qareport_build['created_at']
 
             numbers_of_result = get_test_result_number_for_build(target_qareport_build, jobs)
+            target_qareport_build['numbers_of_result'] = numbers_of_result
+            target_qareport_build['qa_report_project'] = target_qareport_project
+
             test_numbers.addWithHash(numbers_of_result)
 
         has_error = False
