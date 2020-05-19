@@ -82,6 +82,8 @@ class IRC:
 
     # TODO need to be thread safe
     def addFunctions(self, func_dict={}):
+        for key in func_dict.keys():
+            logger.info("regiester irc founction: %s" % key)
         self.func_listener.update(func_dict)
 
 
@@ -95,7 +97,7 @@ class IRC:
 
         # Transfer data
         if type(msgStrOrAry) == list:
-            for msg in msgAry:
+            for msg in msgStrOrAry:
                 msg_out = "PRIVMSG %s : %s\r\n" % (self.channel, str(msg))
                 self.irc_socket.send(bytes(msg_out, "UTF-8"))
         else:
