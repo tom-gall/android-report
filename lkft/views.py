@@ -1184,6 +1184,32 @@ def new_build(request, branch, describe, name, number):
         return HttpResponse("ERROR:%s" % err_msg,
                             status=200)
 
+
+def get_ci_build_info(build_name, build_number):
+    ci_build_url = jenkins_api.get_job_url(name=build_name, number=build_number)
+    try:
+        ci_build = jenkins_api.get_build_details_with_full_url(build_url=ci_build_url)
+        ci_build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(ci_build['timestamp'])/1000)
+        kernel_change_start_timestamp = ci_build['start_timestamp']
+
+        if ci_build.get('building'):
+            ci_build['status'] = 'INPROGRESS'
+            ci_build['duration'] = datetime.timedelta(milliseconds=0)
+        else:
+            ci_build['status']  = ci_build.get('result') # null or SUCCESS, FAILURE, ABORTED
+            ci_build['duration'] = datetime.timedelta(milliseconds=ci_build['duration'])
+        ci_build['finished_timestamp'] = ci_build['start_timestamp'] + ci_build['duration']
+
+    except qa_report.UrlNotFoundException as e:
+        ci_build = {
+                'status': 'CI_BUILD_DELETED',
+                'duration': datetime.timedelta(milliseconds=0),
+            }
+
+    ci_build['name'] = build_name
+    return ci_build
+
+
 def get_kernel_changes_info(db_kernelchanges=[]):
     queued_ci_items = jenkins_api.get_queued_items()
     lkft_projects = qa_report_api.get_lkft_qa_report_projects()
@@ -1193,6 +1219,7 @@ def get_kernel_changes_info(db_kernelchanges=[]):
     project_platform_bugs = {} #cache bugs for the project and the platform
 
     for db_kernelchange in db_kernelchanges:
+        test_numbers = qa_report.TestNumbers()
         kernelchange = {}
         if db_kernelchange.reported and  db_kernelchange.result == 'ALL_COMPLETED':
             kernelchange['branch'] = db_kernelchange.branch
@@ -1211,32 +1238,16 @@ def get_kernel_changes_info(db_kernelchanges=[]):
             kernelchanges.append(kernelchange)
             continue
 
-        trigger_url = jenkins_api.get_job_url(name=db_kernelchange.trigger_name, number=db_kernelchange.trigger_number)
-        try:
-            trigger_build = jenkins_api.get_build_details_with_full_url(build_url=trigger_url)
-            kernel_change_start_timestamp = qa_report_api.get_aware_datetime_from_timestamp(int(trigger_build['timestamp'])/1000)
-            trigger_build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(trigger_build['timestamp'])/1000)
-        except qa_report.UrlNotFoundException as e:
-            trigger_build = {
-                    'start_timestamp': db_kernelchange.timestamp,
-                }
-        trigger_build['name'] = db_kernelchange.trigger_name
+        trigger_build = get_ci_build_info(db_kernelchange.trigger_name, db_kernelchange.trigger_number)
         trigger_build['kernel_change'] = db_kernelchange
-        if trigger_build.get('result') is None:
-            kernel_change_finished_timestamp = kernel_change_start_timestamp
-            trigger_build['status'] = 'TRIGGER_BUILD_DELETED'
-            trigger_build['duration'] = datetime.timedelta(milliseconds=0)
-        elif trigger_build.get('building'):
-            trigger_build['status'] = 'INPROGRESS'
-            kernel_change_finished_timestamp = trigger_build['start_timestamp']
-            trigger_build['duration'] = datetime.timedelta(milliseconds=0)
+        if trigger_build.get('start_timestamp') is None:
+            trigger_build['start_timestamp'] = db_kernelchange.timestamp
+            trigger_build['finished_timestamp'] = trigger_build['start_timestamp'] + trigger_build['duration']
+            kernel_change_status = "TRIGGER_BUILD_DELETED"
         else:
-            trigger_build['status']  = trigger_build.get('result') # null or SUCCESS, FAILURE, ABORTED
-            trigger_build['duration'] = datetime.timedelta(milliseconds=trigger_build['duration'])
-            kernel_change_finished_timestamp = trigger_build['start_timestamp'] + trigger_build['duration']
-
-        test_numbers = qa_report.TestNumbers()
-        kernel_change_status = "TRIGGER_BUILD_COMPLETED"
+            kernel_change_status = "TRIGGER_BUILD_COMPLETED"
+        kernel_change_start_timestamp = trigger_build['start_timestamp']
+        kernel_change_finished_timestamp = trigger_build['finished_timestamp']
 
         dbci_builds = CiBuild.objects_kernel_change.get_builds_per_kernel_change(kernel_change=db_kernelchange).order_by('name', '-number')
         expect_build_names = find_expect_cibuilds(trigger_name=db_kernelchange.trigger_name, branch_name=db_kernelchange.branch)
@@ -1251,29 +1262,11 @@ def get_kernel_changes_info(db_kernelchanges=[]):
             else:
                 ci_build_names.append(dbci_build.name)
 
-            try:
-                build_url = jenkins_api.get_job_url(name=dbci_build.name, number=dbci_build.number)
-                build = jenkins_api.get_build_details_with_full_url(build_url=build_url)
-                build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(build['timestamp'])/1000)
-            except qa_report.UrlNotFoundException as e:
-                build = {
-                    'start_timestamp': dbci_build.timestamp,
-                }
+            build = get_ci_build_info(dbci_build.name, dbci_build.number)
             build['dbci_build'] = dbci_build
-
-            if build.get('building'):
-                build_status = 'INPROGRESS'
+            if build.get('status') == 'INPROGRESS':
                 has_build_inprogress = True
-                build['duration'] = datetime.timedelta(milliseconds=0)
-            elif build.get('result') is None:
-                build_status = "CI_BUILD_DELETED"
-                build['duration'] = datetime.timedelta(milliseconds=0)
-            else:
-                build_status = build.get('result') # null or SUCCESS, FAILURE, ABORTED
-                build['duration'] = datetime.timedelta(milliseconds=build['duration'])
 
-            build['status'] = build_status
-            build['name'] = dbci_build.name
             jenkins_ci_builds.append(build)
             configs = get_configs(ci_build=build)
             lkft_build_configs.extend(configs)
