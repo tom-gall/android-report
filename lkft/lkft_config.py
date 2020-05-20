@@ -2,6 +2,9 @@
 from __future__ import unicode_literals
 
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 citrigger_lkft = {
     'lkft-aosp-master-cts-vts': {
@@ -254,16 +257,23 @@ def get_url_content(url=None):
 def get_configs(ci_build=None):
     build_name = ci_build.get('name')
     configs = []
-    ci_config_file_url = "https://git.linaro.org/ci/job/configs.git/plain/%s.yaml" % build_name
-    content = get_url_content(url=ci_config_file_url)
-    if content is not None:
-        pat_configs = re.compile("\n\s+name:\s*ANDROID_BUILD_CONFIG\n\s+default:\s*'(?P<value>[a-zA-Z0-9\ -_.]+)'\s*\n")
-        configs_str = pat_configs.findall(content)
-        if len(configs_str) > 0:
-            for config in ' '.join(configs_str[0].split()).split():
-                configs.append((config, ci_build))
+    ci_build_actions = ci_build.get('actions')
+    for action in ci_build_actions:
+        class_name = action.get('_class')
+        if class_name != 'hudson.model.ParametersAction':
+            continue
+        parameters = action.get('parameters')
+        for parameter in parameters:
+            para_class = parameter.get('_class')
+            para_name = parameter.get('name')
+            if para_class == 'hudson.model.StringParameterValue' \
+                and para_name == 'ANDROID_BUILD_CONFIG':
+                value = parameter.get('value')
+                for config in ' '.join(value.split()).split():
+                    configs.append((config, ci_build))
 
     return configs
+
 
 def get_qa_server_project(lkft_build_config_name=None):
     #TEST_QA_SERVER=https://qa-reports.linaro.org
@@ -271,6 +281,10 @@ def get_qa_server_project(lkft_build_config_name=None):
     #TEST_QA_SERVER_TEAM=android-lkft-rc
     url_build_config = "https://android-git.linaro.org/android-build-configs.git/plain/lkft/%s?h=lkft" % lkft_build_config_name
     content = get_url_content(url_build_config)
+    if content is None:
+        # the project had been deleted or not specified(like the gki build)
+        return (None, None)
+
     pat_project = re.compile("\nTEST_QA_SERVER_PROJECT=(?P<value>[a-zA-Z0-9\ -_.]+)\n")
     project_str = pat_project.findall(content)
     if len(project_str) > 0:
