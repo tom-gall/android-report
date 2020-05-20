@@ -8,6 +8,7 @@
 
 import datetime
 import json
+import logging
 import os
 import re
 import yaml
@@ -19,19 +20,23 @@ from django.utils.timesince import timesince
 from lkft.models import KernelChange, CiBuild, ReportBuild, ReportProject
 
 from lcr import qa_report
+from lcr.irc import IRC
 
 from lcr.settings import QA_REPORT, QA_REPORT_DEFAULT
 
-from lkft.views import get_test_result_number_for_build, get_lkft_build_status
+from lkft.views import get_test_result_number_for_build, get_lkft_build_status, get_ci_build_info
 from lkft.views import extract
 from lkft.views import get_lkft_bugs, get_hardware_from_pname, get_result_file_path, get_kver_with_pname_env
 from lkft.lkft_config import find_expect_cibuilds
 
 from lkft.lkft_config import get_configs, get_qa_server_project
 
+logger = logging.getLogger(__name__)
+
 qa_report_def = QA_REPORT[QA_REPORT_DEFAULT]
 qa_report_api = qa_report.QAReportApi(qa_report_def.get('domain'), qa_report_def.get('token'))
 jenkins_api = qa_report.JenkinsApi('ci.linaro.org', None)
+irc = IRC.getInstance()
 
 class Command(BaseCommand):
     help = 'Check the build and test results for kernel changes, and send report if the jobs finished'
@@ -76,79 +81,55 @@ class Command(BaseCommand):
 
 
     def handle(self, *args, **options):
-
-        total_reports = []
-
-        lkft_projects = qa_report_api.get_lkft_qa_report_projects()
         queued_ci_items = jenkins_api.get_queued_items()
-        kernel_changes = KernelChange.objects_needs_report.all()
-
+        lkft_projects = qa_report_api.get_lkft_qa_report_projects()
+        total_reports = []
         # add the same project might have several kernel changes not finished yet
         project_builds = {} # cache builds for the project
         project_platform_bugs = {} #cache bugs for the project and the platform
 
-        for kernel_change in kernel_changes:
-            lkft_build_configs = []
-
+        # db_kernelchanges = KernelChange.objects_needs_report.all().filter(branch="android-mainline")
+        db_kernelchanges = KernelChange.objects_needs_report.all()
+        number_kernelchanges = len(db_kernelchanges)
+        index = 0
+        logger.info("length of kernel changes: %s" % number_kernelchanges)
+        for db_kernelchange in db_kernelchanges:
+            index = index +1
+            logger.info("%d/%d: Try to get info for kernel change: %s %s %s %s" % (index, number_kernelchanges, db_kernelchange.branch, db_kernelchange.describe, db_kernelchange.result, timesince(db_kernelchange.timestamp)))
             test_numbers = qa_report.TestNumbers()
-
-            trigger_url = jenkins_api.get_job_url(name=kernel_change.trigger_name, number=kernel_change.trigger_number)
-            try:
-                trigger_build = jenkins_api.get_build_details_with_full_url(build_url=trigger_url)
-            except qa_report.UrlNotFoundException:
-                print("the build does not exist any more: %s" % trigger_url)
-                continue
-            trigger_build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(trigger_build['timestamp'])/1000)
-            trigger_build['duration'] = datetime.timedelta(milliseconds=trigger_build['duration'])
-            trigger_build['name'] = kernel_change.trigger_name
-            trigger_build['kernel_change'] = kernel_change
-            if trigger_build.get('building'):
-                trigger_build['status'] = 'INPROGRESS'
-                kernel_change_finished_timestamp = trigger_build['start_timestamp']
+            trigger_build = get_ci_build_info(db_kernelchange.trigger_name, db_kernelchange.trigger_number)
+            trigger_build['kernel_change'] = db_kernelchange
+            if trigger_build.get('start_timestamp') is None:
+                trigger_build['start_timestamp'] = db_kernelchange.timestamp
+                trigger_build['finished_timestamp'] = trigger_build['start_timestamp'] + trigger_build['duration']
+                kernel_change_status = "TRIGGER_BUILD_DELETED"
             else:
-                trigger_build['status']  = trigger_build.get('result') # null or SUCCESS, FAILURE, ABORTED
-                kernel_change_finished_timestamp = trigger_build['start_timestamp'] + trigger_build['duration']
+                kernel_change_status = "TRIGGER_BUILD_COMPLETED"
+            kernel_change_start_timestamp = trigger_build['start_timestamp']
+            kernel_change_finished_timestamp = trigger_build['finished_timestamp']
 
-            kernel_change_status = "TRIGGER_BUILD_COMPLETED"
-
-            dbci_builds = CiBuild.objects_kernel_change.get_builds_per_kernel_change(kernel_change=kernel_change).order_by('name', '-number')
-            expect_build_names = find_expect_cibuilds(trigger_name=kernel_change.trigger_name, branch_name=kernel_change.branch)
+            dbci_builds = CiBuild.objects_kernel_change.get_builds_per_kernel_change(kernel_change=db_kernelchange).order_by('name', '-number')
+            expect_build_names = find_expect_cibuilds(trigger_name=db_kernelchange.trigger_name, branch_name=db_kernelchange.branch)
 
             jenkins_ci_builds = []
+            lkft_build_configs = []
             ci_build_names = []
             has_build_inprogress = False
             for dbci_build in dbci_builds:
-                if dbci_build.name == kernel_change.trigger_name:
+                if dbci_build.name == db_kernelchange.trigger_name:
                     # ignore the trigger builds
                     continue
                 if dbci_build.name in ci_build_names:
+                    # only use the latest build(which might be triggered manually) for the same kernel change
                     continue
                 else:
                     ci_build_names.append(dbci_build.name)
 
-                try:
-                    build_url = jenkins_api.get_job_url(name=dbci_build.name, number=dbci_build.number)
-                    build = jenkins_api.get_build_details_with_full_url(build_url=build_url)
-                    build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(build['timestamp'])/1000)
-                except qa_report.UrlNotFoundException:
-                    build = {
-                        'start_timestamp': dbci_build.timestamp,
-                    }
+                build = get_ci_build_info(dbci_build.name, dbci_build.number)
                 build['dbci_build'] = dbci_build
-
-                if build.get('building'):
-                    build_status = 'INPROGRESS'
+                if build.get('status') == 'INPROGRESS':
                     has_build_inprogress = True
-                    build['duration'] = datetime.timedelta(milliseconds=0)
-                elif build.get('result') is None:
-                    build_status = "CI_BUILD_DELETED"
-                    build['duration'] = datetime.timedelta(milliseconds=0)
-                else:
-                    build_status = build.get('result') # null or SUCCESS, FAILURE, ABORTED
-                    build['duration'] = datetime.timedelta(milliseconds=build['duration'])
 
-                build['status'] = build_status
-                build['name'] = dbci_build.name
                 jenkins_ci_builds.append(build)
                 configs = get_configs(ci_build=build)
                 lkft_build_configs.extend(configs)
@@ -156,21 +137,21 @@ class Command(BaseCommand):
             not_started_ci_builds = expect_build_names - set(ci_build_names)
 
             queued_ci_builds = []
-            diabled_ci_builds = []
+            disabled_ci_builds = []
             not_reported_ci_builds = []
             if len(not_started_ci_builds) > 0:
                 for cibuild_name in not_started_ci_builds:
                     is_queued_build = False
                     for queued_item in queued_ci_items:
                         if cibuild_name == queued_item.get('build_name') and \
-                            kernel_change.describe == queued_item.get('KERNEL_DESCRIBE'):
+                             db_kernelchange.describe == queued_item.get('KERNEL_DESCRIBE'):
                                 is_queued_build = True
                                 queued_ci_builds.append(queued_item)
                     if is_queued_build:
                         continue
 
                     if jenkins_api.is_build_disabled(cibuild_name):
-                        diabled_ci_builds.append(cibuild_name)
+                        disabled_ci_builds.append(cibuild_name)
                     else:
                         not_reported_ci_builds.append(cibuild_name)
 
@@ -216,7 +197,7 @@ class Command(BaseCommand):
                     project_builds[target_qareport_project_id] = builds
 
                 for build in builds:
-                    if build.get('version') == kernel_change.describe:
+                    if build.get('version') == db_kernelchange.describe:
                         target_qareport_build = build
                         break
 
@@ -334,14 +315,14 @@ class Command(BaseCommand):
                     kernel_change_status = 'ALL_COMPLETED'
 
             kernel_change_report = {
-                    'kernel_change': kernel_change,
+                    'kernel_change': db_kernelchange,
                     'trigger_build': trigger_build,
                     'jenkins_ci_builds': jenkins_ci_builds,
                     'qa_report_builds': qa_report_builds,
                     'kernel_change_status': kernel_change_status,
                     'error_dict': error_dict,
                     'queued_ci_builds': queued_ci_builds,
-                    'diabled_ci_builds': diabled_ci_builds,
+                    'disabled_ci_builds': disabled_ci_builds,
                     'not_reported_ci_builds': not_reported_ci_builds,
                     'start_timestamp': trigger_build.get('start_timestamp'),
                     'finished_timestamp': kernel_change_finished_timestamp,
@@ -354,10 +335,11 @@ class Command(BaseCommand):
         for kernel_change_report in total_reports:
             status = kernel_change_report.get('kernel_change_status')
             trigger_build = kernel_change_report.get('trigger_build')
-
+            kernel_change = kernel_change_report.get('kernel_change')
             # Try to cache Trigger build information to database
+
             try:
-                trigger_dbci_build = CiBuild.objects.get(name=trigger_build.get('name'), number=trigger_build.get('number'))
+                trigger_dbci_build = CiBuild.objects.get(name=trigger_build.get('name'), kernel_change=kernel_change)
                 trigger_dbci_build.duration = trigger_build.get('duration').total_seconds()
                 trigger_dbci_build.timestamp = trigger_build.get('start_timestamp')
                 trigger_dbci_build.result = trigger_build.get('status')
@@ -386,7 +368,7 @@ class Command(BaseCommand):
             test_numbers = kernel_change_report.get('test_numbers')
 
             kernel_change = kernel_change_report.get('kernel_change')
-            kernel_change.reported = (status == 'ALL_COMPLETED')
+            kernel_change.reported = (status == 'ALL_COMPLETED') or (status == 'TRIGGER_BUILD_DELETED')
             kernel_change.result = status
             kernel_change.timestamp = start_timestamp
             kernel_change.duration = (finished_timestamp - start_timestamp).total_seconds()
@@ -449,11 +431,17 @@ class Command(BaseCommand):
                                         status=qareport_build.get('build_status'),
                                         qa_build_id=qareport_build.get('id'))
 
-        return None
         # print out the reports
         print("########## REPORTS FOR KERNEL CHANGES#################")
+        num_kernelchanges = len(total_reports)
+        index = 0
+        irc.send("KERNEL CHANGES STATUS REPORT STARTED: %d in total" % num_kernelchanges)
         for kernel_change_report in total_reports:
             kernel_change = kernel_change_report.get('kernel_change')
+            index = index + 1
+            irc.send("%d/%d: %s %s %s %s" % (index, num_kernelchanges, kernel_change.branch, kernel_change.describe, kernel_change.result, timesince(kernel_change.timestamp)))
+            continue
+
             trigger_build = kernel_change_report.get('trigger_build')
             jenkins_ci_builds = kernel_change_report.get('jenkins_ci_builds')
             qa_report_builds = kernel_change_report.get('qa_report_builds')
@@ -490,8 +478,8 @@ class Command(BaseCommand):
             for build in not_reported_ci_builds:
                 print("\t\t %s: not reported" % (str(build)))
 
-            diabled_ci_builds = kernel_change_report.get('diabled_ci_builds')
-            for build in diabled_ci_builds:
+            disabled_ci_builds = kernel_change_report.get('disabled_ci_builds')
+            for build in disabled_ci_builds:
                 print("\t\t %s: disabled" % (str(build)))
 
             print("\t Summary of Projects Status:")
@@ -554,3 +542,5 @@ class Command(BaseCommand):
                 print("\t\t\t Failures Not Reported: %s" % (len(new_failures)))
                 for failure in new_failures:
                     print("\t\t\t\t %s %s: %s" % (failure.get('module_name'), failure.get('test_name'), failure.get('message')))
+
+        irc.send("KERNEL CHANGES STATUS REPORT FINISHED: %d in total" % num_kernelchanges)
