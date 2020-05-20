@@ -1202,6 +1202,7 @@ def get_ci_build_info(build_name, build_number):
 
     except qa_report.UrlNotFoundException as e:
         ci_build = {
+                'number': build_number,
                 'status': 'CI_BUILD_DELETED',
                 'duration': datetime.timedelta(milliseconds=0),
             }
@@ -1274,7 +1275,7 @@ def get_kernel_changes_info(db_kernelchanges=[]):
         not_started_ci_builds = expect_build_names - set(ci_build_names)
 
         queued_ci_builds = []
-        diabled_ci_builds = []
+        disabled_ci_builds = []
         not_reported_ci_builds = []
         if len(not_started_ci_builds) > 0:
             for cibuild_name in not_started_ci_builds:
@@ -1288,7 +1289,7 @@ def get_kernel_changes_info(db_kernelchanges=[]):
                     continue
 
                 if jenkins_api.is_build_disabled(cibuild_name):
-                    diabled_ci_builds.append(cibuild_name)
+                    disabled_ci_builds.append(cibuild_name)
                 else:
                     not_reported_ci_builds.append(cibuild_name)
 
