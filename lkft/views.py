@@ -744,7 +744,10 @@ def list_jobs(request):
     failures = collections.OrderedDict(sorted(failures.items()))
 
     def get_job_name(item):
-        return item.get('name')
+        if item.get('name'):
+            return item.get('name')
+        else:
+            return ""
 
     sorted_jobs = sorted(jobs, key=get_job_name)
     final_jobs = []
