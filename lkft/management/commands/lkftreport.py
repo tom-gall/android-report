@@ -80,6 +80,35 @@ class Command(BaseCommand):
                 }
 
 
+    def get_qareport_build(self, build_version, qaproject_name, cached_qaprojects=[], cached_qareport_builds=[]):
+        target_qareport_project = None
+        for lkft_project in cached_qaprojects:
+            if lkft_project.get('full_name') == qaproject_name:
+                target_qareport_project = lkft_project
+                break
+        if target_qareport_project is None:
+            return (None, None)
+
+
+        target_qareport_project_id = target_qareport_project.get('id')
+        builds = cached_qareport_builds.get(target_qareport_project_id)
+        if builds is None:
+            builds = qa_report_api.get_all_builds(target_qareport_project_id)
+            cached_qareport_builds[target_qareport_project_id] = builds
+
+        target_qareport_build = None
+        for build in builds:
+            if build.get('version') == build_version:
+                target_qareport_build = build
+                logger.info("%s %s %s" % (build.get('version'),
+                                             build.get('created_at'),
+                                             build.get('project'),
+                                             ))
+                break
+
+        return (target_qareport_project, target_qareport_build)
+
+
     def handle(self, *args, **options):
         queued_ci_items = jenkins_api.get_queued_items()
         lkft_projects = qa_report_api.get_lkft_qa_report_projects()
@@ -111,31 +140,47 @@ class Command(BaseCommand):
             dbci_builds = CiBuild.objects_kernel_change.get_builds_per_kernel_change(kernel_change=db_kernelchange).order_by('name', '-number')
             expect_build_names = find_expect_cibuilds(trigger_name=db_kernelchange.trigger_name, branch_name=db_kernelchange.branch)
 
+            # used to cached all the ci builds data
             jenkins_ci_builds = []
-            lkft_build_configs = []
+            # used to record the lkft build config to find the qa-report project
+            lkft_build_configs = {}
             ci_build_names = []
             has_build_inprogress = False
             for dbci_build in dbci_builds:
-                if dbci_build.name == db_kernelchange.trigger_name:
-                    # ignore the trigger builds
-                    continue
-                if dbci_build.name in ci_build_names:
-                    # only use the latest build(which might be triggered manually) for the same kernel change
-                    continue
-                else:
-                    ci_build_names.append(dbci_build.name)
+                #if dbci_build.name == db_kernelchange.trigger_name:
+                #    # ignore the trigger builds
+                #    continue
+                #else:
+                ci_build_names.append(dbci_build.name)
 
                 build = get_ci_build_info(dbci_build.name, dbci_build.number)
                 build['dbci_build'] = dbci_build
+                jenkins_ci_builds.append(build)
                 if build.get('status') == 'INPROGRESS':
                     has_build_inprogress = True
 
-                jenkins_ci_builds.append(build)
+                if build.get('status') != 'SUCCESS':
+                    # no need to check the build/job results as the ci build not finished successfully yet
+                    # and the qa-report build is not created yet
+                    continue
+
                 configs = get_configs(ci_build=build)
-                lkft_build_configs.extend(configs)
+                for lkft_build_config, ci_build in configs:
+                    if lkft_build_config.startswith('lkft-gki-'):
+                        # gki builds does not have any qa-preoject set
+                        continue
+                    if lkft_build_configs.get(lkft_build_config) is not None:
+                        # only use the latest build(which might be triggered manually) for the same kernel change
+                        # even for the generic build that used the same lkft_build_config.
+                        # used the "-number" filter to make sure ci builds is sorted in descending,
+                        # and the first one is the latest
+                        continue
+
+                    lkft_build_configs[lkft_build_config] = ci_build
 
             not_started_ci_builds = expect_build_names - set(ci_build_names)
 
+            # need to check how to find the builds not started or failed
             queued_ci_builds = []
             disabled_ci_builds = []
             not_reported_ci_builds = []
@@ -152,13 +197,14 @@ class Command(BaseCommand):
 
                     if jenkins_api.is_build_disabled(cibuild_name):
                         disabled_ci_builds.append(cibuild_name)
-                    else:
-                        not_reported_ci_builds.append(cibuild_name)
+                    #else:
+                    #    not_reported_ci_builds.append(cibuild_name)
 
             if queued_ci_builds:
                 kernel_change_status = "CI_BUILDS_IN_QUEUE"
             elif not_reported_ci_builds:
                 kernel_change_status = "CI_BUILDS_NOT_REPORTED"
+                logger.info("NOT REPORTED BUILDS: %s" % ' '.join(not_reported_ci_builds))
             elif has_build_inprogress:
                 kernel_change_status = "CI_BUILDS_IN_PROGRESS"
             else:
@@ -171,35 +217,16 @@ class Command(BaseCommand):
 
             qareport_project_not_found_configs = []
             qareport_build_not_found_configs = []
-            for lkft_build_config, ci_build in lkft_build_configs:
-                if ci_build.get('status') != 'SUCCESS':
-                    # no need to check the build/job results as the ci build not finished successfully yet
-                    continue
-
+            for lkft_build_config, ci_build in lkft_build_configs.items():
                 (project_group, project_name) = get_qa_server_project(lkft_build_config_name=lkft_build_config)
                 target_lkft_project_full_name = "%s/%s" % (project_group, project_name)
-
-                target_qareport_project = None
-                for lkft_project in lkft_projects:
-                    if lkft_project.get('full_name') == target_lkft_project_full_name:
-                        target_qareport_project = lkft_project
-                        break
-
+                (target_qareport_project, target_qareport_build) = self.get_qareport_build(db_kernelchange.describe,
+                                                                    target_lkft_project_full_name,
+                                                                    cached_qaprojects=lkft_projects,
+                                                                    cached_qareport_builds=project_builds)
                 if target_qareport_project is None:
                     qareport_project_not_found_configs.append(lkft_build_config)
                     continue
-
-                target_qareport_build = None
-                target_qareport_project_id = target_qareport_project.get('id')
-                builds = project_builds.get(target_qareport_project_id)
-                if builds is None:
-                    builds = qa_report_api.get_all_builds(target_qareport_project_id)
-                    project_builds[target_qareport_project_id] = builds
-
-                for build in builds:
-                    if build.get('version') == db_kernelchange.describe:
-                        target_qareport_build = build
-                        break
 
                 if target_qareport_build is None:
                     qareport_build_not_found_configs.append(lkft_build_config)
@@ -304,9 +331,11 @@ class Command(BaseCommand):
                     if qareport_project_not_found_configs:
                         kernel_change_status = 'HAS_QA_PROJECT_NOT_FOUND'
                         error_dict['qareport_project_not_found_configs'] = qareport_project_not_found_configs
+                        logger.info("qareport_build_not_found_configs: %s" % ' '.join(qareport_build_not_found_configs))
                     if qareport_build_not_found_configs:
                         kernel_change_status = 'HAS_QA_BUILD_NOT_FOUND'
                         error_dict['qareport_build_not_found_configs'] = qareport_build_not_found_configs
+                        logger.info("qareport_build_not_found_configs: %s" % ' '.join(qareport_build_not_found_configs))
                 elif has_jobs_not_submitted:
                     kernel_change_status = 'HAS_JOBS_NOT_SUBMITTED'
                 elif has_jobs_in_progress:
