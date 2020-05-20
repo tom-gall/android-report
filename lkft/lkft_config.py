@@ -112,12 +112,12 @@ citrigger_lkft_rcs = {
 trigger_branch_builds_info = {
     'trigger-lkft-android-common':{
         'android-5.4': ['lkft-hikey-aosp-master-5.4',
-                        'lkft-hikey960-aosp-master-5.4',
-                        'lkft-db845c-aosp-master-5.4'],
+                        'lkft-generic-build'],
 
-        'android-mainline': ['lkft-x15-aosp-master-mainline',
-                            'lkft-db845c-aosp-master-mainline',
-                            'lkft-hikey960-aosp-master-mainline-gki'],
+        'android-5.4-stable': ['lkft-generic-build'],
+
+        'android-mainline': ['lkft-generic-build',
+                             'lkft-x15-aosp-master-mainline'],
     },
 
     # configs for hikey kernels
@@ -148,8 +148,8 @@ trigger_branch_builds_info = {
 
     # configs for hikey kernels
     'trigger-lkft-linaro-hikey': {
-        'android-hikey-linaro-4.14-lkft': ['lkft-hikey-aosp-master-4.14-lkft'],
-        'android-hikey-linaro-4.19-lkft': ['lkft-hikey-aosp-master-4.19-lkft'],
+        'android-hikey-linaro-4.14-stable-lkft': ['lkft-generic-mirror-build'],
+        'android-hikey-linaro-4.19-lkft': ['lkft-generic-mirror-build'],
         },
 }
 
