@@ -6,13 +6,13 @@ from .models import KernelChange, CiBuild, ReportBuild, ReportProject
 
 # Register your models here.
 class KernelChangeAdmin(admin.ModelAdmin):
-    list_display = ['branch', 'describe', 'trigger_name', 'trigger_number', 'reported']
-    search_fields = ('branch', 'describe')
+    list_display = ['branch', 'describe', 'trigger_name', 'trigger_number', 'result', 'reported']
+    search_fields = ('branch', 'describe', 'result')
 
 
 class CiBuildAdmin(admin.ModelAdmin):
     list_display = ['name', 'number', 'kernel_change', 'result']
-    search_fields = ('name', 'number', 'kernel_change')
+    search_fields = ('name', 'number', 'kernel_change__branch', 'kernel_change__describe')
 
 
 class ReportBuildAdmin(admin.ModelAdmin):
