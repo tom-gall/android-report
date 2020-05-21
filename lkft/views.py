@@ -1208,6 +1208,7 @@ def get_ci_build_info(build_name, build_number):
                 'number': build_number,
                 'status': 'CI_BUILD_DELETED',
                 'duration': datetime.timedelta(milliseconds=0),
+                'actions': [],
             }
 
     ci_build['name'] = build_name
