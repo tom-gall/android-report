@@ -1453,6 +1453,20 @@ def list_describe_kernel_changes(request, branch, describe):
     db_ci_builds = CiBuild.objects.filter(kernel_change=db_kernel_change).exclude(name=db_kernel_change.trigger_name).order_by('name', 'number')
     db_trigger_build = CiBuild.objects.get(name=db_kernel_change.trigger_name, kernel_change=db_kernel_change)
 
+    kernel_change = {}
+    kernel_change['branch'] = db_kernel_change.branch
+    kernel_change['describe'] = db_kernel_change.describe
+    kernel_change['result'] = db_kernel_change.result
+    kernel_change['trigger_name'] = db_kernel_change.trigger_name
+    kernel_change['trigger_number'] = db_kernel_change.trigger_number
+    kernel_change['timestamp'] = db_kernel_change.timestamp
+    kernel_change['duration'] = datetime.timedelta(seconds=db_kernel_change.duration)
+    kernel_change['number_passed'] = db_kernel_change.number_passed
+    kernel_change['number_failed'] = db_kernel_change.number_failed
+    kernel_change['number_total'] = db_kernel_change.number_total
+    kernel_change['modules_done'] = db_kernel_change.modules_done
+    kernel_change['modules_total'] = db_kernel_change.modules_total
+
     trigger_build = {}
     trigger_build['name'] = db_trigger_build.name
     trigger_build['number'] = db_trigger_build.number
@@ -1491,7 +1505,7 @@ def list_describe_kernel_changes(request, branch, describe):
 
     return render(request, 'lkft-describe.html',
                        {
-                            "kernel_change": db_kernel_change,
+                            "kernel_change": kernel_change,
                             'report_builds': report_builds,
                             'trigger_build': trigger_build,
                             'ci_builds': ci_builds,
