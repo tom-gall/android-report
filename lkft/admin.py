@@ -17,7 +17,7 @@ class CiBuildAdmin(admin.ModelAdmin):
 
 class ReportBuildAdmin(admin.ModelAdmin):
     list_display = ['qa_project', 'version', 'number_passed', 'number_failed', 'number_total', 'modules_done', 'modules_total', 'qa_build_id']
-    search_fields = ('qa_project', 'version')
+    search_fields = ('qa_project__group', 'qa_project__name', 'qa_project__slug', 'version')
 
 
 class ReportProjectAdmin(admin.ModelAdmin):
