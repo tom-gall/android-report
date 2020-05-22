@@ -299,34 +299,49 @@ def get_testcases_number_for_job(job):
     return job['numbers']
 
 
+def get_classified_jobs(jobs=[]):
+    '''
+        remove the resubmitted jobs and duplicated jobs(needs the jobs to be sorted in job_id descending order)
+        as the result for the resubmit(including the duplicated jobs) jobs should be ignored.
+    '''
+    resubmitted_job_urls = [ job.get('parent_job') for job in jobs if job.get('parent_job')]
+    job_names = []
+    jobs_to_be_checked = []
+    resubmitted_or_duplicated_jobs = []
+    for job in jobs:
+        if job.get('url') in resubmitted_job_urls:
+            # ignore jobs which were resubmitted
+            logger.info("%s: %s:%s has been resubmitted already" % (build.get('version'), job.get('job_id'), job.get('url')))
+            job['resubmitted'] = True
+            resubmitted_or_duplicated_jobs.append(job)
+            continue
+
+        if job.get('name') in job_names:
+            logger.info("%s %s: %s %s the same name job has been recorded" % (build.get('version'), job.get('name'), job.get('job_id'), job.get('url')))
+            job['duplicated'] = True
+            resubmitted_or_duplicated_jobs.append(job)
+            continue
+
+        jobs_to_be_checked.append(job)
+        job_names.append(job.get('name'))
+
+    return {
+        'final_jobs': jobs_to_be_checked,
+        'resubmitted_or_duplicated_jobs': resubmitted_or_duplicated_jobs,
+        }
+
+
 def get_test_result_number_for_build(build, jobs=None):
     test_numbers = qa_report.TestNumbers()
 
     if not jobs:
         jobs = qa_report_api.get_jobs_for_build(build.get("id"))
 
-    resubmitted_job_urls = [ job.get('parent_job') for job in jobs if job.get('parent_job')]
-    job_names = []
-    jobs_to_be_checked = []
-    for job in jobs:
-        if job.get('url') in resubmitted_job_urls:
-            # ignore jobs which were resubmitted
-            logger.info("%s: %s:%s has been resubmitted already" % (build.get('version'), job.get('job_id'), job.get('url')))
-            job['resubmitted'] = True
-            continue
-
-        if job.get('name') in job_names:
-            logger.info("%s %s: %s %s the same name job has been recorded" % (build.get('version'), job.get('name'), job.get('job_id'), job.get('url')))
-            job['duplicated'] = True
-            continue
-
-        jobs_to_be_checked.append(job)
-
+    jobs_to_be_checked = get_classified_jobs(jobs=jobs).get('final_jobs')
     download_attachments_save_result(jobs=jobs_to_be_checked)
     for job in jobs_to_be_checked:
         numbers = get_testcases_number_for_job(job)
         test_numbers.addWithHash(numbers)
-        job_names.append(job.get('name'))
 
     return {
         'number_passed': test_numbers.number_passed,
@@ -340,22 +355,7 @@ def get_lkft_build_status(build, jobs):
     if not jobs:
         jobs = qa_report_api.get_jobs_for_build(build.get("id"))
 
-    resubmitted_job_urls = [ job.get('parent_job') for job in jobs if job.get('parent_job')]
-    job_names = []
-    jobs_to_be_checked = []
-    for job in jobs:
-        if job.get('url') in resubmitted_job_urls:
-            # ignore jobs which were resubmitted
-            logger.info("%s: %s:%s has been resubmitted already" % (build.get('version'), job.get('job_id'), job.get('url')))
-            continue
-
-        if job.get('name') in job_names:
-            logger.info("%s %s: %s %s the same name job has been recorded" % (build.get('version'), job.get('name'), job.get('job_id'), job.get('url')))
-            continue
-
-        jobs_to_be_checked.append(job)
-        job_names.append(job.get('name'))
-
+    jobs_to_be_checked = get_classified_jobs(jobs=jobs).get('final_jobs')
     last_fetched_timestamp = build.get('created_at')
     has_unsubmitted = False
     is_inprogress = False
