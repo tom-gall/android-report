@@ -371,6 +371,14 @@ def get_lkft_build_status(build, jobs):
             is_inprogress = True
             break
 
+    if has_unsubmitted:
+        build['build_status'] = "JOBSNOTSUBMITTED"
+    elif is_inprogress:
+        build['build_status'] = "JOBSINPROGRESS"
+    else:
+        build['build_status'] = "JOBSCOMPLETED"
+        build['last_fetched_timestamp'] = last_fetched_timestamp
+
     return {
         'is_inprogress': is_inprogress,
         'has_unsubmitted': has_unsubmitted,
@@ -389,13 +397,6 @@ def get_project_info(project):
         jobs = qa_report_api.get_jobs_for_build(last_build.get("id"))
         last_build['numbers_of_result'] = get_test_result_number_for_build(last_build, jobs)
         build_status = get_lkft_build_status(last_build, jobs)
-        if build_status['has_unsubmitted']:
-            last_build['build_status'] = "JOBSNOTSUBMITTED"
-        elif build_status['is_inprogress']:
-            last_build['build_status'] = "JOBSINPROGRESS"
-        else:
-            last_build['build_status'] = "JOBSCOMPLETED"
-            last_build['last_fetched_timestamp'] = build_status['last_fetched_timestamp']
         project['last_build'] = last_build
 
     logger.info("%s: Start to get ci trigger build information for project", project.get('name'))
@@ -1390,14 +1391,10 @@ def get_kernel_changes_info(db_kernelchanges=[]):
             jobs = qa_report_api.get_jobs_for_build(target_qareport_build.get("id"))
             build_status = get_lkft_build_status(target_qareport_build, jobs)
             if build_status['has_unsubmitted']:
-                target_qareport_build['build_status'] = "JOBSNOTSUBMITTED"
                 has_jobs_not_submitted = True
             elif build_status['is_inprogress']:
-                target_qareport_build['build_status'] = "JOBSINPROGRESS"
                 has_jobs_in_progress = True
             else:
-                target_qareport_build['build_status'] = "JOBSCOMPLETED"
-                target_qareport_build['last_fetched_timestamp'] = build_status['last_fetched_timestamp']
                 if kernel_change_finished_timestamp is None or \
                     kernel_change_finished_timestamp < build_status['last_fetched_timestamp']:
                     kernel_change_finished_timestamp = build_status['last_fetched_timestamp']
