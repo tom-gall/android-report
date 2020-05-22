@@ -311,13 +311,11 @@ def get_classified_jobs(jobs=[]):
     for job in jobs:
         if job.get('url') in resubmitted_job_urls:
             # ignore jobs which were resubmitted
-            logger.info("%s: %s:%s has been resubmitted already" % (build.get('version'), job.get('job_id'), job.get('url')))
             job['resubmitted'] = True
             resubmitted_or_duplicated_jobs.append(job)
             continue
 
         if job.get('name') in job_names:
-            logger.info("%s %s: %s %s the same name job has been recorded" % (build.get('version'), job.get('name'), job.get('job_id'), job.get('url')))
             job['duplicated'] = True
             resubmitted_or_duplicated_jobs.append(job)
             continue
