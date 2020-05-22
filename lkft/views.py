@@ -1239,13 +1239,16 @@ def get_qareport_build(build_version, qaproject_name, cached_qaprojects=[], cach
 
 
 def get_kernel_changes_info(db_kernelchanges=[]):
+    number_kernelchanges = len(db_kernelchanges)
+    if number_kernelchanges < 1:
+        return []
+
     queued_ci_items = jenkins_api.get_queued_items()
     lkft_projects = qa_report_api.get_lkft_qa_report_projects()
     kernelchanges = []
     # add the same project might have several kernel changes not finished yet
     project_builds = {} # cache builds for the project
 
-    number_kernelchanges = len(db_kernelchanges)
     index = 0
     logger.info("length of kernel changes: %s" % number_kernelchanges)
     for db_kernelchange in db_kernelchanges:
@@ -1254,19 +1257,7 @@ def get_kernel_changes_info(db_kernelchanges=[]):
         test_numbers = qa_report.TestNumbers()
         kernelchange = {}
         if db_kernelchange.reported and db_kernelchange.result == 'ALL_COMPLETED':
-            kernelchange['branch'] = db_kernelchange.branch
-            kernelchange['describe'] = db_kernelchange.describe
-            kernelchange['trigger_name'] = db_kernelchange.trigger_name
-            kernelchange['trigger_number'] = db_kernelchange.trigger_number
-            kernelchange['start_timestamp'] = db_kernelchange.timestamp
-            kernelchange['finished_timestamp'] = None
-            kernelchange['duration'] = datetime.timedelta(seconds=db_kernelchange.duration)
-            kernelchange['status'] = db_kernelchange.result
-            kernelchange['number_passed'] = db_kernelchange.number_passed
-            kernelchange['number_failed'] = db_kernelchange.number_failed
-            kernelchange['number_total'] = db_kernelchange.number_total
-            kernelchange['modules_done'] = db_kernelchange.modules_done
-            kernelchange['modules_total'] = db_kernelchange.modules_total
+            kernelchange = { 'kernel_change': db_kernelchange }
             kernelchanges.append(kernelchange)
             continue
 
@@ -1278,7 +1269,6 @@ def get_kernel_changes_info(db_kernelchanges=[]):
             kernel_change_status = "TRIGGER_BUILD_DELETED"
         else:
             kernel_change_status = "TRIGGER_BUILD_COMPLETED"
-        kernel_change_start_timestamp = trigger_build['start_timestamp']
         kernel_change_finished_timestamp = trigger_build['finished_timestamp']
 
         dbci_builds = CiBuild.objects_kernel_change.get_builds_per_kernel_change(kernel_change=db_kernelchange).order_by('name', '-number')
@@ -1320,7 +1310,7 @@ def get_kernel_changes_info(db_kernelchanges=[]):
                     # and the first one is the latest
                     continue
 
-                    lkft_build_configs[lkft_build_config] = ci_build
+                lkft_build_configs[lkft_build_config] = ci_build
 
         not_started_ci_builds = expect_build_names - set(ci_build_names)
 
@@ -1405,14 +1395,16 @@ def get_kernel_changes_info(db_kernelchanges=[]):
             target_qareport_build['final_jobs'] = final_jobs
             target_qareport_build['resubmitted_or_duplicated_jobs'] = resubmitted_or_duplicated_jobs
             target_qareport_build['ci_build'] = ci_build
-            qa_report_builds.append(target_qareport_build)
 
+            qa_report_builds.append(target_qareport_build)
             test_numbers.addWithHash(numbers_of_result)
 
         has_error = False
         error_dict = {}
         if kernel_change_status == "CI_BUILDS_COMPLETED":
-            if qareport_project_not_found_configs or qareport_build_not_found_configs:
+            if len(lkft_build_configs) == 0:
+                kernel_change_status = 'NO_QA_PROJECT_FOUND'
+            elif qareport_project_not_found_configs or qareport_build_not_found_configs:
                 has_error = True
                 if qareport_project_not_found_configs:
                     kernel_change_status = 'HAS_QA_PROJECT_NOT_FOUND'
@@ -1429,23 +1421,65 @@ def get_kernel_changes_info(db_kernelchanges=[]):
             else:
                 kernel_change_status = 'ALL_COMPLETED'
 
-        kernelchange['branch'] = db_kernelchange.branch
-        kernelchange['describe'] = db_kernelchange.describe
-        kernelchange['trigger_name'] = db_kernelchange.trigger_name
-        kernelchange['trigger_number'] = db_kernelchange.trigger_number
-        kernelchange['start_timestamp'] = kernel_change_start_timestamp
-        kernelchange['finished_timestamp'] = kernel_change_finished_timestamp
-        kernelchange['duration'] = kernelchange['finished_timestamp'] - kernelchange['start_timestamp']
-        kernelchange['status'] = kernel_change_status
-        kernelchange['number_passed'] = test_numbers.number_passed
-        kernelchange['number_failed'] = test_numbers.number_failed
-        kernelchange['number_total'] = test_numbers.number_total
-        kernelchange['modules_done'] = test_numbers.modules_done
-        kernelchange['modules_total'] = test_numbers.modules_total
+        kernelchange = {
+                'kernel_change': db_kernelchange,
+                'trigger_build': trigger_build,
+                'jenkins_ci_builds': jenkins_ci_builds,
+                'qa_report_builds': qa_report_builds,
+                'kernel_change_status': kernel_change_status,
+                'error_dict': error_dict,
+                'queued_ci_builds': queued_ci_builds,
+                'disabled_ci_builds': disabled_ci_builds,
+                'not_reported_ci_builds': not_reported_ci_builds,
+                'start_timestamp': trigger_build.get('start_timestamp'),
+                'finished_timestamp': kernel_change_finished_timestamp,
+                'test_numbers': test_numbers,
+            }
 
         kernelchanges.append(kernelchange)
 
     return kernelchanges
+
+
+def get_kernel_changes_info_wrapper_for_display(db_kernelchanges=[]):
+    kernelchanges = get_kernel_changes_info(db_kernelchanges=db_kernelchanges)
+    kernelchanges_return = []
+    for kernelchange in kernelchanges:
+        kernelchange_return = {}
+        db_kernelchange = kernelchange.get('kernel_change')
+
+        kernelchange_return['branch'] = db_kernelchange.branch
+        kernelchange_return['describe'] = db_kernelchange.describe
+        kernelchange_return['trigger_name'] = db_kernelchange.trigger_name
+        kernelchange_return['trigger_number'] = db_kernelchange.trigger_number
+
+        if db_kernelchange.reported and db_kernelchange.result == 'ALL_COMPLETED':
+            kernelchange_return['start_timestamp'] = db_kernelchange.timestamp
+            kernelchange_return['finished_timestamp'] = None
+            kernelchange_return['duration'] = datetime.timedelta(seconds=db_kernelchange.duration)
+            kernelchange_return['status'] = db_kernelchange.result
+            kernelchange_return['number_passed'] = db_kernelchange.number_passed
+            kernelchange_return['number_failed'] = db_kernelchange.number_failed
+            kernelchange_return['number_total'] = db_kernelchange.number_total
+            kernelchange_return['modules_done'] = db_kernelchange.modules_done
+            kernelchange_return['modules_total'] = db_kernelchange.modules_total
+        else:
+            test_numbers = kernelchange.get('test_numbers')
+            kernelchange_return['start_timestamp'] = kernelchange.get('start_timestamp')
+            kernelchange_return['finished_timestamp'] = kernelchange.get('finished_timestamp')
+            kernelchange_return['duration'] = kernelchange_return['finished_timestamp'] - kernelchange_return['start_timestamp']
+
+            kernelchange_return['status'] = kernelchange.get('kernel_change_status')
+
+            kernelchange_return['number_passed'] = test_numbers.number_passed
+            kernelchange_return['number_failed'] = test_numbers.number_failed
+            kernelchange_return['number_total'] = test_numbers.number_total
+            kernelchange_return['modules_done'] = test_numbers.modules_done
+            kernelchange_return['modules_total'] = test_numbers.modules_total
+
+        kernelchanges_return.append(kernelchange_return)
+
+    return kernelchanges_return
 
 
 def get_kernel_changes_for_all_branches():
@@ -1459,7 +1493,7 @@ def get_kernel_changes_for_all_branches():
             unique_branch_names.append(db_kernelchange.branch)
             check_branches.append(db_kernelchange)
 
-    return get_kernel_changes_info(db_kernelchanges=check_branches)
+    return get_kernel_changes_info_wrapper_for_display(db_kernelchanges=check_branches)
 
 
 @login_required
@@ -1474,7 +1508,7 @@ def list_kernel_changes(request):
 @login_required
 def list_branch_kernel_changes(request, branch):
     db_kernelchanges = KernelChange.objects.all().filter(branch=branch).order_by('-trigger_number')
-    kernelchanges = get_kernel_changes_info(db_kernelchanges=db_kernelchanges)
+    kernelchanges = get_kernel_changes_info_wrapper_for_display(db_kernelchanges=db_kernelchanges)
 
     return render(request, 'lkft-kernelchanges.html',
                        {
