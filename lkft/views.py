@@ -650,10 +650,6 @@ def list_jobs(request):
     failures = {}
     resubmitted_job_urls = []
     for job in jobs:
-        if job.get('job_status') is None and \
-            job.get('submitted') and \
-            not job.get('fetched'):
-            job['job_status'] = 'Submitted'
         if job.get('failure'):
             failure = job.get('failure')
             new_str = failure.replace('"', '\\"').replace('\'', '"')
