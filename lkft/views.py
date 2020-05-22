@@ -1244,7 +1244,6 @@ def get_kernel_changes_info(db_kernelchanges=[]):
     kernelchanges = []
     # add the same project might have several kernel changes not finished yet
     project_builds = {} # cache builds for the project
-    project_platform_bugs = {} #cache bugs for the project and the platform
 
     number_kernelchanges = len(db_kernelchanges)
     index = 0
@@ -1385,7 +1384,11 @@ def get_kernel_changes_info(db_kernelchanges=[]):
             target_qareport_build['project_id'] = target_qareport_project.get('id')
 
             jobs = qa_report_api.get_jobs_for_build(target_qareport_build.get("id"))
-            build_status = get_lkft_build_status(target_qareport_build, jobs)
+            classified_jobs = get_classified_jobs(jobs=jobs)
+            final_jobs = classified_jobs.get('final_jobs')
+            resubmitted_or_duplicated_jobs = classified_jobs.get('resubmitted_or_duplicated_jobs')
+
+            build_status = get_lkft_build_status(target_qareport_build, final_jobs)
             if build_status['has_unsubmitted']:
                 has_jobs_not_submitted = True
             elif build_status['is_inprogress']:
@@ -1396,9 +1399,13 @@ def get_kernel_changes_info(db_kernelchanges=[]):
                     kernel_change_finished_timestamp = build_status['last_fetched_timestamp']
                 target_qareport_build['duration'] = build_status['last_fetched_timestamp'] - target_qareport_build['created_at']
 
-            numbers_of_result = get_test_result_number_for_build(target_qareport_build, jobs)
+            numbers_of_result = get_test_result_number_for_build(target_qareport_build, final_jobs)
             target_qareport_build['numbers_of_result'] = numbers_of_result
             target_qareport_build['qa_report_project'] = target_qareport_project
+            target_qareport_build['final_jobs'] = final_jobs
+            target_qareport_build['resubmitted_or_duplicated_jobs'] = resubmitted_or_duplicated_jobs
+            target_qareport_build['ci_build'] = ci_build
+            qa_report_builds.append(target_qareport_build)
 
             test_numbers.addWithHash(numbers_of_result)
 

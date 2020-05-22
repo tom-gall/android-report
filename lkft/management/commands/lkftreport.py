@@ -138,8 +138,8 @@ class Command(BaseCommand):
         # add the same project might have several kernel changes not finished yet
         project_builds = {} # cache builds for the project
 
-        db_kernelchanges = KernelChange.objects_needs_report.all().filter(branch="android-5.4")
-        #db_kernelchanges = KernelChange.objects_needs_report.all()
+        # db_kernelchanges = KernelChange.objects_needs_report.all().filter(branch="android-5.4")
+        db_kernelchanges = KernelChange.objects_needs_report.all()
         number_kernelchanges = len(db_kernelchanges)
         index = 0
         logger.info("length of kernel changes: %s" % number_kernelchanges)
@@ -261,7 +261,7 @@ class Command(BaseCommand):
                 target_qareport_build['project_id'] = target_qareport_project.get('id')
 
                 jobs = qa_report_api.get_jobs_for_build(target_qareport_build.get("id"))
-                classified_jobs = = get_classified_jobs(jobs=jobs)
+                classified_jobs = get_classified_jobs(jobs=jobs)
                 final_jobs = classified_jobs.get('final_jobs')
                 resubmitted_or_duplicated_jobs = classified_jobs.get('resubmitted_or_duplicated_jobs')
 
