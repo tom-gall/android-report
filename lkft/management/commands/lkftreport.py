@@ -24,7 +24,7 @@ from lcr.irc import IRC
 
 from lcr.settings import QA_REPORT, QA_REPORT_DEFAULT
 
-from lkft.views import get_test_result_number_for_build, get_lkft_build_status, get_ci_build_info
+from lkft.views import get_test_result_number_for_build, get_lkft_build_status, get_ci_build_info, get_qareport_build
 from lkft.views import extract
 from lkft.views import get_lkft_bugs, get_hardware_from_pname, get_result_file_path, get_kver_with_pname_env
 from lkft.lkft_config import find_expect_cibuilds
@@ -80,45 +80,16 @@ class Command(BaseCommand):
                 }
 
 
-    def get_qareport_build(self, build_version, qaproject_name, cached_qaprojects=[], cached_qareport_builds=[]):
-        target_qareport_project = None
-        for lkft_project in cached_qaprojects:
-            if lkft_project.get('full_name') == qaproject_name:
-                target_qareport_project = lkft_project
-                break
-        if target_qareport_project is None:
-            return (None, None)
-
-
-        target_qareport_project_id = target_qareport_project.get('id')
-        builds = cached_qareport_builds.get(target_qareport_project_id)
-        if builds is None:
-            builds = qa_report_api.get_all_builds(target_qareport_project_id)
-            cached_qareport_builds[target_qareport_project_id] = builds
-
-        target_qareport_build = None
-        for build in builds:
-            if build.get('version') == build_version:
-                target_qareport_build = build
-                logger.info("%s %s %s" % (build.get('version'),
-                                             build.get('created_at'),
-                                             build.get('project'),
-                                             ))
-                break
-
-        return (target_qareport_project, target_qareport_build)
-
-
     def handle(self, *args, **options):
         queued_ci_items = jenkins_api.get_queued_items()
         lkft_projects = qa_report_api.get_lkft_qa_report_projects()
-        total_reports = []
+        kernelchanges = []
         # add the same project might have several kernel changes not finished yet
         project_builds = {} # cache builds for the project
         project_platform_bugs = {} #cache bugs for the project and the platform
 
-        # db_kernelchanges = KernelChange.objects_needs_report.all().filter(branch="android-mainline")
-        db_kernelchanges = KernelChange.objects_needs_report.all()
+        db_kernelchanges = KernelChange.objects_needs_report.all().filter(branch="android-5.4")
+        #db_kernelchanges = KernelChange.objects_needs_report.all()
         number_kernelchanges = len(db_kernelchanges)
         index = 0
         logger.info("length of kernel changes: %s" % number_kernelchanges)
@@ -220,7 +191,7 @@ class Command(BaseCommand):
             for lkft_build_config, ci_build in lkft_build_configs.items():
                 (project_group, project_name) = get_qa_server_project(lkft_build_config_name=lkft_build_config)
                 target_lkft_project_full_name = "%s/%s" % (project_group, project_name)
-                (target_qareport_project, target_qareport_build) = self.get_qareport_build(db_kernelchange.describe,
+                (target_qareport_project, target_qareport_build) = get_qareport_build(db_kernelchange.describe,
                                                                     target_lkft_project_full_name,
                                                                     cached_qaprojects=lkft_projects,
                                                                     cached_qareport_builds=project_builds)
@@ -343,7 +314,7 @@ class Command(BaseCommand):
                 else:
                     kernel_change_status = 'ALL_COMPLETED'
 
-            kernel_change_report = {
+            kernelchange = {
                     'kernel_change': db_kernelchange,
                     'trigger_build': trigger_build,
                     'jenkins_ci_builds': jenkins_ci_builds,
@@ -358,14 +329,15 @@ class Command(BaseCommand):
                     'test_numbers': test_numbers,
                 }
 
-            total_reports.append(kernel_change_report)
+            kernelchanges.append(kernelchange)
 
         ## cache to database
-        for kernel_change_report in total_reports:
+        for kernel_change_report in kernelchanges:
             status = kernel_change_report.get('kernel_change_status')
             trigger_build = kernel_change_report.get('trigger_build')
             kernel_change = kernel_change_report.get('kernel_change')
             # Try to cache Trigger build information to database
+            logger.info("%s %s %s" % (kernel_change.branch, kernel_change.describe, status))
 
             try:
                 trigger_dbci_build = CiBuild.objects.get(name=trigger_build.get('name'), kernel_change=kernel_change)
@@ -397,7 +369,7 @@ class Command(BaseCommand):
             test_numbers = kernel_change_report.get('test_numbers')
 
             kernel_change = kernel_change_report.get('kernel_change')
-            kernel_change.reported = (status == 'ALL_COMPLETED') or (status == 'TRIGGER_BUILD_DELETED')
+            kernel_change.reported = (status == 'ALL_COMPLETED')
             kernel_change.result = status
             kernel_change.timestamp = start_timestamp
             kernel_change.duration = (finished_timestamp - start_timestamp).total_seconds()
@@ -462,10 +434,10 @@ class Command(BaseCommand):
 
         # print out the reports
         print("########## REPORTS FOR KERNEL CHANGES#################")
-        num_kernelchanges = len(total_reports)
+        num_kernelchanges = len(kernelchanges)
         index = 0
         irc.send("KERNEL CHANGES STATUS REPORT STARTED: %d in total" % num_kernelchanges)
-        for kernel_change_report in total_reports:
+        for kernel_change_report in kernelchanges:
             kernel_change = kernel_change_report.get('kernel_change')
             index = index + 1
             irc.send("%d/%d: %s %s %s %s" % (index, num_kernelchanges, kernel_change.branch, kernel_change.describe, kernel_change.result, timesince(kernel_change.timestamp)))
