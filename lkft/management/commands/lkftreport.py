@@ -80,13 +80,63 @@ class Command(BaseCommand):
                 }
 
 
+   def get_bugs_for_project(self, project_name="", cachepool={}):
+        platform_name = get_hardware_from_pname(project_name)
+        project_platform_key = "%s#%s" % (project_name, platform_name)
+        bugs = cachepool.get(project_platform_key)
+        if bugs is None:
+            bugs = get_lkft_bugs(summary_keyword=project_name, platform=platform_name)
+            cachepool[project_platform_key] = bugs
+
+    def get_failures_for_build(self, project_name="", jobs=[]):
+        failures = {}
+        for job in jobs:
+            if job.get('failure'):
+                failure = job.get('failure')
+                new_str = failure.replace('"', '\\"').replace('\'', '"')
+                try:
+                    failure_dict = json.loads(new_str)
+                except ValueError:
+                    failure_dict = {'error_msg': new_str}
+
+
+            result_file_path = get_result_file_path(job=job)
+            if not result_file_path or not os.path.exists(result_file_path):
+                continue
+
+            kernel_version = get_kver_with_pname_env(prj_name=project_name, env=job.get('environment'))
+
+            platform = job.get('environment').split('_')[0]
+
+            metadata = {
+                'job_id': job.get('job_id'),
+                'qa_job_id': qa_report_api.get_qa_job_id_with_url(job_url=job.get('url')),
+                'result_url': job.get('attachment_url'),
+                'lava_nick': job.get('lava_config').get('nick'),
+                'kernel_version': kernel_version,
+                'platform': platform,
+                }
+            extract(result_file_path, failed_testcases_all=failures, metadata=metadata)
+        return failures
+
+
+    def get_bugs_and_failures_for_qabuild(self, target_qareport_build, cachepool={}):
+        qa_project = target_qareport_build.get('qa_report_project')
+        project_name = qa_project.get('name')
+        final_jobs = target_qareport_build.get('final_jobs')
+        failures = self.get_failures_for_build(project_name=project_name, jobs=final_jobs)
+        bugs = self.get_bugs_for_project(project_name=project_name, cachepool=cachepool)
+        classification = self.classify_bugs_and_failures(bugs=bugs, failures=failures)
+        target_qareport_build['failures'] = failures
+        target_qareport_build['classification'] = classification
+
+
     def handle(self, *args, **options):
         queued_ci_items = jenkins_api.get_queued_items()
         lkft_projects = qa_report_api.get_lkft_qa_report_projects()
         kernelchanges = []
         # add the same project might have several kernel changes not finished yet
         project_builds = {} # cache builds for the project
-        project_platform_bugs = {} #cache bugs for the project and the platform
 
         db_kernelchanges = KernelChange.objects_needs_report.all().filter(branch="android-5.4")
         #db_kernelchanges = KernelChange.objects_needs_report.all()
@@ -245,54 +295,6 @@ class Command(BaseCommand):
                 target_qareport_build['final_jobs'] = final_jobs
                 target_qareport_build['resubmitted_or_duplicated_jobs'] = resubmitted_or_duplicated_jobs
                 qa_report_builds.append(target_qareport_build)
-
-                project_name = target_qareport_project.get('name')
-                platform_name = get_hardware_from_pname(project_name)
-                project_platform_key = "%s#%s" % (project_name, platform_name)
-                bugs = project_platform_bugs.get(project_platform_key)
-                if bugs is None:
-                    bugs = get_lkft_bugs(summary_keyword=project_name, platform=platform_name)
-                    project_platform_bugs[project_platform_key] = bugs
-
-                build['bugs'] = bugs
-
-                failures = {}
-                for job in final_jobs:
-                    if job.get('job_status') is None and \
-                        job.get('submitted') and \
-                        not job.get('fetched'):
-                        job['job_status'] = 'Submitted'
-                    if job.get('failure'):
-                        failure = job.get('failure')
-                        new_str = failure.replace('"', '\\"').replace('\'', '"')
-                        try:
-                            failure_dict = json.loads(new_str)
-                        except ValueError:
-                            failure_dict = {'error_msg': new_str}
-
-
-                    result_file_path = get_result_file_path(job=job)
-                    if not result_file_path or not os.path.exists(result_file_path):
-                        continue
-
-                    kernel_version = get_kver_with_pname_env(prj_name=project_name, env=job.get('environment'))
-
-                    platform = job.get('environment').split('_')[0]
-
-                    metadata = {
-                        'job_id': job.get('job_id'),
-                        'qa_job_id': qa_report_api.get_qa_job_id_with_url(job_url=job.get('url')),
-                        'result_url': job.get('attachment_url'),
-                        'lava_nick': job.get('lava_config').get('nick'),
-                        'kernel_version': kernel_version,
-                        'platform': platform,
-                        }
-                    extract(result_file_path, failed_testcases_all=failures, metadata=metadata)
-
-                target_qareport_build['failures'] = failures
-                classification = self.classify_bugs_and_failures(bugs=bugs, failures=failures)
-                target_qareport_build['classification'] = classification
-                target_qareport_build['ci_build'] = ci_build
 
             has_error = False
             error_dict = {}
@@ -521,11 +523,15 @@ class Command(BaseCommand):
                                             numbers_of_result.get('number_failed')))
 
             print("\t Failures and Bugs:")
+
+            project_platform_bugs = {} #cache bugs for the project and the platform
             for build in qa_report_builds:
                 qa_report_project = build.get('qa_report_project')
                 print("\t\t %s %s %s" % (qa_report_project.get('full_name'),
                                             build.get('build_status'),
                                             build.get('created_at')))
+
+                self.get_bugs_and_failures_for_qabuild(build, cachepool=project_platform_bugs)
 
                 classification = build.get('classification')
                 bugs_reproduced = classification.get('bugs_reproduced')
