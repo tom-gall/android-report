@@ -239,11 +239,12 @@ class Command(BaseCommand):
         print("########## REPORTS FOR KERNEL CHANGES#################")
         num_kernelchanges = len(kernelchanges)
         index = 0
-        irc.send("KERNEL CHANGES STATUS REPORT STARTED: %d in total" % num_kernelchanges)
+        ircMsgList=[]
+        ircMsgList.append("KERNEL CHANGES STATUS REPORT STARTED: %d in total" % num_kernelchanges)
         for kernel_change_report in kernelchanges:
             kernel_change = kernel_change_report.get('kernel_change')
             index = index + 1
-            irc.send("%d/%d: %s %s %s %s" % (index, num_kernelchanges, kernel_change.branch, kernel_change.describe, kernel_change.result, timesince(kernel_change.timestamp)))
+            ircMsgList.append("%d/%d: %s %s %s %s" % (index, num_kernelchanges, kernel_change.branch, kernel_change.describe, kernel_change.result, timesince(kernel_change.timestamp)))
             continue
 
             trigger_build = kernel_change_report.get('trigger_build')
@@ -351,4 +352,5 @@ class Command(BaseCommand):
                 for failure in new_failures:
                     print("\t\t\t\t %s %s: %s" % (failure.get('module_name'), failure.get('test_name'), failure.get('message')))
 
-        irc.send("KERNEL CHANGES STATUS REPORT FINISHED: %d in total" % num_kernelchanges)
+        ircMsgList.append("KERNEL CHANGES STATUS REPORT FINISHED: %d in total" % num_kernelchanges)
+        irc.sendAndQuit(msgStrOrAry=ircMsgList)

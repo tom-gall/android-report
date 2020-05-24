@@ -43,27 +43,25 @@ class IRC:
             or not IRC_CONFIG.get('enable'):
             return None
 
+        configs = IRC_CONFIG.get('configs')
+        if configs:
+            self.server = configs.get('server')
+            self.port = configs.get('port')
+            self.channel = configs.get('channel')
+            self.botnick = configs.get('botnick')
+            self.botpass = configs.get('botpass')
+
         if IRC.__instance != None:
             raise Exception("This class is a singleton!")
         else:
-            self.irc_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            configs = IRC_CONFIG.get('configs')
-            if configs:
-                self.server = configs.get('server')
-                self.port = configs.get('port')
-                self.channel = configs.get('channel')
-                self.botnick = configs.get('botnick')
-                self.botpass = configs.get('botpass')
-                self.connect()
+            IRC.__instance = self
+#            self.connect()
+#            self.addFunctions(func_dict={
+#                    'PING': self.func_pong,
+#                    })
 
-                self.addFunctions(func_dict={
-                        'PING': self.func_pong,
-                        })
-
-                t = threading.Thread(target=self.dealWithFunctions, args=())
-                t.start()
-
-        IRC.__instance = self
+#            t = threading.Thread(target=self.dealWithFunctions, args=())
+#            t.start()
 
 
     def func_pong(self, irc=None, text=""):
@@ -105,9 +103,15 @@ class IRC:
             self.irc_socket.send(bytes(msg_out, "UTF-8"))
 
 
+    def sendAndQuit(self, msgStrOrAry=None):
+        self.connect()
+        self.send(msgStrOrAry=msgStrOrAry)
+        self.send(msgStrOrAry="QUIT")
+
+
     def connectWithConfigs(self, server, port, channel, botnick, botpass):
         if self.irc_socket is None:
-            return None
+            self.irc_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         # Connect to the server
         logger.info("Connecting to: " + self.server)
@@ -159,8 +163,6 @@ class IRC:
 
 
     def connect(self):
-        if self.irc_socket is None:
-            return None
         self.connectWithConfigs(self.server, self.port, self.channel, self.botnick, self.botpass)
 
 
