@@ -23,13 +23,10 @@ from lcr import qa_report
 
 from lcr.settings import QA_REPORT, QA_REPORT_DEFAULT, BUILD_WITH_JOBS_NUMBER
 
-from lkft.views import get_test_result_number_for_build, get_lkft_build_status, get_projects_info
+from lkft.views import get_test_result_number_for_build, get_projects_info
 from lkft.views import extract
-from lkft.views import get_lkft_bugs, get_hardware_from_pname, get_result_file_path, get_kver_with_pname_env
 from lkft.views import download_attachments_save_result
-from lkft.lkft_config import find_expect_cibuilds, get_version_from_pname, get_kver_with_pname_env
-
-from lkft.lkft_config import get_configs, get_qa_server_project
+from lkft.lkft_config import get_version_from_pname, get_kver_with_pname_env
 
 qa_report_def = QA_REPORT[QA_REPORT_DEFAULT]
 qa_report_api = qa_report.QAReportApi(qa_report_def.get('domain'), qa_report_def.get('token'))
