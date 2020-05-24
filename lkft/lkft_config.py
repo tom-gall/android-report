@@ -276,27 +276,45 @@ def get_configs(ci_build=None):
 
 
 def get_qa_server_project(lkft_build_config_name=None):
-    #TEST_QA_SERVER=https://qa-reports.linaro.org
-    #TEST_QA_SERVER_PROJECT=mainline-gki-aosp-master-hikey960
-    #TEST_QA_SERVER_TEAM=android-lkft-rc
+    # TEST_QA_SERVER=https://qa-reports.linaro.org
+    # TEST_QA_SERVER_PROJECT=mainline-gki-aosp-master-hikey960
+    # TEST_QA_SERVER_TEAM=android-lkft-rc
+    # TEST_OTHER_PLANS="EXTRAS"
+    # TEST_TEMPLATES_EXTRAS="template-cts-presubmit.yaml template-cts-presubmit-CtsDeqpTestCases.yaml template-cts-presubmit-CtsLibcoreOjTestCases.yaml"
+    # TEST_QA_SERVER_PROJECT_EXTRAS=5.4-stable-gki-aosp-master-db845c-presubmit
+
+    projects=[]
+
     url_build_config = "https://android-git.linaro.org/android-build-configs.git/plain/lkft/%s?h=lkft" % lkft_build_config_name
     content = get_url_content(url_build_config)
     if content is None:
         # the project had been deleted or not specified(like the gki build)
-        return (None, None)
+        return []
 
-    pat_project = re.compile("\nTEST_QA_SERVER_PROJECT=(?P<value>[a-zA-Z0-9\ -_.]+)\n")
-    project_str = pat_project.findall(content)
-    if len(project_str) > 0:
-        project = project_str[0]
+    content_dict={}
+    for line in content.split('\n'):
+        if line.startswith("#") or not line:
+            continue
+        key_value_array = line.split("=")
+        key = key_value_array[0]
+        value = " ".join(key_value_array[1:]).strip('"')
+        content_dict[key.strip()] = value.strip()
+
+    def_project = content_dict.get('TEST_QA_SERVER_PROJECT')
+    def_team = content_dict.get('TEST_QA_SERVER_TEAM', 'android-lkft')
+    if def_project is None:
+        return projects
     else:
-        project = None
+        projects.append((def_team, def_project))
 
-    pat_team=re.compile("\nTEST_QA_SERVER_TEAM=(?P<value>[a-zA-Z0-9\ -_.]+)\n")
-    team_str = pat_team.findall(content)
-    if len(team_str) > 0:
-        team = team_str[0]
-    else:
-        team = "android-lkft"
+    other_plans = content_dict.get('TEST_OTHER_PLANS')
+    if other_plans is not None:
+        for other_plan in other_plans.split(" "):
+            project_key_name = "TEST_QA_SERVER_PROJECT_%s" % other_plan
+            team_key_name = "TEST_QA_SERVER_TEAM_%s" % other_plan
+            other_plan_project = content_dict.get(project_key_name)
+            other_plan_team = content_dict.get(team_key_name, 'android-lkft')
+            if other_plan_project is not None:
+                projects.append((other_plan_team, other_plan_project))
 
-    return (team, project)
+    return projects

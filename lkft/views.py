@@ -1350,52 +1350,53 @@ def get_kernel_changes_info(db_kernelchanges=[]):
         qareport_project_not_found_configs = []
         qareport_build_not_found_configs = []
         for lkft_build_config, ci_build in lkft_build_configs.items():
-            (project_group, project_name) = get_qa_server_project(lkft_build_config_name=lkft_build_config)
-            target_lkft_project_full_name = "%s/%s" % (project_group, project_name)
-            (target_qareport_project, target_qareport_build) = get_qareport_build(db_kernelchange.describe,
-                                                                    target_lkft_project_full_name,
-                                                                    cached_qaprojects=lkft_projects,
-                                                                    cached_qareport_builds=project_builds)
-            if target_qareport_project is None:
-                qareport_project_not_found_configs.append(lkft_build_config)
-                continue
+            projects = get_qa_server_project(lkft_build_config_name=lkft_build_config)
+            for (project_group, project_name) in projects:
+                target_lkft_project_full_name = "%s/%s" % (project_group, project_name)
+                (target_qareport_project, target_qareport_build) = get_qareport_build(db_kernelchange.describe,
+                                                                        target_lkft_project_full_name,
+                                                                        cached_qaprojects=lkft_projects,
+                                                                        cached_qareport_builds=project_builds)
+                if target_qareport_project is None:
+                    qareport_project_not_found_configs.append(lkft_build_config)
+                    continue
 
-            if target_qareport_build is None:
-                qareport_build_not_found_configs.append(lkft_build_config)
-                continue
+                if target_qareport_build is None:
+                    qareport_build_not_found_configs.append(lkft_build_config)
+                    continue
 
-            created_str = target_qareport_build.get('created_at')
-            target_qareport_build['created_at'] = qa_report_api.get_aware_datetime_from_str(created_str)
-            target_qareport_build['project_name'] = project_name
-            target_qareport_build['project_group'] = project_group
-            target_qareport_build['project_slug'] = target_qareport_project.get('slug')
-            target_qareport_build['project_id'] = target_qareport_project.get('id')
+                created_str = target_qareport_build.get('created_at')
+                target_qareport_build['created_at'] = qa_report_api.get_aware_datetime_from_str(created_str)
+                target_qareport_build['project_name'] = project_name
+                target_qareport_build['project_group'] = project_group
+                target_qareport_build['project_slug'] = target_qareport_project.get('slug')
+                target_qareport_build['project_id'] = target_qareport_project.get('id')
 
-            jobs = qa_report_api.get_jobs_for_build(target_qareport_build.get("id"))
-            classified_jobs = get_classified_jobs(jobs=jobs)
-            final_jobs = classified_jobs.get('final_jobs')
-            resubmitted_or_duplicated_jobs = classified_jobs.get('resubmitted_or_duplicated_jobs')
+                jobs = qa_report_api.get_jobs_for_build(target_qareport_build.get("id"))
+                classified_jobs = get_classified_jobs(jobs=jobs)
+                final_jobs = classified_jobs.get('final_jobs')
+                resubmitted_or_duplicated_jobs = classified_jobs.get('resubmitted_or_duplicated_jobs')
 
-            build_status = get_lkft_build_status(target_qareport_build, final_jobs)
-            if build_status['has_unsubmitted']:
-                has_jobs_not_submitted = True
-            elif build_status['is_inprogress']:
-                has_jobs_in_progress = True
-            else:
-                if kernel_change_finished_timestamp is None or \
-                    kernel_change_finished_timestamp < build_status['last_fetched_timestamp']:
-                    kernel_change_finished_timestamp = build_status['last_fetched_timestamp']
-                target_qareport_build['duration'] = build_status['last_fetched_timestamp'] - target_qareport_build['created_at']
+                build_status = get_lkft_build_status(target_qareport_build, final_jobs)
+                if build_status['has_unsubmitted']:
+                    has_jobs_not_submitted = True
+                elif build_status['is_inprogress']:
+                    has_jobs_in_progress = True
+                else:
+                    if kernel_change_finished_timestamp is None or \
+                        kernel_change_finished_timestamp < build_status['last_fetched_timestamp']:
+                        kernel_change_finished_timestamp = build_status['last_fetched_timestamp']
+                    target_qareport_build['duration'] = build_status['last_fetched_timestamp'] - target_qareport_build['created_at']
 
-            numbers_of_result = get_test_result_number_for_build(target_qareport_build, final_jobs)
-            target_qareport_build['numbers_of_result'] = numbers_of_result
-            target_qareport_build['qa_report_project'] = target_qareport_project
-            target_qareport_build['final_jobs'] = final_jobs
-            target_qareport_build['resubmitted_or_duplicated_jobs'] = resubmitted_or_duplicated_jobs
-            target_qareport_build['ci_build'] = ci_build
+                numbers_of_result = get_test_result_number_for_build(target_qareport_build, final_jobs)
+                target_qareport_build['numbers_of_result'] = numbers_of_result
+                target_qareport_build['qa_report_project'] = target_qareport_project
+                target_qareport_build['final_jobs'] = final_jobs
+                target_qareport_build['resubmitted_or_duplicated_jobs'] = resubmitted_or_duplicated_jobs
+                target_qareport_build['ci_build'] = ci_build
 
-            qa_report_builds.append(target_qareport_build)
-            test_numbers.addWithHash(numbers_of_result)
+                qa_report_builds.append(target_qareport_build)
+                test_numbers.addWithHash(numbers_of_result)
 
         has_error = False
         error_dict = {}
