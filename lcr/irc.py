@@ -103,6 +103,11 @@ class IRC:
             self.irc_socket.send(bytes(msg_out, "UTF-8"))
 
 
+    def quit(self):
+        if self.irc_socket:
+            self.irc_socket.send(bytes("QUIT", "UTF-8"))
+
+
     def sendAndQuit(self, msgStrOrAry=None):
         if self.server is None:
             # should be only available when irc notification enabled
@@ -110,7 +115,7 @@ class IRC:
         else:
             self.connect()
             self.send(msgStrOrAry=msgStrOrAry)
-            self.send(msgStrOrAry="QUIT")
+            self.quit()
 
 
     def connectWithConfigs(self, server, port, channel, botnick, botpass):
