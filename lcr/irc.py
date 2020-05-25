@@ -104,9 +104,13 @@ class IRC:
 
 
     def sendAndQuit(self, msgStrOrAry=None):
-        self.connect()
-        self.send(msgStrOrAry=msgStrOrAry)
-        self.send(msgStrOrAry="QUIT")
+        if self.server is None:
+            # should be only available when irc notification enabled
+            return
+        else:
+            self.connect()
+            self.send(msgStrOrAry=msgStrOrAry)
+            self.send(msgStrOrAry="QUIT")
 
 
     def connectWithConfigs(self, server, port, channel, botnick, botpass):
