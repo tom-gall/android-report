@@ -220,7 +220,7 @@ projectids = {
 }
 
 def do_boilerplate():
-    print "Nothing for now"
+    print("Nothing for now")
 
 def versiontoMME(versionString):
     versionDict = { 'Major':0,
@@ -403,9 +403,9 @@ def find_regressions(goodruns):
 """
 def print_androidresultheader(project_info, regressionCount):
     if regressionCount > 0:
-        print "    " + project_info['OS'] + "/" + project_info['hardware'] + " - " + str(regressionCount) + " Regressions"
+        print("    " + project_info['OS'] + "/" + project_info['hardware'] + " - " + str(regressionCount) + " Regressions")
     else:
-        print "    " + project_info['OS'] + "/" + project_info['hardware'] + " - No Regressions"
+        print("    " + project_info['OS'] + "/" + project_info['hardware'] + " - No Regressions")
 
 
 def add_unique_kernel(unique_kernels, kernel_version):
@@ -418,18 +418,18 @@ def report_results(run, regressions, combo, priorrun):
     job = jobs[0]
     numbers = job['numbers']
     project_info = projectids[combo]
-    print project_info['branch']
+    print(project_info['branch'])
     print_androidresultheader(project_info, len(regressions))
-    print "    Current:" + run['version'] + "  Prior:" + priorrun['version']
+    print("    Current:" + run['version'] + "  Prior:" + priorrun['version'])
     for regression in regressions:
-        print "        " + regression['test_name']
+        print("        " + regression['test_name'])
 
 def report_kernels_in_report(unique_kernels): 
-    print " "
-    print " "
-    print "Kernels in this report:"
+    print(" ")
+    print(" ")
+    print("Kernels in this report:")
     for kernel in unique_kernels:
-        print "    " + kernel
+        print("    " + kernel)
 
 class Command(BaseCommand):
     help = 'returns Android Common Kernel Regression Report for specific kernels'
