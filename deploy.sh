@@ -32,39 +32,38 @@ cd ${virenv_dir}
 if [ ! -f get-pip.py ]; then
    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
 fi
-sudo python get-pip.py
+sudo python3 get-pip.py
 
 sudo apt-get update
 #sudo apt-get install python-django-auth-ldap
 ## dependency for python-ldap
-sudo apt-get install libsasl2-dev python-dev libldap2-dev libssl-dev
+sudo apt-get install libsasl2-dev python-dev python3-dev libldap2-dev libssl-dev gcc libjpeg-dev libpq-dev
 #sudo apt-get install libtiff5-dev libjpeg8-dev zlib1g-dev libfreetype6-dev liblcms2-dev libwebp-dev libharfbuzz-dev libfribidi-dev tcl8.6-dev tk8.6-dev python-tk
 # https://virtualenv.pypa.io/en/stable/
 sudo pip install virtualenv
-virtualenv ${virenv_dir}
+virtualenv --python=python3 ${virenv_dir}
 source ${virenv_dir}/bin/activate
 
 #(ENV)$ deactivate
 #$ rm -r /path/to/ENV
 
 #https://docs.djangoproject.com/en/1.11/topics/install/#installing-official-release
-pip install Django==1.11.8
-pip install pyaml
-pip install lava-tool
-pip install django-crispy-forms==1.8.1
-#pip install psycopg2
-pip install psycopg2-binary
-pip install python-ldap # will install the 3.0 version
+pip install Django==1.11.17 pyaml django-crispy-forms python-ldap django-auth-ldap requests reportlab psycopg2
+#pip install Django==1.11.8
+#pip install Django==3.0.8
+#pip install pyaml
+#pip install django-crispy-forms==1.8.1
+#pip install python-ldap # will install the 3.0 version
 # https://django-auth-ldap.readthedocs.io/en/latest/install.html
-pip install django-auth-ldap # needs python-ldap >= 3.0
+#pip install django-auth-ldap # needs python-ldap >= 3.0
 #pip install bugzilla
-pip install requests
-pip install reportlab
+#pip install requests
+#pip install reportlab
 ## pip install Pillow
 ## pip install rst2pdf
 
 # https://docs.djangoproject.com/en/1.11/intro/tutorial01/
-python -m django --version
+python3 -m django --version
 #python manage.py startapp ${instance_report_app}
 # django-admin startproject ${instance_name}
 cd ${work_root}
@@ -77,12 +76,12 @@ fi
 cd lcr-report
 mkdir -p datafiles/logfiles/
 sudo chown -R :www-data datafiles
-rm -fr db.sqlite3
-python manage.py migrate
-python manage.py createsuperuser
-echo "Please access the site via http://127.0.0.1:9000/lkft"
+rm -fr datafiles/db.sqlite3
+python3 manage.py migrate
+python3 manage.py createsuperuser
+echo "Please access the site via http://127.0.0.1:8000/lkft"
 echo "And you still need to update the bugzilla, qa-report tokens to resubmit job or create bugs"
-python manage.py runserver 0.0.0.0:9000
+python3 manage.py runserver 0.0.0.0:8000
 # By running makemigrations, you’re telling Django that you’ve made some changes to your models (in this case,
 # you’ve made new ones) and that you’d like the changes to be stored as a migration.
 # python manage.py makemigrations report

@@ -20,9 +20,11 @@ import xml.etree.ElementTree as ET
 import zipfile
 
 from django.contrib.auth.decorators import login_required
+from django.utils.timesince import timesince
 
 from lcr.settings import FILES_DIR, LAVA_SERVERS, BUGZILLA_API_KEY, BUILD_WITH_JOBS_NUMBER
 from lcr.settings import QA_REPORT, QA_REPORT_DEFAULT
+from lcr.irc import IRC
 
 from lcr import qa_report, bugzilla
 from lcr.qa_report import DotDict, UrlNotFoundException
@@ -36,7 +38,7 @@ from .models import KernelChange, CiBuild, ReportBuild, ReportProject
 qa_report_def = QA_REPORT[QA_REPORT_DEFAULT]
 qa_report_api = qa_report.QAReportApi(qa_report_def.get('domain'), qa_report_def.get('token'))
 jenkins_api = qa_report.JenkinsApi('ci.linaro.org', None)
-
+irc = IRC.getInstance()
 
 DIR_ATTACHMENTS = os.path.join(FILES_DIR, 'lkft')
 logger = logging.getLogger(__name__)
@@ -297,34 +299,47 @@ def get_testcases_number_for_job(job):
     return job['numbers']
 
 
+def get_classified_jobs(jobs=[]):
+    '''
+        remove the resubmitted jobs and duplicated jobs(needs the jobs to be sorted in job_id descending order)
+        as the result for the resubmit(including the duplicated jobs) jobs should be ignored.
+    '''
+    resubmitted_job_urls = [ job.get('parent_job') for job in jobs if job.get('parent_job')]
+    job_names = []
+    jobs_to_be_checked = []
+    resubmitted_or_duplicated_jobs = []
+    for job in jobs:
+        if job.get('url') in resubmitted_job_urls:
+            # ignore jobs which were resubmitted
+            job['resubmitted'] = True
+            resubmitted_or_duplicated_jobs.append(job)
+            continue
+
+        if job.get('name') in job_names:
+            job['duplicated'] = True
+            resubmitted_or_duplicated_jobs.append(job)
+            continue
+
+        jobs_to_be_checked.append(job)
+        job_names.append(job.get('name'))
+
+    return {
+        'final_jobs': jobs_to_be_checked,
+        'resubmitted_or_duplicated_jobs': resubmitted_or_duplicated_jobs,
+        }
+
+
 def get_test_result_number_for_build(build, jobs=None):
     test_numbers = qa_report.TestNumbers()
 
     if not jobs:
         jobs = qa_report_api.get_jobs_for_build(build.get("id"))
 
-    resubmitted_job_urls = [ job.get('parent_job') for job in jobs if job.get('parent_job')]
-    job_names = []
-    jobs_to_be_checked = []
-    for job in jobs:
-        if job.get('url') in resubmitted_job_urls:
-            # ignore jobs which were resubmitted
-            logger.info("%s: %s:%s has been resubmitted already" % (build.get('version'), job.get('job_id'), job.get('url')))
-            job['resubmitted'] = True
-            continue
-
-        if job.get('name') in job_names:
-            logger.info("%s %s: %s %s the same name job has been recorded" % (build.get('version'), job.get('name'), job.get('job_id'), job.get('url')))
-            job['duplicated'] = True
-            continue
-
-        jobs_to_be_checked.append(job)
-
+    jobs_to_be_checked = get_classified_jobs(jobs=jobs).get('final_jobs')
     download_attachments_save_result(jobs=jobs_to_be_checked)
     for job in jobs_to_be_checked:
         numbers = get_testcases_number_for_job(job)
         test_numbers.addWithHash(numbers)
-        job_names.append(job.get('name'))
 
     return {
         'number_passed': test_numbers.number_passed,
@@ -338,22 +353,7 @@ def get_lkft_build_status(build, jobs):
     if not jobs:
         jobs = qa_report_api.get_jobs_for_build(build.get("id"))
 
-    resubmitted_job_urls = [ job.get('parent_job') for job in jobs if job.get('parent_job')]
-    job_names = []
-    jobs_to_be_checked = []
-    for job in jobs:
-        if job.get('url') in resubmitted_job_urls:
-            # ignore jobs which were resubmitted
-            logger.info("%s: %s:%s has been resubmitted already" % (build.get('version'), job.get('job_id'), job.get('url')))
-            continue
-
-        if job.get('name') in job_names:
-            logger.info("%s %s: %s %s the same name job has been recorded" % (build.get('version'), job.get('name'), job.get('job_id'), job.get('url')))
-            continue
-
-        jobs_to_be_checked.append(job)
-        job_names.append(job.get('name'))
-
+    jobs_to_be_checked = get_classified_jobs(jobs=jobs).get('final_jobs')
     last_fetched_timestamp = build.get('created_at')
     has_unsubmitted = False
     is_inprogress = False
@@ -368,6 +368,14 @@ def get_lkft_build_status(build, jobs):
         else:
             is_inprogress = True
             break
+
+    if has_unsubmitted:
+        build['build_status'] = "JOBSNOTSUBMITTED"
+    elif is_inprogress:
+        build['build_status'] = "JOBSINPROGRESS"
+    else:
+        build['build_status'] = "JOBSCOMPLETED"
+        build['last_fetched_timestamp'] = last_fetched_timestamp
 
     return {
         'is_inprogress': is_inprogress,
@@ -387,13 +395,6 @@ def get_project_info(project):
         jobs = qa_report_api.get_jobs_for_build(last_build.get("id"))
         last_build['numbers_of_result'] = get_test_result_number_for_build(last_build, jobs)
         build_status = get_lkft_build_status(last_build, jobs)
-        if build_status['has_unsubmitted']:
-            last_build['build_status'] = "JOBSNOTSUBMITTED"
-        elif build_status['is_inprogress']:
-            last_build['build_status'] = "JOBSINPROGRESS"
-        else:
-            last_build['build_status'] = "JOBSCOMPLETED"
-            last_build['last_fetched_timestamp'] = build_status['last_fetched_timestamp']
         project['last_build'] = last_build
 
     logger.info("%s: Start to get ci trigger build information for project", project.get('name'))
@@ -647,10 +648,6 @@ def list_jobs(request):
     failures = {}
     resubmitted_job_urls = []
     for job in jobs:
-        if job.get('job_status') is None and \
-            job.get('submitted') and \
-            not job.get('fetched'):
-            job['job_status'] = 'Submitted'
         if job.get('failure'):
             failure = job.get('failure')
             new_str = failure.replace('"', '\\"').replace('\'', '"')
@@ -658,6 +655,8 @@ def list_jobs(request):
                 failure_dict = json.loads(new_str)
             except ValueError:
                 failure_dict = {'error_msg': new_str}
+            job['failure'] = failure_dict
+
         if job.get('parent_job'):
             resubmitted_job_urls.append(job.get('parent_job'))
 
@@ -743,7 +742,10 @@ def list_jobs(request):
     failures = collections.OrderedDict(sorted(failures.items()))
 
     def get_job_name(item):
-        return item.get('name')
+        if item.get('name'):
+            return item.get('name')
+        else:
+            return ""
 
     sorted_jobs = sorted(jobs, key=get_job_name)
     final_jobs = []
@@ -1127,6 +1129,8 @@ def new_kernel_changes(request, branch, describe, trigger_name, trigger_number):
     logger.info('request from remote_host=%s,remote_addr=%s' % (remote_host, remote_addr))
     logger.info('request for branch=%s, describe=%s, trigger_name=%s, trigger_number=%s' % (branch, describe, trigger_name, trigger_number))
 
+    irc.sendAndQuit(msgStrOrAry="New kernel changes found: branch=%s, describe=%s, %s" % (branch, describe, "https://ci.linaro.org/job/%s/%s" % (trigger_name, trigger_number)))
+
     err_msg = None
     try:
         KernelChange.objects.get(branch=branch, describe=describe)
@@ -1181,85 +1185,138 @@ def new_build(request, branch, describe, name, number):
         return HttpResponse("ERROR:%s" % err_msg,
                             status=200)
 
+
+def get_ci_build_info(build_name, build_number):
+    ci_build_url = jenkins_api.get_job_url(name=build_name, number=build_number)
+    try:
+        ci_build = jenkins_api.get_build_details_with_full_url(build_url=ci_build_url)
+        ci_build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(ci_build['timestamp'])/1000)
+        kernel_change_start_timestamp = ci_build['start_timestamp']
+
+        if ci_build.get('building'):
+            ci_build['status'] = 'INPROGRESS'
+            ci_build['duration'] = datetime.timedelta(milliseconds=0)
+        else:
+            ci_build['status']  = ci_build.get('result') # null or SUCCESS, FAILURE, ABORTED
+            ci_build['duration'] = datetime.timedelta(milliseconds=ci_build['duration'])
+        ci_build['finished_timestamp'] = ci_build['start_timestamp'] + ci_build['duration']
+
+    except qa_report.UrlNotFoundException as e:
+        ci_build = {
+                'number': build_number,
+                'status': 'CI_BUILD_DELETED',
+                'duration': datetime.timedelta(milliseconds=0),
+                'actions': [],
+            }
+
+    ci_build['name'] = build_name
+    return ci_build
+
+
+def get_qareport_build(build_version, qaproject_name, cached_qaprojects=[], cached_qareport_builds=[]):
+    target_qareport_project = None
+    for lkft_project in cached_qaprojects:
+        if lkft_project.get('full_name') == qaproject_name:
+            target_qareport_project = lkft_project
+            break
+    if target_qareport_project is None:
+        return (None, None)
+
+
+    target_qareport_project_id = target_qareport_project.get('id')
+    builds = cached_qareport_builds.get(target_qareport_project_id)
+    if builds is None:
+        builds = qa_report_api.get_all_builds(target_qareport_project_id)
+        cached_qareport_builds[target_qareport_project_id] = builds
+
+    target_qareport_build = None
+    for build in builds:
+        if build.get('version') == build_version:
+            target_qareport_build = build
+            break
+
+    return (target_qareport_project, target_qareport_build)
+
+
 def get_kernel_changes_info(db_kernelchanges=[]):
+    number_kernelchanges = len(db_kernelchanges)
+    if number_kernelchanges < 1:
+        return []
+
     queued_ci_items = jenkins_api.get_queued_items()
     lkft_projects = qa_report_api.get_lkft_qa_report_projects()
-
     kernelchanges = []
+    # add the same project might have several kernel changes not finished yet
+    project_builds = {} # cache builds for the project
 
+    index = 0
+    logger.info("length of kernel changes: %s" % number_kernelchanges)
     for db_kernelchange in db_kernelchanges:
+        index = index +1
+        logger.info("%d/%d: Try to get info for kernel change: %s %s %s %s" % (index, number_kernelchanges, db_kernelchange.branch, db_kernelchange.describe, db_kernelchange.result, timesince(db_kernelchange.timestamp)))
+        test_numbers = qa_report.TestNumbers()
         kernelchange = {}
-        if db_kernelchange.reported and  db_kernelchange.result == 'ALL_COMPLETED':
-            kernelchange['branch'] = db_kernelchange.branch
-            kernelchange['describe'] = db_kernelchange.describe
-            kernelchange['trigger_name'] = db_kernelchange.trigger_name
-            kernelchange['trigger_number'] = db_kernelchange.trigger_number
-            kernelchange['start_timestamp'] = db_kernelchange.timestamp
-            kernelchange['finished_timestamp'] = None
-            kernelchange['duration'] = datetime.timedelta(seconds=db_kernelchange.duration)
-            kernelchange['status'] = db_kernelchange.result
-            kernelchange['number_passed'] = db_kernelchange.number_passed
-            kernelchange['number_failed'] = db_kernelchange.number_failed
-            kernelchange['number_total'] = db_kernelchange.number_total
-            kernelchange['modules_done'] = db_kernelchange.modules_done
-            kernelchange['modules_total'] = db_kernelchange.modules_total
+        if db_kernelchange.reported and db_kernelchange.result == 'ALL_COMPLETED':
+            kernelchange = { 'kernel_change': db_kernelchange }
             kernelchanges.append(kernelchange)
             continue
 
-        try:
-            trigger_url = jenkins_api.get_job_url(name=db_kernelchange.trigger_name, number=db_kernelchange.trigger_number)
-            trigger_build = jenkins_api.get_build_details_with_full_url(build_url=trigger_url)
-            kernel_change_start_timestamp = qa_report_api.get_aware_datetime_from_timestamp(int(trigger_build['timestamp'])/1000)
-        except UrlNotFoundException as e:
-            kernel_change_start_timestamp = db_kernelchange.timestamp
-
-        kernel_change_finished_timestamp = kernel_change_start_timestamp
-
-        test_numbers = qa_report.TestNumbers()
-
-        kernel_change_status = "TRIGGER_BUILD_COMPLETED"
+        trigger_build = get_ci_build_info(db_kernelchange.trigger_name, db_kernelchange.trigger_number)
+        trigger_build['kernel_change'] = db_kernelchange
+        if trigger_build.get('start_timestamp') is None:
+            trigger_build['start_timestamp'] = db_kernelchange.timestamp
+            trigger_build['finished_timestamp'] = trigger_build['start_timestamp'] + trigger_build['duration']
+            kernel_change_status = "TRIGGER_BUILD_DELETED"
+        else:
+            kernel_change_status = "TRIGGER_BUILD_COMPLETED"
+        kernel_change_finished_timestamp = trigger_build['finished_timestamp']
 
         dbci_builds = CiBuild.objects_kernel_change.get_builds_per_kernel_change(kernel_change=db_kernelchange).order_by('name', '-number')
         expect_build_names = find_expect_cibuilds(trigger_name=db_kernelchange.trigger_name, branch_name=db_kernelchange.branch)
 
-        lkft_build_configs = []
+        # used to cached all the ci builds data
+        jenkins_ci_builds = []
+        # used to record the lkft build config to find the qa-report project
+        lkft_build_configs = {}
         ci_build_names = []
         has_build_inprogress = False
         for dbci_build in dbci_builds:
-            if dbci_build.name in ci_build_names:
-                continue
-            else:
-                ci_build_names.append(dbci_build.name)
+            #if dbci_build.name == db_kernelchange.trigger_name:
+            #    # ignore the trigger builds
+            #    continue
+            #else:
+            ci_build_names.append(dbci_build.name)
 
-
-            try:
-                build_url = jenkins_api.get_job_url(name=dbci_build.name, number=dbci_build.number)
-                build = jenkins_api.get_build_details_with_full_url(build_url=build_url)
-                build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(build['timestamp'])/1000)
-            except UrlNotFoundException as e:
-                build = {
-                    'start_timestamp': dbci_build.timestamp,
-                }
+            build = get_ci_build_info(dbci_build.name, dbci_build.number)
             build['dbci_build'] = dbci_build
-
-            if build.get('building'):
-                build_status = 'INPROGRESS'
+            jenkins_ci_builds.append(build)
+            if build.get('status') == 'INPROGRESS':
                 has_build_inprogress = True
-            elif build.get('result') is None:
-                build_status = "CI_BUILD_DELETED"
-            else:
-                build_status = build.get('result') # null or SUCCESS, FAILURE, ABORTED
-                build['duration'] = datetime.timedelta(milliseconds=build['duration'])
 
-            build['status'] = build_status
-            build['name'] = dbci_build.name
+            if build.get('status') != 'SUCCESS':
+                # no need to check the build/job results as the ci build not finished successfully yet
+                # and the qa-report build is not created yet
+                continue
+
             configs = get_configs(ci_build=build)
-            lkft_build_configs.extend(configs)
+            for lkft_build_config, ci_build in configs:
+                if lkft_build_config.startswith('lkft-gki-'):
+                    # gki builds does not have any qa-preoject set
+                    continue
+                if lkft_build_configs.get(lkft_build_config) is not None:
+                    # only use the latest build(which might be triggered manually) for the same kernel change
+                    # even for the generic build that used the same lkft_build_config.
+                    # used the "-number" filter to make sure ci builds is sorted in descending,
+                    # and the first one is the latest
+                    continue
+
+                lkft_build_configs[lkft_build_config] = ci_build
 
         not_started_ci_builds = expect_build_names - set(ci_build_names)
 
+        # need to check how to find the builds not started or failed
         queued_ci_builds = []
-        diabled_ci_builds = []
+        disabled_ci_builds = []
         not_reported_ci_builds = []
         if len(not_started_ci_builds) > 0:
             for cibuild_name in not_started_ci_builds:
@@ -1273,14 +1330,15 @@ def get_kernel_changes_info(db_kernelchanges=[]):
                     continue
 
                 if jenkins_api.is_build_disabled(cibuild_name):
-                    diabled_ci_builds.append(cibuild_name)
-                else:
-                    not_reported_ci_builds.append(cibuild_name)
+                    disabled_ci_builds.append(cibuild_name)
+                #else:
+                #    not_reported_ci_builds.append(cibuild_name)
 
         if queued_ci_builds:
             kernel_change_status = "CI_BUILDS_IN_QUEUE"
         elif not_reported_ci_builds:
             kernel_change_status = "CI_BUILDS_NOT_REPORTED"
+            logger.info("NOT REPORTED BUILDS: %s" % ' '.join(not_reported_ci_builds))
         elif has_build_inprogress:
             kernel_change_status = "CI_BUILDS_IN_PROGRESS"
         else:
@@ -1293,66 +1351,70 @@ def get_kernel_changes_info(db_kernelchanges=[]):
 
         qareport_project_not_found_configs = []
         qareport_build_not_found_configs = []
-        for lkft_build_config, ci_build in lkft_build_configs:
-            if ci_build.get('status') != 'SUCCESS':
-                # no need to check the build/job results as the ci build not finished successfully yet
-                continue
+        for lkft_build_config, ci_build in lkft_build_configs.items():
+            projects = get_qa_server_project(lkft_build_config_name=lkft_build_config)
+            for (project_group, project_name) in projects:
+                target_lkft_project_full_name = "%s/%s" % (project_group, project_name)
+                (target_qareport_project, target_qareport_build) = get_qareport_build(db_kernelchange.describe,
+                                                                        target_lkft_project_full_name,
+                                                                        cached_qaprojects=lkft_projects,
+                                                                        cached_qareport_builds=project_builds)
+                if target_qareport_project is None:
+                    qareport_project_not_found_configs.append(lkft_build_config)
+                    continue
 
-            (project_group, project_name) = get_qa_server_project(lkft_build_config_name=lkft_build_config)
-            target_lkft_project_full_name = "%s/%s" % (project_group, project_name)
+                if target_qareport_build is None:
+                    qareport_build_not_found_configs.append(lkft_build_config)
+                    continue
 
-            target_qareport_project = None
-            for lkft_project in lkft_projects:
-                if lkft_project.get('full_name') == target_lkft_project_full_name:
-                    target_qareport_project = lkft_project
-                    break
+                created_str = target_qareport_build.get('created_at')
+                target_qareport_build['created_at'] = qa_report_api.get_aware_datetime_from_str(created_str)
+                target_qareport_build['project_name'] = project_name
+                target_qareport_build['project_group'] = project_group
+                target_qareport_build['project_slug'] = target_qareport_project.get('slug')
+                target_qareport_build['project_id'] = target_qareport_project.get('id')
 
-            if target_qareport_project is None:
-                qareport_project_not_found_configs.append(lkft_build_config)
-                continue
+                jobs = qa_report_api.get_jobs_for_build(target_qareport_build.get("id"))
+                classified_jobs = get_classified_jobs(jobs=jobs)
+                final_jobs = classified_jobs.get('final_jobs')
+                resubmitted_or_duplicated_jobs = classified_jobs.get('resubmitted_or_duplicated_jobs')
 
-            target_qareport_build = None
-            builds = qa_report_api.get_all_builds(target_qareport_project.get('id'))
-            for build in builds:
-                if build.get('version') == db_kernelchange.describe:
-                    target_qareport_build = build
-                    break
+                build_status = get_lkft_build_status(target_qareport_build, final_jobs)
+                if build_status['has_unsubmitted']:
+                    has_jobs_not_submitted = True
+                elif build_status['is_inprogress']:
+                    has_jobs_in_progress = True
+                else:
+                    if kernel_change_finished_timestamp is None or \
+                        kernel_change_finished_timestamp < build_status['last_fetched_timestamp']:
+                        kernel_change_finished_timestamp = build_status['last_fetched_timestamp']
+                    target_qareport_build['duration'] = build_status['last_fetched_timestamp'] - target_qareport_build['created_at']
 
-            if target_qareport_build is None:
-                qareport_build_not_found_configs.append(lkft_build_config)
-                continue
+                numbers_of_result = get_test_result_number_for_build(target_qareport_build, final_jobs)
+                target_qareport_build['numbers_of_result'] = numbers_of_result
+                target_qareport_build['qa_report_project'] = target_qareport_project
+                target_qareport_build['final_jobs'] = final_jobs
+                target_qareport_build['resubmitted_or_duplicated_jobs'] = resubmitted_or_duplicated_jobs
+                target_qareport_build['ci_build'] = ci_build
 
-            created_str = target_qareport_build.get('created_at')
-            target_qareport_build['created_at'] = qa_report_api.get_aware_datetime_from_str(created_str)
-            jobs = qa_report_api.get_jobs_for_build(target_qareport_build.get("id"))
-            build_status = get_lkft_build_status(target_qareport_build, jobs)
-            if build_status['has_unsubmitted']:
-                target_qareport_build['build_status'] = "JOBSNOTSUBMITTED"
-                has_jobs_not_submitted = True
-            elif build_status['is_inprogress']:
-                target_qareport_build['build_status'] = "JOBSINPROGRESS"
-                has_jobs_in_progress = True
-            else:
-                target_qareport_build['build_status'] = "JOBSCOMPLETED"
-                target_qareport_build['last_fetched_timestamp'] = build_status['last_fetched_timestamp']
-                if kernel_change_finished_timestamp is None or \
-                    kernel_change_finished_timestamp < build_status['last_fetched_timestamp']:
-                    kernel_change_finished_timestamp = build_status['last_fetched_timestamp']
-
-            numbers_of_result = get_test_result_number_for_build(target_qareport_build, jobs)
-            test_numbers.addWithHash(numbers_of_result)
+                qa_report_builds.append(target_qareport_build)
+                test_numbers.addWithHash(numbers_of_result)
 
         has_error = False
         error_dict = {}
         if kernel_change_status == "CI_BUILDS_COMPLETED":
-            if qareport_project_not_found_configs or qareport_build_not_found_configs:
+            if len(lkft_build_configs) == 0:
+                kernel_change_status = 'NO_QA_PROJECT_FOUND'
+            elif qareport_project_not_found_configs or qareport_build_not_found_configs:
                 has_error = True
                 if qareport_project_not_found_configs:
                     kernel_change_status = 'HAS_QA_PROJECT_NOT_FOUND'
                     error_dict['qareport_project_not_found_configs'] = qareport_project_not_found_configs
+                    logger.info("qareport_build_not_found_configs: %s" % ' '.join(qareport_build_not_found_configs))
                 if qareport_build_not_found_configs:
                     kernel_change_status = 'HAS_QA_BUILD_NOT_FOUND'
                     error_dict['qareport_build_not_found_configs'] = qareport_build_not_found_configs
+                    logger.info("qareport_build_not_found_configs: %s" % ' '.join(qareport_build_not_found_configs))
             elif has_jobs_not_submitted:
                 kernel_change_status = 'HAS_JOBS_NOT_SUBMITTED'
             elif has_jobs_in_progress:
@@ -1360,27 +1422,68 @@ def get_kernel_changes_info(db_kernelchanges=[]):
             else:
                 kernel_change_status = 'ALL_COMPLETED'
 
-        kernelchange['branch'] = db_kernelchange.branch
-        kernelchange['describe'] = db_kernelchange.describe
-        kernelchange['trigger_name'] = db_kernelchange.trigger_name
-        kernelchange['trigger_number'] = db_kernelchange.trigger_number
-        kernelchange['start_timestamp'] = kernel_change_start_timestamp
-        kernelchange['finished_timestamp'] = kernel_change_finished_timestamp
-        kernelchange['duration'] = kernelchange['finished_timestamp'] - kernelchange['start_timestamp']
-        kernelchange['status'] = kernel_change_status
-        kernelchange['number_passed'] = test_numbers.number_passed
-        kernelchange['number_failed'] = test_numbers.number_failed
-        kernelchange['number_total'] = test_numbers.number_total
-        kernelchange['modules_done'] = test_numbers.modules_done
-        kernelchange['modules_total'] = test_numbers.modules_total
+        kernelchange = {
+                'kernel_change': db_kernelchange,
+                'trigger_build': trigger_build,
+                'jenkins_ci_builds': jenkins_ci_builds,
+                'qa_report_builds': qa_report_builds,
+                'kernel_change_status': kernel_change_status,
+                'error_dict': error_dict,
+                'queued_ci_builds': queued_ci_builds,
+                'disabled_ci_builds': disabled_ci_builds,
+                'not_reported_ci_builds': not_reported_ci_builds,
+                'start_timestamp': trigger_build.get('start_timestamp'),
+                'finished_timestamp': kernel_change_finished_timestamp,
+                'test_numbers': test_numbers,
+            }
 
         kernelchanges.append(kernelchange)
 
     return kernelchanges
 
 
-@login_required
-def list_kernel_changes(request):
+def get_kernel_changes_info_wrapper_for_display(db_kernelchanges=[]):
+    kernelchanges = get_kernel_changes_info(db_kernelchanges=db_kernelchanges)
+    kernelchanges_return = []
+    for kernelchange in kernelchanges:
+        kernelchange_return = {}
+        db_kernelchange = kernelchange.get('kernel_change')
+
+        kernelchange_return['branch'] = db_kernelchange.branch
+        kernelchange_return['describe'] = db_kernelchange.describe
+        kernelchange_return['trigger_name'] = db_kernelchange.trigger_name
+        kernelchange_return['trigger_number'] = db_kernelchange.trigger_number
+
+        if db_kernelchange.reported and db_kernelchange.result == 'ALL_COMPLETED':
+            kernelchange_return['start_timestamp'] = db_kernelchange.timestamp
+            kernelchange_return['finished_timestamp'] = None
+            kernelchange_return['duration'] = datetime.timedelta(seconds=db_kernelchange.duration)
+            kernelchange_return['status'] = db_kernelchange.result
+            kernelchange_return['number_passed'] = db_kernelchange.number_passed
+            kernelchange_return['number_failed'] = db_kernelchange.number_failed
+            kernelchange_return['number_total'] = db_kernelchange.number_total
+            kernelchange_return['modules_done'] = db_kernelchange.modules_done
+            kernelchange_return['modules_total'] = db_kernelchange.modules_total
+        else:
+            test_numbers = kernelchange.get('test_numbers')
+            kernelchange_return['start_timestamp'] = kernelchange.get('start_timestamp')
+            kernelchange_return['finished_timestamp'] = kernelchange.get('finished_timestamp')
+            kernelchange_return['duration'] = kernelchange_return['finished_timestamp'] - kernelchange_return['start_timestamp']
+
+            kernelchange_return['status'] = kernelchange.get('kernel_change_status')
+
+            kernelchange_return['number_passed'] = test_numbers.number_passed
+            kernelchange_return['number_failed'] = test_numbers.number_failed
+            kernelchange_return['number_total'] = test_numbers.number_total
+            kernelchange_return['modules_done'] = test_numbers.modules_done
+            kernelchange_return['modules_total'] = test_numbers.modules_total
+
+        kernelchanges_return.append(kernelchange_return)
+
+    return kernelchanges_return
+
+
+def get_kernel_changes_for_all_branches():
     db_kernelchanges = KernelChange.objects.all().order_by('branch', '-trigger_number')
     check_branches = []
     unique_branch_names = []
@@ -1391,8 +1494,12 @@ def list_kernel_changes(request):
             unique_branch_names.append(db_kernelchange.branch)
             check_branches.append(db_kernelchange)
 
-    kernelchanges = get_kernel_changes_info(db_kernelchanges=check_branches)
+    return get_kernel_changes_info_wrapper_for_display(db_kernelchanges=check_branches)
 
+
+@login_required
+def list_kernel_changes(request):
+    kernelchanges = get_kernel_changes_for_all_branches()
     return render(request, 'lkft-kernelchanges.html',
                        {
                             "kernelchanges": kernelchanges,
@@ -1402,7 +1509,7 @@ def list_kernel_changes(request):
 @login_required
 def list_branch_kernel_changes(request, branch):
     db_kernelchanges = KernelChange.objects.all().filter(branch=branch).order_by('-trigger_number')
-    kernelchanges = get_kernel_changes_info(db_kernelchanges=db_kernelchanges)
+    kernelchanges = get_kernel_changes_info_wrapper_for_display(db_kernelchanges=db_kernelchanges)
 
     return render(request, 'lkft-kernelchanges.html',
                        {
@@ -1415,6 +1522,20 @@ def list_describe_kernel_changes(request, branch, describe):
     db_report_builds = ReportBuild.objects.filter(kernel_change=db_kernel_change).order_by('qa_project__group', 'qa_project__name')
     db_ci_builds = CiBuild.objects.filter(kernel_change=db_kernel_change).exclude(name=db_kernel_change.trigger_name).order_by('name', 'number')
     db_trigger_build = CiBuild.objects.get(name=db_kernel_change.trigger_name, kernel_change=db_kernel_change)
+
+    kernel_change = {}
+    kernel_change['branch'] = db_kernel_change.branch
+    kernel_change['describe'] = db_kernel_change.describe
+    kernel_change['result'] = db_kernel_change.result
+    kernel_change['trigger_name'] = db_kernel_change.trigger_name
+    kernel_change['trigger_number'] = db_kernel_change.trigger_number
+    kernel_change['timestamp'] = db_kernel_change.timestamp
+    kernel_change['duration'] = datetime.timedelta(seconds=db_kernel_change.duration)
+    kernel_change['number_passed'] = db_kernel_change.number_passed
+    kernel_change['number_failed'] = db_kernel_change.number_failed
+    kernel_change['number_total'] = db_kernel_change.number_total
+    kernel_change['modules_done'] = db_kernel_change.modules_done
+    kernel_change['modules_total'] = db_kernel_change.modules_total
 
     trigger_build = {}
     trigger_build['name'] = db_trigger_build.name
@@ -1454,9 +1575,35 @@ def list_describe_kernel_changes(request, branch, describe):
 
     return render(request, 'lkft-describe.html',
                        {
-                            "kernel_change": db_kernel_change,
+                            "kernel_change": kernel_change,
                             'report_builds': report_builds,
                             'trigger_build': trigger_build,
                             'ci_builds': ci_builds,
                         }
             )
+
+########################################
+### Register for IRC functions
+########################################
+def func_irc_list_kernel_changes(irc=None, text=None):
+    if irc is None:
+        return
+    kernelchanges = get_kernel_changes_for_all_branches()
+    ircMsgs = []
+    for kernelchange in kernelchanges:
+        irc_msg = "branch:%s, describe=%s, %s, modules_done=%s" % (kernelchange.get('branch'),
+                        kernelchange.get('describe'),
+                        kernelchange.get('status'),
+                        kernelchange.get('modules_done'))
+        ircMsgs.append(irc_msg)
+
+    irc.send(ircMsgs)
+
+irc_notify_funcs = {
+    'listkernelchanges': func_irc_list_kernel_changes,
+}
+
+irc.addFunctions(irc_notify_funcs)
+
+########################################
+########################################

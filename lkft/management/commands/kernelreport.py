@@ -24,18 +24,16 @@ from lcr.settings import QA_REPORT, QA_REPORT_DEFAULT, BUILD_WITH_JOBS_NUMBER
 
 from lkft.views import get_test_result_number_for_build, get_lkft_build_status
 from lkft.views import extract
-from lkft.views import get_lkft_bugs, get_hardware_from_pname, get_result_file_path, get_kver_with_pname_env
+from lkft.views import get_result_file_path
 from lkft.views import download_attachments_save_result
-from lkft.lkft_config import find_expect_cibuilds, get_version_from_pname, get_kver_with_pname_env
-
-from lkft.lkft_config import get_configs, get_qa_server_project
+from lkft.lkft_config import get_version_from_pname, get_kver_with_pname_env
 
 qa_report_def = QA_REPORT[QA_REPORT_DEFAULT]
 qa_report_api = qa_report.QAReportApi(qa_report_def.get('domain'), qa_report_def.get('token'))
 jenkins_api = qa_report.JenkinsApi('ci.linaro.org', None)
 
 rawkernels = {
-   '4.4':['4.4o-8.1-hikey', 
+   '4.4':['4.4o-8.1-hikey',
             '4.4o-9.0-lcr-hikey',
             '4.4o-10.0-gsi-hikey',
             '4.4p-9.0-hikey',
@@ -58,6 +56,8 @@ rawkernels = {
             '4.14p-10.0-gsi-hikey960',
             '4.14q-10.0-gsi-hikey',
             '4.14q-10.0-gsi-hikey960',
+            '4.14-stable-master-hikey-lkft',
+            '4.14-stable-master-hikey960-lkft',
             ],
    '4.19':[ 
             '4.19q-10.0-gsi-hikey',
@@ -66,6 +66,8 @@ rawkernels = {
    '5.4':[ 
             '5.4-gki-aosp-master-hikey960',
             '5.4-gki-aosp-master-db845c',
+            '5.4-stable-gki-aosp-master-hikey960',
+            '5.4-stable-gki-aosp-master-db845c',
             ],
 }
 
@@ -175,6 +177,16 @@ projectids = {
                      'hardware': 'hikey960',
                      'OS' : 'Android10',
                      'branch' : 'Android-4.14-q',},
+   '4.14-stable-master-hikey-lkft':
+                    {'project_id': 297, 
+                     'hardware': 'hikey',
+                     'OS' : 'AOSP',
+                     'branch': 'Android-4.14-stable',},
+   '4.14-stable-master-hikey960-lkft':
+                    {'project_id': 298, 
+                     'hardware': 'hikey960',
+                     'OS' : 'AOSP',
+                     'branch': 'Android-4.14-stable',},
    '4.19q-10.0-gsi-hikey':
                     {'project_id': 210, 
                      'hardware': 'hikey',
@@ -195,10 +207,20 @@ projectids = {
                      'hardware': 'db845c',
                      'OS' : 'AOSP',
                      'branch' : 'Android-5.4',},
+   '5.4-stable-gki-aosp-master-hikey960':
+                    {'project_id': 296, 
+                     'hardware': 'hikey960',
+                     'OS' : 'AOSP',
+                     'branch' : 'Android-5.4-stable',},
+   '5.4-stable-gki-aosp-master-db845c':
+                    {'project_id': 295,
+                     'hardware': 'db845c',
+                     'OS' : 'AOSP',
+                     'branch' : 'Android-5.4-stable',},
 }
 
 def do_boilerplate():
-    print "Nothing for now"
+    print("Nothing for now")
 
 def versiontoMME(versionString):
     versionDict = { 'Major':0,
@@ -232,7 +254,17 @@ def find_best_two_runs(builds, project_name, project):
         build_number_total = 0
         build_modules_total = 0
         build_modules_done = 0
+        build['created_at'] = qa_report_api.get_aware_datetime_from_str(build.get('created_at'))
         jobs = qa_report_api.get_jobs_for_build(build.get("id"))
+        build_status = get_lkft_build_status(build, jobs)
+        if build_status['has_unsubmitted']:
+            #print "has unsubmitted"
+            continue
+        elif build_status['is_inprogress']:
+            #print "in progress"
+            continue
+           
+        # print "ok great should be complete" 
         if number_of_build_with_jobs < BUILD_WITH_JOBS_NUMBER:
             build_numbers = get_test_result_number_for_build(build, jobs)
             build_number_passed = build_number_passed + build_numbers.get('number_passed')
@@ -241,6 +273,7 @@ def find_best_two_runs(builds, project_name, project):
             build_modules_total = build_modules_total + build_numbers.get('modules_total')
             build_modules_done = build_modules_done + build_numbers.get('modules_done')
             number_of_build_with_jobs = number_of_build_with_jobs + 1
+            #print "numbers passed in build" + str(build_number_passed)
         number_of_build_with_jobs = number_of_build_with_jobs + 1
         build['numbers'] = {
                            'number_passed': build_number_passed,
@@ -249,9 +282,12 @@ def find_best_two_runs(builds, project_name, project):
                            'modules_done': build_modules_done,
                            'modules_total': build_modules_total,
                            }
-        build['created_at'] = qa_report_api.get_aware_datetime_from_str(build.get('created_at'))
         build['jobs'] = jobs
+        #if build_number_passed == 0:
+        #    continue
+
         download_attachments_save_result(jobs=jobs)
+            
         failures = {}
         resubmitted_job_urls = []
        
@@ -367,9 +403,9 @@ def find_regressions(goodruns):
 """
 def print_androidresultheader(project_info, regressionCount):
     if regressionCount > 0:
-        print "    " + project_info['OS'] + "/" + project_info['hardware'] + " - " + str(regressionCount) + " Regressions"
+        print("    " + project_info['OS'] + "/" + project_info['hardware'] + " - " + str(regressionCount) + " Regressions")
     else:
-        print "    " + project_info['OS'] + "/" + project_info['hardware'] + " - No Regressions"
+        print("    " + project_info['OS'] + "/" + project_info['hardware'] + " - No Regressions")
 
 
 def add_unique_kernel(unique_kernels, kernel_version):
@@ -382,18 +418,18 @@ def report_results(run, regressions, combo, priorrun):
     job = jobs[0]
     numbers = job['numbers']
     project_info = projectids[combo]
-    print project_info['branch']
+    print(project_info['branch'])
     print_androidresultheader(project_info, len(regressions))
-    print "    Current:" + run['version'] + "  Prior:" + priorrun['version']
+    print("    Current:" + run['version'] + "  Prior:" + priorrun['version'])
     for regression in regressions:
-        print "        " + regression['test_name']
+        print("        " + regression['test_name'])
 
 def report_kernels_in_report(unique_kernels): 
-    print " "
-    print " "
-    print "Kernels in this report:"
+    print(" ")
+    print(" ")
+    print("Kernels in this report:")
     for kernel in unique_kernels:
-        print "    " + kernel
+        print("    " + kernel)
 
 class Command(BaseCommand):
     help = 'returns Android Common Kernel Regression Report for specific kernels'
@@ -418,7 +454,6 @@ class Command(BaseCommand):
             project =  qa_report_api.get_project(project_id)
             builds = qa_report_api.get_all_builds(project_id)
             project_name = project.get('name')
-            # builds = qa_report_api.get_all_builds(project_id)
             goodruns = find_best_two_runs(builds, project_name, project)
             add_unique_kernel(unique_kernels, goodruns[0]['version'])
             regressions = find_regressions(goodruns)

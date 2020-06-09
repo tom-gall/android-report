@@ -209,7 +209,10 @@ class QAReportApi(RESTFullApi):
 
     def get_jobs_for_build(self, build_id):
         api_url = "api/builds/%s/testjobs" % build_id
-        return self.get_list_results(api_url=api_url)
+        jobs = self.get_list_results(api_url=api_url)
+        for job in jobs:
+            self.set_job_status(job)
+        return jobs
 
 
     def get_project_with_name(self, project_name):
@@ -289,9 +292,17 @@ class QAReportApi(RESTFullApi):
         api_url = 'api/forceresubmit/%s' % qa_job_id
         return self.call_with_api_url(api_url=api_url, method='POST', returnResponse=True)
 
+    def set_job_status(self, job):
+        if job.get('job_status') is None and \
+            job.get('submitted') and \
+            not job.get('fetched'):
+            job['job_status'] = 'Submitted'
+
     def get_job_with_id(self, qa_job_id):
         api_url = 'api/testjobs/%s' % qa_job_id
-        return self.call_with_api_url(api_url=api_url)
+        job = self.call_with_api_url(api_url=api_url)
+        self.set_job_status(job)
+        return job
 
     def get_job_api_url(self, qa_job_id):
         api_url = '%s/api/testjobs/%s' % (self.get_api_url_prefix().strip('/'), qa_job_id)

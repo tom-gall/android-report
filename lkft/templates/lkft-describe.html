@@ -2,7 +2,7 @@
 
 {% block title %} {{kernel_change.describe}} {% endblock %}
 
-{% block headline %}<h1>{{kernel_change.describe}} -- {{kernel_change.result}}</a></h1>{% endblock %}
+{% block headline %}<h1>{{kernel_change.describe}}</h1>{% endblock %}
 
 {% block content %}
 
@@ -31,7 +31,7 @@
     </tr>
     <tr>
         <th>Duration</th>
-        {% if kernel_change.status == 'ALL_COMPLETED' %}
+        {% if kernel_change.result == 'ALL_COMPLETED' %}
         <td align='right'>Took {{kernel_change.duration}} to finish</td>
         {% else %}
         <td align='right'>--</td>
@@ -129,7 +129,7 @@
     <td><a href="https://qa-reports.linaro.org/{{report_build.qa_project.group}}/">{{report_build.qa_project.group}}</a></td>
     <td>
         <a href="/lkft/builds?project_id={{report_build.qa_project.project_id}}">{{report_build.qa_project.name}}</a><br/>
-        <a href="https://qa-reports.linaro.org/{{report_build.qa_project.group}}/{{report_build.qa_project.slug}}/">Link To QA-REPORT</a>
+        <a href="https://qa-reports.linaro.org/{{report_build.qa_project.group}}/{{report_build.qa_project.slug}}/build/{{kernel_change.describe}}">Link To QA-REPORT</a>
     </td>
     <td align='right'>{{report_build.status}}</td>
     <td><p>Started at {{ report_build.started_at|date:'M. d, Y, H:i'}},<br/>{{ report_build.started_at|timesince}} ago</p></td>
