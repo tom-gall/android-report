@@ -401,11 +401,11 @@ def find_regressions(goodruns):
                      'OS' : 'Android10',
                      'branch' : 'Android-4.19-q',},
 """
-def print_androidresultheader(project_info, regressionCount):
+def print_androidresultheader(output, project_info, regressionCount):
     if regressionCount > 0:
-        print("    " + project_info['OS'] + "/" + project_info['hardware'] + " - " + str(regressionCount) + " Regressions")
+        output.write("    " + project_info['OS'] + "/" + project_info['hardware'] + " - " + str(regressionCount) + " Regressions\n")
     else:
-        print("    " + project_info['OS'] + "/" + project_info['hardware'] + " - No Regressions")
+        output.write("    " + project_info['OS'] + "/" + project_info['hardware'] + " - No Regressions\n")
 
 
 def add_unique_kernel(unique_kernels, kernel_version):
@@ -413,33 +413,35 @@ def add_unique_kernel(unique_kernels, kernel_version):
         unique_kernels.append(kernel_version)
 
 
-def report_results(run, regressions, combo, priorrun):
+def report_results(output, run, regressions, combo, priorrun):
     jobs = run['jobs']
     job = jobs[0]
     numbers = job['numbers']
     project_info = projectids[combo]
-    print(project_info['branch'])
-    print_androidresultheader(project_info, len(regressions))
-    print("    Current:" + run['version'] + "  Prior:" + priorrun['version'])
+    output.write(project_info['branch'] + "\n")
+    print_androidresultheader(output, project_info, len(regressions))
+    output.write("    Current:" + run['version'] + "  Prior:" + priorrun['version']+"\n")
     for regression in regressions:
-        print("        " + regression['test_name'])
+        output.write("        " + regression['test_name'] + "\n")
 
-def report_kernels_in_report(unique_kernels): 
-    print(" ")
-    print(" ")
-    print("Kernels in this report:")
+def report_kernels_in_report(output, unique_kernels): 
+    output.write("\n")
+    output.write("\n")
+    output.write("Kernels in this report:\n")
     for kernel in unique_kernels:
-        print("    " + kernel)
+        output.write("    " + kernel+"\n")
 
 class Command(BaseCommand):
     help = 'returns Android Common Kernel Regression Report for specific kernels'
 
     def add_arguments(self, parser):
         parser.add_argument('kernel', type=str, help='Kernel version')
+        parser.add_argument('outputfile', type=str, help='Output File')
 
     def handle(self, *args, **options):
         kernel = options['kernel']
-  #      try:
+        output = open(options['outputfile'], "w")
+
         # map kernel to all available kernel, board, OS combos that match
         work = []
         unique_kernels=[]
@@ -457,8 +459,9 @@ class Command(BaseCommand):
             goodruns = find_best_two_runs(builds, project_name, project)
             add_unique_kernel(unique_kernels, goodruns[0]['version'])
             regressions = find_regressions(goodruns)
-            report_results(goodruns[0], regressions, combo, goodruns[1])
-        report_kernels_in_report(unique_kernels)
+            report_results(output, goodruns[0], regressions, combo, goodruns[1])
+        report_kernels_in_report(output, unique_kernels)
+        output.close()
         
 """
         except:
