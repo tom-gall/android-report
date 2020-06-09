@@ -655,6 +655,8 @@ def list_jobs(request):
                 failure_dict = json.loads(new_str)
             except ValueError:
                 failure_dict = {'error_msg': new_str}
+            job['failure'] = failure_dict
+
         if job.get('parent_job'):
             resubmitted_job_urls.append(job.get('parent_job'))
 
