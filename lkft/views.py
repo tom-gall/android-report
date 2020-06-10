@@ -179,9 +179,9 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
     kernel_version = metadata.get('kernel_version')
     platform = metadata.get('platform')
     qa_job_id = metadata.get('qa_job_id')
-    total_number = 0
-    passed_number = 0
-    failed_number = 0
+    number_total = 0
+    number_passed = 0
+    number_failed = 0
     modules_done = 0
     modules_total = 0
 
@@ -192,9 +192,9 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
             root = ET.fromstring(f_zip_fd.read(TEST_RESULT_XML_NAME))
 
             summary_node = root.find('Summary')
-            passed_number = int(summary_node.attrib['pass'])
-            failed_number = int(summary_node.attrib['failed'])
-            total_number = passed_number + failed_number
+            number_passed = int(summary_node.attrib['pass'])
+            number_failed = int(summary_node.attrib['failed'])
+            number_total = number_passed + number_failed
             modules_done = int(summary_node.attrib['modules_done'])
             modules_total = int(summary_node.attrib['modules_total'])
 
@@ -252,9 +252,9 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
             logger.error('xml.etree.ElementTree.ParseError: %s' % e)
             logger.info('Please Check %s manually' % result_zip_path)
     return {
-                'total_number': total_number,
-                'passed_number': passed_number,
-                'failed_number': failed_number,
+                'number_total': number_total,
+                'number_passed': number_passed,
+                'number_failed': number_failed,
                 'modules_done': modules_done,
                 'modules_total': modules_total,
             }
