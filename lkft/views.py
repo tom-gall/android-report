@@ -354,7 +354,10 @@ def get_lkft_build_status(build, jobs):
         jobs = qa_report_api.get_jobs_for_build(build.get("id"))
 
     jobs_to_be_checked = get_classified_jobs(jobs=jobs).get('final_jobs')
-    last_fetched_timestamp = build.get('created_at')
+    if isinstance(build.get('created_at'), str):
+        last_fetched_timestamp = qa_report_api.get_aware_datetime_from_str(build.get('created_at'))
+    else:
+        last_fetched_timestamp = build.get('created_at')
     has_unsubmitted = False
     is_inprogress = False
     for job in jobs_to_be_checked:
@@ -362,9 +365,10 @@ def get_lkft_build_status(build, jobs):
             has_unsubmitted = True
             break
         if job.get('fetched'):
-            job_last_fetched_timestamp = qa_report_api.get_aware_datetime_from_str(job.get('fetched_at'))
-            if job_last_fetched_timestamp > last_fetched_timestamp:
-                last_fetched_timestamp = job_last_fetched_timestamp
+            if job.get('fetched_at'):
+                job_last_fetched_timestamp = qa_report_api.get_aware_datetime_from_str(job.get('fetched_at'))
+                if job_last_fetched_timestamp > last_fetched_timestamp:
+                    last_fetched_timestamp = job_last_fetched_timestamp
         else:
             is_inprogress = True
             break
@@ -566,9 +570,12 @@ def list_builds(request):
             ## For cases that the build information still not cached into database yet
             build_numbers = qa_report.TestNumbers()
             jobs = qa_report_api.get_jobs_for_build(build.get("id"))
+
+            build['created_at'] = qa_report_api.get_aware_datetime_from_str(build.get('created_at'))
+            get_lkft_build_status(build, jobs)
+
             temp_build_numbers = get_test_result_number_for_build(build, jobs)
             build_numbers.addWithHash(temp_build_numbers)
-            build['created_at'] = qa_report_api.get_aware_datetime_from_str(build.get('created_at'))
 
             build['numbers'] = {
                                 'number_passed': build_numbers.number_passed,
@@ -577,10 +584,7 @@ def list_builds(request):
                                 'modules_done': build_numbers.modules_done,
                                 'modules_total': build_numbers.modules_total,
                                 }
-            if build.get('finished'):
-                build['build_status'] = 'JOBSCOMPLETED'
-            else:
-                build['build_status'] = 'JOBSINPROGRESS'
+
 
         builds_result.append(build)
 
