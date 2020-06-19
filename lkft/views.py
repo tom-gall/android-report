@@ -1293,6 +1293,9 @@ def get_kernel_changes_info(db_kernelchanges=[]):
         lkft_build_configs = {}
         ci_build_names = []
         has_build_inprogress = False
+        # success, inprogress, inqueue jobs are not failed jobs
+        all_builds_failed = True
+        all_builds_has_failed = False
         for dbci_build in dbci_builds:
             #if dbci_build.name == db_kernelchange.trigger_name:
             #    # ignore the trigger builds
@@ -1305,11 +1308,15 @@ def get_kernel_changes_info(db_kernelchanges=[]):
             jenkins_ci_builds.append(build)
             if build.get('status') == 'INPROGRESS':
                 has_build_inprogress = True
+                all_builds_failed = False
 
             if build.get('status') != 'SUCCESS':
                 # no need to check the build/job results as the ci build not finished successfully yet
                 # and the qa-report build is not created yet
+                all_builds_has_failed = True
                 continue
+            else:
+                all_builds_failed = False
 
             configs = get_configs(ci_build=build)
             for lkft_build_config, ci_build in configs:
@@ -1349,13 +1356,17 @@ def get_kernel_changes_info(db_kernelchanges=[]):
 
         if queued_ci_builds:
             kernel_change_status = "CI_BUILDS_IN_QUEUE"
+        elif has_build_inprogress:
+            kernel_change_status = "CI_BUILDS_IN_PROGRESS"
         elif not_reported_ci_builds:
             kernel_change_status = "CI_BUILDS_NOT_REPORTED"
             logger.info("NOT REPORTED BUILDS: %s" % ' '.join(not_reported_ci_builds))
-        elif has_build_inprogress:
-            kernel_change_status = "CI_BUILDS_IN_PROGRESS"
+        elif all_builds_failed:
+            kernel_change_status = "CI_BUILDS_ALL_FAILED"
+        elif all_builds_has_failed:
+            kernel_change_status = "CI_BUILDS_HAS_FAILED"
         else:
-            kernel_change_status = "CI_BUILDS_COMPLETED"
+            kernel_change_status = "CI_BUILDS_COMPLETED" # might be the case that some failed, some passed
 
         qa_report_builds = []
         has_jobs_not_submitted = False
