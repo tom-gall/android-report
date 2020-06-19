@@ -172,7 +172,7 @@ class Command(BaseCommand):
             test_numbers = kernel_change_report.get('test_numbers')
 
             kernel_change = kernel_change_report.get('kernel_change')
-            kernel_change.reported = (status == 'ALL_COMPLETED')
+            kernel_change.reported = (status == 'ALL_COMPLETED') || status == ('CI_BUILDS_ALL_FAILED')
             kernel_change.result = status
             kernel_change.timestamp = start_timestamp
             kernel_change.duration = (finished_timestamp - start_timestamp).total_seconds()
