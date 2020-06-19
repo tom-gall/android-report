@@ -31,12 +31,18 @@ class IRC:
     @staticmethod
     def getInstance():
         """ Static access method. """
-        #if IRC.__instance == None:
-        return IRC()
-        #return IRC.__instance
+        if IRC.__instance == None:
+            logger.info("new instance")
+            return IRC()
+
+        logger.info("use existing instance")
+        return IRC.__instance
 
     def __init__(self):
         """ Virtually private constructor. """
+
+        if IRC.__instance != None:
+            raise Exception("This class is a singleton!")
 
         if IRC_CONFIG is None \
             or IRC_CONFIG.get('enable') is None \
@@ -51,10 +57,7 @@ class IRC:
             self.botnick = configs.get('botnick')
             self.botpass = configs.get('botpass')
 
-        #if IRC.__instance != None:
-        #    raise Exception("This class is a singleton!")
-        #else:
-        #    IRC.__instance = self
+            IRC.__instance = self
 #            self.connect()
 #            self.addFunctions(func_dict={
 #                    'PING': self.func_pong,
@@ -81,7 +84,7 @@ class IRC:
     # TODO need to be thread safe
     def addFunctions(self, func_dict={}):
         for key in func_dict.keys():
-            logger.info("regiester irc founction: %s" % key)
+            logger.info("regiester irc function: %s" % key)
         self.func_listener.update(func_dict)
 
 
@@ -136,22 +139,22 @@ class IRC:
             self.irc_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         # Connect to the server
-        logger.info("Connecting to: " + self.server)
-        self.irc_socket.connect((self.server, int(self.port)))
+        logger.info("Connecting to: " + server)
+        self.irc_socket.connect((server, int(port)))
 
         # Perform user authentication
-        self.irc_socket.send(bytes("USER " + self.botnick + " " + self.botnick +" " + self.botnick + " :python\n", "UTF-8"))
-        logger.info("after send command USER to: " + self.server)
-        self.irc_socket.send(bytes("NICK " + self.botnick + "\n", "UTF-8"))
-        logger.info("after send command NICK to: " + self.server)
-        self.irc_socket.send(bytes("NICKSERV IDENTIFY " + self.botpass + "\n", "UTF-8"))
+        self.irc_socket.send(bytes("USER " + botnick + " " + botnick +" " + botnick + " :python\n", "UTF-8"))
+        logger.info("after send command USER to: " + server)
+        self.irc_socket.send(bytes("NICK " + botnick + "\n", "UTF-8"))
+        logger.info("after send command NICK to: " + server)
+        self.irc_socket.send(bytes("NICKSERV IDENTIFY " + botpass + "\n", "UTF-8"))
 
         str_idenfified = "You are now identified for"
         identified = False
         sleep_time = 0
         while not identified:
             if sleep_time > 25:
-                logger.info("Failed to identify for the account of %s after %d seconds" % (self.botnick, sleep_time))
+                logger.info("Failed to identify for the account of %s after %d seconds" % (botnick, sleep_time))
                 break
             text = self.irc_socket.recv(2040).decode("UTF-8")
             if text.find(str_idenfified) != -1:
@@ -164,8 +167,8 @@ class IRC:
 
         # continue to try, but the result won't be as expected
         # join the channel
-        logger.info("Try to join: " + self.channel)
-        self.irc_socket.send(bytes("JOIN " + self.channel + "\n", "UTF-8"))
+        logger.info("Try to join: " + channel)
+        self.irc_socket.send(bytes("JOIN " + channel + "\n", "UTF-8"))
         str_joined = ":End of /NAMES list"
         joined = False
         sleep_time = 0
@@ -181,7 +184,7 @@ class IRC:
                 logger.debug("%d not found joined message" % sleep_time)
                 time.sleep(3)
                 sleep_time = sleep_time + 3
-        logger.info("joined to: " + self.channel)
+        logger.info("joined to: " + channel)
 
 
     def connect(self):
