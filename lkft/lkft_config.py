@@ -186,6 +186,14 @@ trigger_branch_builds_info = {
         },
 }
 
+def get_supported_branches():
+    branches = []
+    triggers = trigger_branch_builds_info.keys()
+    for trigger in triggers:
+        trigger_branches = trigger_branch_builds_info.get(trigger)
+        branches.extend(trigger_branches.keys())
+    return branches
+
 def find_expect_cibuilds(trigger_name=None, branch_name=None):
     if not trigger_name:
         return set([])

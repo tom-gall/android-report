@@ -31,7 +31,7 @@ from lcr.qa_report import DotDict, UrlNotFoundException
 from lcr.utils import download_urllib
 from lkft.lkft_config import find_citrigger, find_cibuild, get_hardware_from_pname, get_version_from_pname, get_kver_with_pname_env
 from lkft.lkft_config import find_expect_cibuilds
-from lkft.lkft_config import get_configs, get_qa_server_project
+from lkft.lkft_config import get_configs, get_qa_server_project, get_supported_branches
 
 from .models import KernelChange, CiBuild, ReportBuild, ReportProject
 
@@ -1128,6 +1128,10 @@ def resubmit_job(request):
 
 def new_kernel_changes(request, branch, describe, trigger_name, trigger_number):
 
+    supported_branches = get_supported_branches()
+    if branch not in supported_branches:
+        return HttpResponse("ERROR: branch %s is not supported yet" % branch, status=200)
+
     remote_addr = request.META.get("REMOTE_ADDR")
     remote_host = request.META.get("REMOTE_HOST")
     logger.info('request from remote_host=%s,remote_addr=%s' % (remote_host, remote_addr))
@@ -1159,6 +1163,11 @@ def new_kernel_changes(request, branch, describe, trigger_name, trigger_number):
 
 
 def new_build(request, branch, describe, name, number):
+
+    supported_branches = get_supported_branches()
+    if branch not in supported_branches:
+        return HttpResponse("ERROR: branch %s is not supported yet" % branch, status=200)
+
     remote_addr = request.META.get("REMOTE_ADDR")
     remote_host = request.META.get("REMOTE_HOST")
     logger.info('request from %s %s' % (remote_host, remote_addr))
