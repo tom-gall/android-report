@@ -1315,7 +1315,8 @@ def get_kernel_changes_info(db_kernelchanges=[]):
                 # and the qa-report build is not created yet
                 all_builds_has_failed = True
                 continue
-            else:
+            elif dbci_build.name != db_kernelchange.trigger_name:
+                # not the trigger build, and the ci build finished successfully
                 all_builds_failed = False
 
             configs = get_configs(ci_build=build)
