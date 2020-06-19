@@ -130,6 +130,9 @@ class Command(BaseCommand):
         # db_kernelchanges = KernelChange.objects_needs_report.all().filter(branch="android-5.4")
         db_kernelchanges = KernelChange.objects_needs_report.all()
         kernelchanges = get_kernel_changes_info(db_kernelchanges=db_kernelchanges)
+        if len(kernelchanges) == 0:
+            logger.info("No kernel change report needs to be updated")
+            return
 
         ## cache to database
         for kernel_change_report in kernelchanges:
