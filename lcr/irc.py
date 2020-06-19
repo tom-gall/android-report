@@ -31,9 +31,9 @@ class IRC:
     @staticmethod
     def getInstance():
         """ Static access method. """
-        if IRC.__instance == None:
-            return IRC()
-        return IRC.__instance
+        #if IRC.__instance == None:
+        return IRC()
+        #return IRC.__instance
 
     def __init__(self):
         """ Virtually private constructor. """
@@ -51,10 +51,10 @@ class IRC:
             self.botnick = configs.get('botnick')
             self.botpass = configs.get('botpass')
 
-        if IRC.__instance != None:
-            raise Exception("This class is a singleton!")
-        else:
-            IRC.__instance = self
+        #if IRC.__instance != None:
+        #    raise Exception("This class is a singleton!")
+        #else:
+        #    IRC.__instance = self
 #            self.connect()
 #            self.addFunctions(func_dict={
 #                    'PING': self.func_pong,
@@ -97,15 +97,27 @@ class IRC:
         if type(msgStrOrAry) == list:
             for msg in msgStrOrAry:
                 msg_out = "PRIVMSG %s : %s\r\n" % (self.channel, str(msg))
-                self.irc_socket.send(bytes(msg_out, "UTF-8"))
+                len_sent = self.irc_socket.send(bytes(msg_out, "UTF-8"))
+                #len_expect = len(bytes(msg_out, "UTF-8"))
+                time.sleep(1) # to workaround the excess flood problem
+                #if len_expect != len_sent:
+                #logger.info("not all bytes sent for msg: %s, sent %d, expected:%d" % (msg_out, len_sent, len_expect))
         else:
             msg_out = "PRIVMSG %s : %s\r\n" % (self.channel, str(msgStrOrAry))
-            self.irc_socket.send(bytes(msg_out, "UTF-8"))
+            len_sent = self.irc_socket.send(bytes(msg_out, "UTF-8")) # [Errno 32] Broken pipe
+            #len_expect = len(bytes(msg_out, "UTF-8"))
+            #if len_expect != len_sent:
+            #    logger.info("not all bytes sent for msg: %s, sent %d, expected:%d" % (msg_out, len_sent, len_expect))
 
 
     def quit(self):
         if self.irc_socket:
             self.irc_socket.send(bytes("QUIT", "UTF-8"))
+            logger.info("sent quit")
+            #time.sleep(1) # (Write error: Connection reset by peer)
+            self.irc_socket.close() # [Errno 106] (EISCONN) Transport endpoint is already connected
+            self.irc_socket = None  # [Errno 9] Bad file descriptor reported when the socket was closed
+            self.__instance = None  # [Errno 9] Bad file descriptor
 
 
     def sendAndQuit(self, msgStrOrAry=None):
@@ -115,6 +127,7 @@ class IRC:
         else:
             self.connect()
             self.send(msgStrOrAry=msgStrOrAry)
+            time.sleep(3) # workaround for Ping timeout: 260 seconds
             self.quit()
 
 
