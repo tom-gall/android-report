@@ -179,10 +179,15 @@ trigger_branch_builds_info = {
         'android-hikey-linaro-4.19-lkft': ['lkft-generic-mirror-build'],
         },
 
-    # configs for hikey kernels
+    # configs for omap kernels
     'trigger-lkft-linaro-omap': {
         'android-beagle-x15-4.14-stable-lkft': ['lkft-generic-omap-build'],
         'android-beagle-x15-4.19-lkft': ['lkft-generic-omap-build'],
+        },
+
+    'trigger-lkft-omap': {
+        'android-beagle-x15-4.14': ['lkft-generic-omap-build'],
+        'android-beagle-x15-4.19': ['lkft-generic-omap-build'],
         },
 }
 
