@@ -247,7 +247,16 @@ class Command(BaseCommand):
         for kernel_change_report in kernelchanges:
             kernel_change = kernel_change_report.get('kernel_change')
             index = index + 1
-            ircMsgList.append("%d/%d: %s %s %s %s" % (index, num_kernelchanges, kernel_change.branch, kernel_change.describe, kernel_change.result, timesince(kernel_change.timestamp)))
+            if status == "ALL_COMPLETED":
+                ircMsgList.append("%d/%d: %s %s %s %s, %s/%s passed, %s/%s done" % (index, num_kernelchanges,
+                                     kernel_change.branch,
+                                     kernel_change.describe,
+                                     kernel_change.result,
+                                     timesince(kernel_change.timestamp),
+                                     kernel_change.number_passed, kernel_change.number_total,
+                                     kernel_change.modules_done, kernel_change.modules_total))
+            else:
+                ircMsgList.append("%d/%d: %s %s %s %s" % (index, num_kernelchanges, kernel_change.branch, kernel_change.describe, kernel_change.result, timesince(kernel_change.timestamp)))
             continue
 
             trigger_build = kernel_change_report.get('trigger_build')
