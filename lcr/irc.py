@@ -58,6 +58,8 @@ class IRC:
             self.botpass = configs.get('botpass')
 
             IRC.__instance = self
+            self.connect_lock = threading.Lock()
+            #self.connect_lock = threading.RLock()
 #            self.connect()
 #            self.addFunctions(func_dict={
 #                    'PING': self.func_pong,
@@ -128,7 +130,13 @@ class IRC:
             # should be only available when irc notification enabled
             return
         else:
+            # maybe need a system level lock, so that the management commands
+            # and the server instance could share the lock
+            #with self.connect_lock:
+            self.connect_lock.acquire() # OSError: [Errno 106] Transport endpoint is already connected
             self.connect()
+            self.connect_lock.release() # OSError: [Errno 106] Transport endpoint is already connected
+
             self.send(msgStrOrAry=msgStrOrAry)
             time.sleep(3) # workaround for Ping timeout: 260 seconds
             self.quit()
@@ -140,7 +148,7 @@ class IRC:
 
         # Connect to the server
         logger.info("Connecting to: " + server)
-        self.irc_socket.connect((server, int(port)))
+        self.irc_socket.connect((server, int(port))) # OSError: [Errno 106] Transport endpoint is already connected
 
         # Perform user authentication
         self.irc_socket.send(bytes("USER " + botnick + " " + botnick +" " + botnick + " :python\n", "UTF-8"))
