@@ -58,7 +58,9 @@ citrigger_lkft = {
 
         'mainline-aosp-master-x15': 'lkft-x15-aosp-master-mainline',
         'mainline-gki-aosp-master-db845c': 'lkft-generic-build',
+        'mainline-gki-aosp-master-db845c-full-cts-vts': 'lkft-generic-build',
         'mainline-gki-aosp-master-hikey960': 'lkft-generic-build',
+        'mainline-gki-aosp-master-hikey960-full-cts-vts': 'lkft-generic-build',
         },
 
     # configs for 4.14 kernels
