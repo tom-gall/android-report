@@ -121,8 +121,8 @@ class ReportBuild(models.Model):
 
 class ReportJob(models.Model):
     job_name = models.CharField(max_length=100)
-    job_url = models.CharField(max_length=100)
-    attachment_url = models.CharField(max_length=100, null=True)
+    job_url = models.URLField(null=True)
+    attachment_url = models.URLField(null=True)
 
     qa_job_id = models.IntegerField(default=0)
 
@@ -144,9 +144,9 @@ class ReportJob(models.Model):
     modules_total = models.IntegerField(default=0)
 
     def __str__(self):
-        return "%s#%s" % (self.job_name, self.report_build.name)
+        return "%s#%s" % (self.job_name, self.report_build.version)
 
     def __unicode__(self):
-        return "%s#%s" % (self.job_name, self.report_build.name)
+        return "%s#%s" % (self.job_name, self.report_build.version)
 
     objects = models.Manager()

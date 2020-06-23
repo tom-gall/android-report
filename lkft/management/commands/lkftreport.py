@@ -36,8 +36,8 @@ irc = IRC.getInstance()
 class Command(BaseCommand):
     help = 'Check the build and test results for kernel changes, and send report if the jobs finished'
 
-#    def add_arguments(self, parser):
-#        parser.add_argument('git_describes', nargs='+', type=str)
+    def add_arguments(self, parser):
+        parser.add_argument('describe', type=str, nargs='?', default=None)
 
     def classify_bugs_and_failures(self, bugs=[], failures=[]):
         bugs_reproduced = []
@@ -127,8 +127,13 @@ class Command(BaseCommand):
 
 
     def handle(self, *args, **options):
-        # db_kernelchanges = KernelChange.objects_needs_report.all().filter(branch="android-5.4")
-        db_kernelchanges = KernelChange.objects_needs_report.all()
+
+        describe = options['describe']
+        if describe is not None:
+            db_kernelchanges = KernelChange.objects_needs_report.all().filter(describe=describe)
+        else:
+            # db_kernelchanges = KernelChange.objects_needs_report.all().filter(branch="android-5.4")
+            db_kernelchanges = KernelChange.objects_needs_report.all()
         kernelchanges = get_kernel_changes_info(db_kernelchanges=db_kernelchanges)
         if len(kernelchanges) == 0:
             logger.info("No kernel change report needs to be updated")
