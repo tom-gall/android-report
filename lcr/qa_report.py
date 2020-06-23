@@ -182,6 +182,10 @@ class QAReportApi(RESTFullApi):
         return self.call_with_api_url(api_url=api_url)
 
 
+    def get_project_url_with_group_slug(self, group, slug):
+        return "https://%s/%s/%s" % (self.domain, group, slug)
+
+
     def get_project_with_url(self, project_url):
         return self.call_with_full_url(request_url=project_url)
 
@@ -194,6 +198,10 @@ class QAReportApi(RESTFullApi):
     def get_build(self, build_id):
         builds_api_url = "api/builds/%s" % build_id
         return self.call_with_api_url(api_url=builds_api_url)
+
+
+    def get_build_url_with_group_slug_buildVersion(self, group, slug, build_version):
+        return "https://%s/%s/%s/%s" % (self.domain, group, slug, build_version)
 
 
     def get_build_with_url(self, build_url):
@@ -297,6 +305,16 @@ class QAReportApi(RESTFullApi):
             job.get('submitted') and \
             not job.get('fetched'):
             job['job_status'] = 'Submitted'
+
+    def reset_qajob_failure_msg(self, job):
+        if job.get('failure'):
+            failure = job.get('failure')
+            new_str = failure.replace('"', '\\"').replace('\'', '"')
+            try:
+                failure_dict = json.loads(new_str)
+            except ValueError:
+                failure_dict = {'error_msg': new_str}
+            job['failure'] = failure_dict
 
     def get_job_with_id(self, qa_job_id):
         api_url = 'api/testjobs/%s' % qa_job_id

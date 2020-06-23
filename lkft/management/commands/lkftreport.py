@@ -17,7 +17,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 from django.utils.timesince import timesince
 
-from lkft.models import KernelChange, CiBuild, ReportBuild, ReportProject
+from lkft.models import KernelChange, CiBuild, ReportBuild, ReportProject, ReportJob
 
 from lcr import qa_report
 from lcr.irc import IRC
@@ -223,7 +223,7 @@ class Command(BaseCommand):
                     report_build.status = qareport_build.get('build_status')
                     report_build.save()
                 except ReportBuild.DoesNotExist:
-                    ReportBuild.objects.create(qa_project=qa_project,
+                    report_build = ReportBuild.objects.create(qa_project=qa_project,
                                         version=kernel_change.describe,
                                         kernel_change=kernel_change,
                                         ci_build=dbci_build,
@@ -237,6 +237,84 @@ class Command(BaseCommand):
                                         fetched_at=qareport_build.get('last_fetched_timestamp'),
                                         status=qareport_build.get('build_status'),
                                         qa_build_id=qareport_build.get('id'))
+
+                final_jobs = qareport_build.get('final_jobs')
+                resubmitted_or_duplicated_jobs = qareport_build.get('resubmitted_or_duplicated_jobs')
+
+                for job in final_jobs + resubmitted_or_duplicated_jobs:
+                    test_numbers = job.get('numbers')
+                    if test_numbers is None:
+                        test_numbers = {
+                            'number_passed': 0,
+                            'number_failed': 0,
+                            'number_total': 0,
+                            'modules_done': 0,
+                            'modules_total': 0,
+                        }
+
+                    if job.get('submitted_at'):
+                        submitted_at = qa_report_api.get_aware_datetime_from_str(job.get('submitted_at'))
+                    else:
+                        submitted_at = None
+
+                    if job.get('fetched_at'):
+                        fetched_at = qa_report_api.get_aware_datetime_from_str(job.get('fetched_at'))
+                    else:
+                        fetched_at = None
+
+                    if job.get('resubmitted'):
+                        resubmitted = job.get('resubmitted')
+                    else:
+                        resubmitted = False
+
+                    qa_report_api.reset_qajob_failure_msg(job)
+                    if job.get('failure'):
+                        failure_msg = job.get('failure').get('error_msg')
+                    else:
+                        failure_msg = None
+
+                    try:
+                        report_job = ReportJob.objects.get(job_url=job.get('external_url'))
+
+                        report_job.job_name = job.get('name')
+                        report_job.attachment_url = job.get('attachment_url')
+                        report_job.qa_job_id = job.get('id')
+                        report_job.report_build = report_build
+                        report_job.parent_job = job.get('parent_job')
+
+                        # JOBSNOTSUBMITTED / JOBSINPROGRESS / JOBSCOMPLETED
+                        report_job.status = job.get('job_status')
+
+                        report_job.failure_msg = failure_msg
+                        report_job.resubmitted = resubmitted
+
+                        report_job.submitted_at = submitted_at
+                        report_job.fetched_at = fetched_at
+
+                        report_job.number_passed = test_numbers.get('number_passed')
+                        report_job.number_failed = test_numbers.get('number_failed')
+                        report_job.number_total = test_numbers.get('number_total')
+                        report_job.modules_done = test_numbers.get('modules_done')
+                        report_job.modules_total = test_numbers.get('modules_total')
+
+                        report_job.save()
+                    except ReportJob.DoesNotExist:
+                        ReportJob.objects.create(job_url=job.get('external_url'),
+                                            job_name=job.get('name'),
+                                            attachment_url=job.get('attachment_url'),
+                                            qa_job_id=job.get('id'),
+                                            report_build=report_build,
+                                            parent_job= job.get('parent_job'),
+                                            status=job.get('job_status'),
+                                            failure_msg=failure_msg,
+                                            resubmitted=resubmitted,
+                                            number_passed=test_numbers.get('number_passed'),
+                                            number_failed=test_numbers.get('number_failed'),
+                                            number_total=test_numbers.get('number_total'),
+                                            modules_done=test_numbers.get('modules_done'),
+                                            modules_total=test_numbers.get('modules_total'),
+                                            submitted_at=submitted_at,
+                                            fetched_at=fetched_at)
 
         # print out the reports
         print("########## REPORTS FOR KERNEL CHANGES#################")

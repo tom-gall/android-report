@@ -143,4 +143,89 @@
 {% endfor %}
 </table>
 </div>
+
+<div>
+<h2>Jobs List:</h2>
+<table border="1">
+<tr>
+    <th> Index</th>
+    <th> QAProjectGroup</th>
+    <th> QAProjectName</th>
+    <th> Job Id/Job Link</a> </th>
+    <th> Job Name/Attachment</a></th>
+    <th> Job Status </th>
+    <th> Resubmit </th>
+    <th> FailureMsg </th>
+    <th> Passed </th>
+    <th> Failed </th>
+    <th> Total </th>
+    <th> ModulesDone </th>
+    <th> ModulesTotal </th>
+</tr>
+{% for job in report_jobs %}
+<tr>
+    <td> {{ forloop.counter }}</td>
+    <td> {{job.qaproject_group }}</td>
+    <td> {{job.qaproject_name }}</td>
+    <td> <a href="{{job.lavajob_url}}">{{job.lavajob_id}}</a> </td>
+    {% if job.lavajob_url %}
+    <td nowrap> <a target='_blank' href="{{job.lavajob_url}}">{{job.lavajob_name}} </a></td>
+    {% else %}
+    <td nowrap> {{job.lavajob_name}}</td>
+    {% endif %}
+    <td>{{job.lavajob_status}} </td>
+    {% if job.lavajob_status == 'Running' or job.lavajob_status == 'Submitted'%}
+    <td>&nbsp;</td>
+    {% else %}
+    <td><a target='_blank' href="/lkft/resubmit-job/?qa_job_id={{job.qajob_id}}">Resubmit</a> </td>
+    {% endif %}
+    {% if job.failure_msg %}
+    <td>{{job.failure_msg}} </td>
+    {% else %}
+    <td>&nbsp;</td>
+    {% endif %}
+    <td align="right">{{job.number_passed}}</td>
+    <td align="right">{{job.number_failed}}</td>
+    <td align="right">{{job.number_total}}</td>
+    <td align="right">{{job.modules_done}}</td>
+    <td align="right">{{job.modules_total}}</td>
+</tr>
+{% endfor %}
+</table>
+</div>
+<div>
+<h2>Resubmitted Jobs List:</h2>
+<table border="1">
+<tr>
+    <th> Index</th>
+    <th> QAProjectGroup</th>
+    <th> QAProjectName</th>
+    <th> Job Id/Job Link</a> </th>
+    <th> Job Name/Attachment</a></th>
+    <th> Job Status </th>
+    <th> FailureMsg </th>
+    <th> Report Bug </th>
+</tr>
+{% for job in resubmitted_jobs %}
+<tr>
+    <td> {{ forloop.counter }}</td>
+    <td> {{job.qaproject_group }}</td>
+    <td> {{job.qaproject_name }}</td>
+    <td> <a href="{{job.lavajob_url}}">{{job.lavajob_id}}</a> </td>
+    {% if job.lavajob_url %}
+    <td nowrap> <a target='_blank' href="{{job.lavajob_url}}">{{job.lavajob_name}} </a></td>
+    {% else %}
+    <td nowrap> {{job.lavajob_name}}</td>
+    {% endif %}
+    <td>{{job.lavajob_status}} </td>
+    {% if job.failure_msg %}
+    <td>{{job.failure_msg}} </td>
+    {% else %}
+    <td>&nbsp;</td>
+    {% endif %}
+    <td><a target='_blank' href="{{job.new_bug_url}}">Report Bug</a></td>
+</tr>
+{% endfor %}
+</table>
+</div>
 {% endblock %}

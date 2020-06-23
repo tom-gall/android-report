@@ -33,7 +33,7 @@ from lkft.lkft_config import find_citrigger, find_cibuild, get_hardware_from_pna
 from lkft.lkft_config import find_expect_cibuilds
 from lkft.lkft_config import get_configs, get_qa_server_project, get_supported_branches
 
-from .models import KernelChange, CiBuild, ReportBuild, ReportProject
+from .models import KernelChange, CiBuild, ReportBuild, ReportProject, ReportJob
 
 qa_report_def = QA_REPORT[QA_REPORT_DEFAULT]
 qa_report_api = qa_report.QAReportApi(qa_report_def.get('domain'), qa_report_def.get('token'))
@@ -639,6 +639,9 @@ def find_bug_for_failure(failure, patterns=[], bugs=[]):
     return found_bug
 
 
+
+
+
 @login_required
 def list_jobs(request):
     build_id = request.GET.get('build_id', None)
@@ -652,14 +655,7 @@ def list_jobs(request):
     failures = {}
     resubmitted_job_urls = []
     for job in jobs:
-        if job.get('failure'):
-            failure = job.get('failure')
-            new_str = failure.replace('"', '\\"').replace('\'', '"')
-            try:
-                failure_dict = json.loads(new_str)
-            except ValueError:
-                failure_dict = {'error_msg': new_str}
-            job['failure'] = failure_dict
+        qa_report_api.reset_qajob_failure_msg(job)
 
         if job.get('parent_job'):
             resubmitted_job_urls.append(job.get('parent_job'))
@@ -1582,6 +1578,7 @@ def list_describe_kernel_changes(request, branch, describe):
         ci_builds.append(ci_build)
 
     report_builds = []
+    db_report_jobs = []
     for db_report_build in db_report_builds:
         report_build = {}
         report_build['qa_project'] = db_report_build.qa_project
@@ -1598,12 +1595,51 @@ def list_describe_kernel_changes(request, branch, describe):
 
         report_builds.append(report_build)
 
+        db_report_jobs_of_build = ReportJob.objects.filter(report_build=db_report_build)
+        db_report_jobs.extend(db_report_jobs_of_build)
+
+    report_jobs = []
+    resubmitted_jobs = []
+    for db_report_job in db_report_jobs:
+        report_job = {}
+        db_report_build = db_report_job.report_build
+        db_report_project = db_report_build.qa_project
+        report_job['qaproject_full_name'] = "%s/%s" % (db_report_project.group, db_report_project.name)
+        report_job['qaproject_group'] = db_report_project.group
+        report_job['qaproject_name'] = db_report_project.name
+        report_job['qaproject_url'] = qa_report_api.get_project_url_with_group_slug(db_report_project.group, db_report_project.slug)
+        report_job['qabuild_version'] = db_report_build.version
+        report_job['qajob_id'] = db_report_job.qa_job_id
+        report_job['qabuild_url'] = qa_report_api.get_build_url_with_group_slug_buildVersion(db_report_project.group,
+                                                                                             db_report_project.slug,
+                                                                                             db_report_build.version)
+
+        report_job['lavajob_id'] = qa_report_api.get_qa_job_id_with_url(db_report_job.job_url)
+        report_job['lavajob_url'] = db_report_job.job_url
+        report_job['lavajob_name'] = db_report_job.job_name
+        report_job['lavajob_attachment_url'] = db_report_job.attachment_url
+        report_job['lavajob_status'] = db_report_job.status
+        report_job['failure_msg'] = db_report_job.failure_msg
+
+        report_job['number_passed'] = db_report_job.number_passed
+        report_job['number_failed'] = db_report_job.number_failed
+        report_job['number_total'] = db_report_job.number_total
+        report_job['modules_done'] = db_report_job.modules_done
+        report_job['modules_total'] = db_report_job.modules_total
+
+        if db_report_job.resubmitted:
+            resubmitted_jobs.append(report_job)
+        else:
+            report_jobs.append(report_job)
+
     return render(request, 'lkft-describe.html',
                        {
                             "kernel_change": kernel_change,
                             'report_builds': report_builds,
                             'trigger_build': trigger_build,
                             'ci_builds': ci_builds,
+                            'report_jobs': report_jobs,
+                            'resubmitted_jobs': resubmitted_jobs,
                         }
             )
 
