@@ -144,6 +144,7 @@
 </table>
 </div>
 
+{% if report_jobs %}
 <div>
 <h2>Jobs List:</h2>
 <table border="1">
@@ -193,6 +194,8 @@
 {% endfor %}
 </table>
 </div>
+
+{% if resubmitted_jobs %}
 <div>
 <h2>Resubmitted Jobs List:</h2>
 <table border="1">
@@ -228,4 +231,6 @@
 {% endfor %}
 </table>
 </div>
+{% endif %}
+{% endif %}
 {% endblock %}
