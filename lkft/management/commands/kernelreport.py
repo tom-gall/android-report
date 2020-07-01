@@ -4,13 +4,15 @@
 ## https://medium.com/@bencleary/django-scheduled-tasks-queues-part-2-fc1fb810b81d
 ## https://medium.com/@kevin.michael.horan/scheduling-tasks-in-django-with-the-advanced-python-scheduler-663f17e868e6
 ## https://django-background-tasks.readthedocs.io/en/latest/
-
-
+# VtsKernelLinuxKselftest#timers_set-timer-lat_32bit
+import pdb
 import datetime
 import json
 import os
 import re
 import yaml
+from dateutil import parser
+import datetime
 
 from django.core.management.base import BaseCommand, CommandError
 
@@ -33,194 +35,342 @@ qa_report_api = qa_report.QAReportApi(qa_report_def.get('domain'), qa_report_def
 jenkins_api = qa_report.JenkinsApi('ci.linaro.org', None)
 
 rawkernels = {
-   '4.4':['4.4o-8.1-hikey',
-            '4.4o-9.0-lcr-hikey',
-            '4.4o-10.0-gsi-hikey',
-            '4.4p-9.0-hikey',
+   '4.4':[
             '4.4p-10.0-gsi-hikey',
+            '4.4p-9.0-hikey',
+            '4.4o-10.0-gsi-hikey',
+            '4.4o-9.0-lcr-hikey',
+            '4.4o-8.1-hikey',
             ],
-   '4.9':['4.9o-8.1-hikey', 
-            '4.9o-9.0-lcr-hikey',
-            '4.9o-10.0-gsi-hikey',
-            '4.9o-10.0-gsi-hikey960',
-            '4.9p-9.0-hikey',
-            '4.9p-9.0-hikey960',
-            '4.9p-10.0-gsi-hikey',
-            '4.9p-10.0-gsi-hikey960',
-            '4.9q-10.0-gsi-hikey',
+   '4.9':[ 
             '4.9q-10.0-gsi-hikey960',
+            '4.9q-10.0-gsi-hikey',
+            '4.9p-10.0-gsi-hikey960',
+            '4.9p-10.0-gsi-hikey',
+            '4.9o-10.0-gsi-hikey960',
+            '4.9p-9.0-hikey960',
+            '4.9p-9.0-hikey',
+            '4.9o-10.0-gsi-hikey',
+            '4.9o-9.0-lcr-hikey',
+            '4.9o-8.1-hikey', 
             ],
-   '4.14':[ '4.14p-9.0-hikey',
-            '4.14p-9.0-hikey960',
-            '4.14p-10.0-gsi-hikey',
-            '4.14p-10.0-gsi-hikey960',
-            '4.14q-10.0-gsi-hikey',
-            '4.14q-10.0-gsi-hikey960',
-            '4.14-stable-master-hikey-lkft',
+   '4.14':[ 
             '4.14-stable-master-hikey960-lkft',
+            '4.14-stable-master-hikey-lkft',
+            '4.14q-10.0-gsi-hikey960',
+            '4.14q-10.0-gsi-hikey',
+            '4.14p-10.0-gsi-hikey960',
+            '4.14p-10.0-gsi-hikey',
+            '4.14p-9.0-hikey960',
+            '4.14p-9.0-hikey',
             ],
    '4.19':[ 
-            '4.19q-10.0-gsi-hikey',
             '4.19q-10.0-gsi-hikey960',
+            '4.19q-10.0-gsi-hikey',
             ],
    '5.4':[ 
-            '5.4-gki-aosp-master-hikey960',
-            '5.4-gki-aosp-master-db845c',
-            '5.4-stable-gki-aosp-master-hikey960',
             '5.4-stable-gki-aosp-master-db845c',
+            '5.4-stable-gki-aosp-master-hikey960',
+            '5.4-gki-aosp-master-db845c',
+            '5.4-gki-aosp-master-hikey960',
             ],
 }
 
 projectids = {
    '4.4o-8.1-hikey': 
                     {'project_id': 86, 
-                     'hardware': 'hikey',
+                     'hardware': 'HiKey',
                      'OS' : 'LCR-Android8',
+                     'baseOS' : 'Android8',
+                     'kern' : '4.4',
                      'branch' : 'Android-4.4-o',}, 
    '4.4o-9.0-lcr-hikey':
                     {'project_id': 253, 
-                     'hardware': 'hikey',
+                     'hardware': 'HiKey',
                      'OS' : 'LCR-Android9',
+                     'baseOS' : 'Android9',
+                     'kern' : '4.4',
                      'branch' : 'Android-4.4-o',},
    '4.4o-10.0-gsi-hikey':
                     {'project_id': 254, 
-                     'hardware': 'hikey',
+                     'hardware': 'HiKey',
                      'OS' : 'Android10',
+                     'kern' : '4.4',
                      'branch' : 'Android-4.4-o',},
    '4.4p-9.0-hikey':
                     {'project_id': 123, 
-                     'hardware': 'hikey',
+                     'hardware': 'HiKey',
                      'OS' : 'LCR-Android9',
+                     'baseOS' : 'Android9',
+                     'kern' : '4.4',
                      'branch' : 'Android-4.4-p',},
    '4.4p-10.0-gsi-hikey':
                     {'project_id': 225, 
-                     'hardware': 'hikey',
+                     'hardware': 'HiKey',
                      'OS' : 'Android10',
+                     'kern' : '4.4',
                      'branch' : 'Android-4.4-p',},
    '4.9o-8.1-hikey':
                     {'project_id': 87, 
-                     'hardware': 'hikey',
+                     'hardware': 'HiKey',
                      'OS' : 'LCR-Android8',
+                     'baseOS' : 'Android8',
+                     'kern' : '4.9',
                      'branch' : 'Android-4.9-o',},
    '4.9o-9.0-lcr-hikey':
                     {'project_id': 250, 
-                     'hardware': 'hikey',
+                     'hardware': 'HiKey',
                      'OS' : 'LCR-Android9',
+                     'baseOS' : 'Android9',
+                     'kern' : '4.9',
                      'branch' : 'Android-4.9-o',},
    '4.9o-10.0-gsi-hikey':
                     {'project_id': 251, 
-                     'hardware': 'hikey',
+                     'hardware': 'HiKey',
                      'OS' : 'Android10',
+                     'kern' : '4.9',
                      'branch' : 'Android-4.9-o',},
    '4.9o-10.0-gsi-hikey960':
                     {'project_id': 255, 
-                     'hardware': 'hikey960',
+                     'hardware': 'HiKey960',
                      'OS' : 'Android10',
+                     'kern' : '4.9',
                      'branch' : 'Android-4.9-o',},
    '4.9p-9.0-hikey':
                     {'project_id': 122, 
-                     'hardware': 'hikey',
+                     'hardware': 'HiKey',
                      'OS' : 'LCR-Android9',
+                     'baseOS' : 'Android9',
+                     'kern' : '4.9',
                      'branch' : 'Android-4.9-p',},
    '4.9p-9.0-hikey960':
                     {'project_id': 179,
-                     'hardware': 'hikey960',
+                     'hardware': 'HiKey960',
                      'OS' : 'LCR-Android9',
+                     'baseOS' : 'Android9',
+                     'kern' : '4.9',
                      'branch' : 'Android-4.9-p',},
    '4.9p-10.0-gsi-hikey':
                     {'project_id': 223,
-                     'hardware': 'hikey',
+                     'hardware': 'HiKey',
                      'OS' : 'Android10',
+                     'kern' : '4.9',
                      'branch' : 'Android-4.9-p',},
    '4.9p-10.0-gsi-hikey960':
                     {'project_id': 222, 
-                     'hardware': 'hikey960',
+                     'hardware': 'HiKey960',
                      'OS' : 'Android10',
+                     'kern' : '4.9',
                      'branch' : 'Android-4.9-p',},
    '4.9q-10.0-gsi-hikey':
                     {'project_id': 212, 
-                     'hardware': 'hikey',
+                     'hardware': 'HiKey',
                      'OS' : 'Android10',
+                     'kern' : '4.9',
                      'branch' : 'Android-4.9-q',},
    '4.9q-10.0-gsi-hikey960':
                     {'project_id': 213, 
-                     'hardware': 'hikey960',
+                     'hardware': 'HiKey960',
                      'OS' : 'Android10',
+                     'kern' : '4.9',
                      'branch' : 'Android-4.9-q',},
    '4.14p-9.0-hikey':
                     {'project_id': 121, 
-                     'hardware': 'hikey',
+                     'hardware': 'HiKey',
                      'OS' : 'LCR-Android9',
+                     'baseOS' : 'Android9',
+                     'kern' : '4.14',
                      'branch' : 'Android-4.14-p',},
    '4.14p-9.0-hikey960':
                     {'project_id': 177, 
-                     'hardware': 'hikey960',
+                     'hardware': 'HiKey960',
                      'OS' : 'LCR-Android9',
+                     'baseOS' : 'Android9',
+                     'kern' : '4.14',
                      'branch' : 'Android-4.14-p',},
    '4.14p-10.0-gsi-hikey':
                     {'project_id': 220, 
-                     'hardware': 'hikey',
+                     'hardware': 'HiKey',
                      'OS' : 'Android10',
+                     'kern' : '4.14',
                      'branch' : 'Android-4.14-p',},
    '4.14p-10.0-gsi-hikey960':
                     {'project_id': 221, 
-                     'hardware': 'hikey960',
+                     'hardware': 'HiKey960',
                      'OS' : 'Android10',
+                     'kern' : '4.14',
                      'branch' : 'Android-4.14-p',},
    '4.14q-10.0-gsi-hikey':
                     {'project_id': 211, 
-                     'hardware': 'hikey',
+                     'hardware': 'HiKey',
                      'OS' : 'Android10',
+                     'kern' : '4.14',
                      'branch': 'Android-4.14-q',},
    '4.14q-10.0-gsi-hikey960':
                     {'project_id': 214,
-                     'hardware': 'hikey960',
+                     'hardware': 'HiKey960',
                      'OS' : 'Android10',
+                     'kern' : '4.14',
                      'branch' : 'Android-4.14-q',},
    '4.14-stable-master-hikey-lkft':
                     {'project_id': 297, 
-                     'hardware': 'hikey',
+                     'hardware': 'HiKey',
                      'OS' : 'AOSP',
+                     'kern' : '4.14',
                      'branch': 'Android-4.14-stable',},
    '4.14-stable-master-hikey960-lkft':
                     {'project_id': 298, 
-                     'hardware': 'hikey960',
+                     'hardware': 'HiKey960',
                      'OS' : 'AOSP',
+                     'kern' : '4.14',
                      'branch': 'Android-4.14-stable',},
    '4.19q-10.0-gsi-hikey':
                     {'project_id': 210, 
-                     'hardware': 'hikey',
+                     'hardware': 'HiKey',
                      'OS' : 'Android10',
+                     'kern' : '4.19',
                      'branch' : 'Android-4.19-q',},
    '4.19q-10.0-gsi-hikey960':
                     {'project_id': 215, 
-                     'hardware': 'hikey960',
+                     'hardware': 'HiKey960',
                      'OS' : 'Android10',
+                     'kern' : '4.19',
                      'branch' : 'Android-4.19-q',},
    '5.4-gki-aosp-master-hikey960':
                     {'project_id': 257, 
-                     'hardware': 'hikey960',
+                     'hardware': 'HiKey960',
                      'OS' : 'AOSP',
+                     'kern' : '5.4',
                      'branch' : 'Android-5.4',},
    '5.4-gki-aosp-master-db845c':
                     {'project_id': 261,
-                     'hardware': 'db845c',
+                     'hardware': 'db845',
                      'OS' : 'AOSP',
+                     'kern' : '5.4',
                      'branch' : 'Android-5.4',},
    '5.4-stable-gki-aosp-master-hikey960':
                     {'project_id': 296, 
-                     'hardware': 'hikey960',
+                     'hardware': 'HiKey960',
+                     'kern' : '5.4',
                      'OS' : 'AOSP',
                      'branch' : 'Android-5.4-stable',},
    '5.4-stable-gki-aosp-master-db845c':
                     {'project_id': 295,
-                     'hardware': 'db845c',
+                     'hardware': 'db845',
                      'OS' : 'AOSP',
+                     'kern' : '5.4',
                      'branch' : 'Android-5.4-stable',},
 }
 
-def do_boilerplate():
-    print("Nothing for now")
+def do_boilerplate(output):
+    output.write("Failure Key:\n")
+    output.write("--------------------\n")
+    output.write("I == Investigation\nB == Bug#, link to bugzilla\nF == Flakey\nU == Unexpected Pass\n\n")
+
+# a flake entry
+# name, state, bugzilla
+def process_flakey_file(flakefile):
+    Dict44 = {'version' : 4.4 , 'flakelist' : [] }
+    Dict49 = {'version' : 4.9 , 'flakelist' : [] }
+    Dict414 = {'version' : 4.14, 'flakelist' : [] }
+    Dict419 = {'version' : 4.19, 'flakelist' : [] }
+    Dict54 = {'version' : 5.4, 'flakelist' : [] }
+    flakeDicts = [Dict44, Dict49, Dict414, Dict419, Dict54]
+
+    kernelsmatch = re.compile('[0-9]+.[0-9]+')
+    androidmatch = re.compile('ANDROID[0-9]+|AOSP')
+    hardwarematch = re.compile('HiKey|db845|HiKey960')
+    allmatch = re.compile('ALL')
+    #pdb.set_trace()
+    Lines = flakefile.readlines()
+    for Line in Lines:
+        if Line[0] == '#':
+            continue
+        if Line[0] == 'I' or Line[0] == 'F' or Line[0] == 'B' or Line[0] == 'E':
+            newstate = Line[0]
+            Line = Line[2:]
+        m = Line.find(' ')
+        if m:
+            testname = Line[0:m]
+            Line = Line[m:]
+            testentry = {'name' : testname, 'state': newstate, 'board': [], 'androidrel':[] }
+            if Line[0:4] == ' ALL':
+               Line = Line[5:]
+               Dict44['flakelist'].append(testentry)
+               Dict49['flakelist'].append(testentry)
+               Dict414['flakelist'].append(testentry)
+               Dict419['flakelist'].append(testentry)
+               Dict54['flakelist'].append(testentry)
+            else:
+               n = kernelsmatch.findall(Line)
+               if n:
+                  Line = Line[n.end():]
+                  for kernel in n:
+                      for Dict in flakeDicts:
+                          if kernel == Dict['version']:
+                              Dict['flakelist'].append(testentry)
+               else:
+                   continue 
+            if Line[0:2] == 'ALL':
+               Line = Line[4:]
+               testentry['board'].append("HiKey")
+               testentry['board'].append("HiKey960")
+               testentry['board'].append("db845")
+            else:
+               h = hardwarematch.findall(Line)
+               if h:
+                  for board in h:
+                      testentry['board'].append(board)
+               else:
+                   continue
+            a = allmatch.search(Line)
+            if a:
+               testentry['androidrel'].append('Android8')
+               testentry['androidrel'].append('Android9')
+               testentry['androidrel'].append('Android10')
+               testentry['androidrel'].append('AOSP')
+            else:
+               a = androidmatch.findall(Line)
+               if a:
+                  for android in a:
+                      testentry['androidrel'].append(android)
+               else:
+                   continue
+        else:
+            continue 
+       
+    return flakeDicts
+
+# take the data dictionaries, the testcase name and ideally the list of failures
+# and determine how to classify a test case. This might be a little slow espeically
+# once linked into bugzilla
+def classifyTest(flakeDicts, testcasename, hardware, kernel, android):
+    for dict in flakeDicts:
+        if dict['version'] == kernel:
+            break
+    #pdb.set_trace()
+    foundboard = 0
+    foundandroid = 0
+    #if testcasename == 'VtsKernelLinuxKselftest.timers_set-timer-lat_64bit':
+    #    pdb.set_trace()
+    #if testcasename == 'android.webkit.cts.WebChromeClientTest#testOnJsBeforeUnloadIsCalled#arm64-v8a':
+    #    pdb.set_trace()
+    for flake in dict['flakelist']:
+        if flake['name'] == testcasename:
+            for board in flake['board'] :
+                if board == hardware:
+                    foundboard = 1
+                    break
+            for rel in flake['androidrel']:
+                if rel == android:
+                    foundandroid = 1
+                    break
+            if foundboard == 1 and foundandroid == 1:
+                return flake['state']
+            else:
+                return 'I'
+    return 'I'
+
 
 def versiontoMME(versionString):
     versionDict = { 'Major':0,
@@ -238,6 +388,63 @@ def versiontoMME(versionString):
         versionDict['Extra'] = tokens[2]
 
     return versionDict
+
+
+def tallyNumbers(build, jobTransactionStatus):
+    buildNumbers = build['numbers']
+    if 'numbers' in jobTransactionStatus['vts-job']:
+        buildNumbers['failed_number'] += jobTransactionStatus['vts-job']['numbers']['failed_number']
+        buildNumbers['passed_number'] += jobTransactionStatus['vts-job']['numbers']['passed_number']
+        buildNumbers['total_number'] += jobTransactionStatus['vts-job']['numbers']['total_number']
+        buildNumbers['modules_done'] += jobTransactionStatus['vts-job']['numbers']['modules_done']
+        buildNumbers['modules_total'] += jobTransactionStatus['vts-job']['numbers']['modules_total']
+    if 'numbers' in jobTransactionStatus['cts-job']:
+        buildNumbers['failed_number'] += jobTransactionStatus['cts-job']['numbers']['failed_number']
+        buildNumbers['passed_number'] += jobTransactionStatus['cts-job']['numbers']['passed_number']
+        buildNumbers['total_number'] += jobTransactionStatus['cts-job']['numbers']['total_number']
+        buildNumbers['modules_done'] += jobTransactionStatus['cts-job']['numbers']['modules_done']
+        buildNumbers['modules_total'] += jobTransactionStatus['cts-job']['numbers']['modules_total']
+
+
+def markjob(job, jobTransactionStatus):
+    vtsSymbol = re.compile('-vts-')
+    bootSymbol = re.compile('boot')
+    ctsSymbol = re.compile('-cts')
+
+    vtsresult = vtsSymbol.search(job['name'])
+    bootresult = bootSymbol.search(job['name'])
+    ctsresult = ctsSymbol.search(job['name'])
+
+    newjobTime = parser.parse(job['created_at'])
+    if vtsresult is not None:
+       jobTransactionStatus['vts'] = 'true'
+       # take the later of the two results
+       if jobTransactionStatus['vts-job'] is None:
+           jobTransactionStatus['vts-job'] = job
+       else:
+           origjobTime = parser.parse(jobTransactionStatus['vts-job']['created_at'])
+           if newjobTime > origjobTime :
+               jobTransactionStatus['vts-job'] = job
+    if ctsresult is not None :
+       jobTransactionStatus['cts'] = 'true'
+       # take the later of the two results
+       if jobTransactionStatus['cts-job'] is None:
+           jobTransactionStatus['cts-job'] = job
+       else:
+           origjobTime = parser.parse(jobTransactionStatus['cts-job']['created_at'])
+           if newjobTime > origjobTime :
+               jobTransactionStatus['cts-job'] = job
+    if bootresult is not None :
+       jobTransactionStatus['boot'] = 'true'
+       # take the later of the two results
+       if jobTransactionStatus['boot-job'] is None:
+           jobTransactionStatus['boot-job'] = job
+       else:
+           origjobTime = parser.parse(jobTransactionStatus['boot-job']['created_at'])
+           if newjobTime > origjobTime :
+               jobTransactionStatus['boot-job'] = job
+
+    
 
 def find_best_two_runs(builds, project_name, project):
     goodruns = []
@@ -265,6 +472,7 @@ def find_best_two_runs(builds, project_name, project):
             continue
            
         # print "ok great should be complete" 
+        '''
         if number_of_build_with_jobs < BUILD_WITH_JOBS_NUMBER:
             build_numbers = get_test_result_number_for_build(build, jobs)
             build_number_passed = build_number_passed + build_numbers.get('number_passed')
@@ -276,11 +484,19 @@ def find_best_two_runs(builds, project_name, project):
             #print "numbers passed in build" + str(build_number_passed)
         number_of_build_with_jobs = number_of_build_with_jobs + 1
         build['numbers'] = {
-                           'number_passed': build_number_passed,
-                           'number_failed': build_number_failed,
-                           'number_total': build_number_total,
+                           'passed_number': build_number_passed,
+                           'failed_number': build_number_failed,
+                           'total_number': build_number_total,
                            'modules_done': build_modules_done,
                            'modules_total': build_modules_total,
+                           }
+        '''
+        build['numbers'] = {
+                           'passed_number': 0,
+                           'failed_number': 0,
+                           'total_number': 0,
+                           'modules_done': 0,
+                           'modules_total': 0,
                            }
         build['jobs'] = jobs
         #if build_number_passed == 0:
@@ -292,7 +508,101 @@ def find_best_two_runs(builds, project_name, project):
         resubmitted_job_urls = []
        
         jobisacceptable=1 
+        jobTransactionStatus = { 'vts' : 'maybe', 'cts' : 'maybe', 'boot': 'maybe',
+                                 'vts-job' : None, 'cts-job' : None, 'boot-job' : None }
+
+        # pdb.set_trace()
         for job in jobs:
+           ctsSymbol = re.compile('-cts')
+
+           ctsresult = ctsSymbol.search(job['name'])
+           jobstatus = job['job_status']
+           jobfailure = job['failure']
+           if ctsresult is not None:
+               print("cts job" + str(jobfailure) + '\n')
+           if jobstatus == 'Complete' and jobfailure is None :
+              markjob(job, jobTransactionStatus)
+
+           result_file_path = get_result_file_path(job=job)
+           if not result_file_path or not os.path.exists(result_file_path):
+              continue
+           # now tally then move onto the next job
+           kernel_version = get_kver_with_pname_env(prj_name=project_name, env=job.get('environment'))
+
+           platform = job.get('environment').split('_')[0]
+           metadata = {
+              'job_id': job.get('job_id'),
+              'qa_job_id': qa_report_api.get_qa_job_id_with_url(job_url=job.get('url')),
+              'result_url': job.get('attachment_url'),
+              'lava_nick': job.get('lava_config').get('nick'),
+              'kernel_version': kernel_version,
+              'platform': platform,
+           }
+           numbers = extract(result_file_path, failed_testcases_all=failures, metadata=metadata)
+           job['numbers'] = numbers
+
+        # now let's see what we have. Do we have a complete yet?
+        print("vts: "+ jobTransactionStatus['vts'] + " cts: "+jobTransactionStatus['cts'] + " boot: " +jobTransactionStatus['boot'] +'\n')
+
+        if jobTransactionStatus['vts'] == 'true' and jobTransactionStatus['cts'] == 'true' and jobTransactionStatus['boot'] == 'true' :
+           #pdb.set_trace()
+           if bailaftertwo == 0 :
+               baseVersionDict = versiontoMME(build['version'])
+               # print "baseset"
+           elif bailaftertwo == 1 :
+               nextVersionDict = versiontoMME(build['version'])
+               if nextVersionDict['Extra'] == baseVersionDict['Extra'] :
+                   continue
+           tallyNumbers(build, jobTransactionStatus)
+           goodruns.append(build)
+           bailaftertwo += 1
+        else:
+           continue
+
+        #if 'run_status' in build:
+        #   # print "found run status" + "build " + str(build.get("id")) + " NOT selected"
+        #    continue
+        #else:
+        #   # print "run status NOT found" + "build " + str(build.get("id")) + " selected"
+        #   if bailaftertwo == 0 :
+        #       baseVersionDict = versiontoMME(build['version'])
+        #       # print "baseset"
+        #   elif bailaftertwo == 1 :
+        #       nextVersionDict = versiontoMME(build['version'])
+        #       if nextVersionDict['Extra'] == baseVersionDict['Extra'] :
+        #           continue
+        #   goodruns.append(build)
+        #   bailaftertwo += 1
+
+        failures_list = []
+        for module_name in sorted(failures.keys()):
+            failures_in_module = failures.get(module_name)
+            for test_name in sorted(failures_in_module.keys()):
+                failure = failures_in_module.get(test_name)
+                abi_stacktrace = failure.get('abi_stacktrace')
+                abis = sorted(abi_stacktrace.keys())
+
+                stacktrace_msg = ''
+                if (len(abis) == 2) and (abi_stacktrace.get(abis[0]) != abi_stacktrace.get(abis[1])):
+                    for abi in abis:
+                        stacktrace_msg = '%s\n\n%s:\n%s' % (stacktrace_msg, abi, abi_stacktrace.get(abi))
+                else:
+                    stacktrace_msg = abi_stacktrace.get(abis[0])
+
+                failure['abis'] = abis
+                failure['stacktrace'] = stacktrace_msg.strip()
+
+                failures_list.append(failure)
+
+        android_version = get_version_from_pname(pname=project.get('name'))
+        build['failures_list'] = failures_list
+
+    return goodruns
+
+    '''
+              if jobstatus == 'Incomplete' :
+        for job in jobs:
+           pdb.set_trace()
            if job.get('job_status') is None and \
               job.get('submitted') and \
               not job.get('fetched'):
@@ -319,60 +629,7 @@ def find_best_two_runs(builds, project_name, project):
            result_file_path = get_result_file_path(job=job)
            if not result_file_path or not os.path.exists(result_file_path):
               continue
-
-           kernel_version = get_kver_with_pname_env(prj_name=project_name, env=job.get('environment'))
-
-           platform = job.get('environment').split('_')[0]
-           metadata = {
-               'job_id': job.get('job_id'),
-               'qa_job_id': qa_report_api.get_qa_job_id_with_url(job_url=job.get('url')),
-               'result_url': job.get('attachment_url'),
-               'lava_nick': job.get('lava_config').get('nick'),
-               'kernel_version': kernel_version,
-               'platform': platform,
-               }
-           numbers = extract(result_file_path, failed_testcases_all=failures, metadata=metadata)
-           job['numbers'] = numbers
-        
-        if 'run_status' in build:
-            # print "found run status" + "build " + str(build.get("id")) + " NOT selected"
-            continue
-        else:
-            # print "run status NOT found" + "build " + str(build.get("id")) + " selected"
-            if bailaftertwo == 0 :
-                baseVersionDict = versiontoMME(build['version'])
-                # print "baseset"
-            elif bailaftertwo == 1 :
-                nextVersionDict = versiontoMME(build['version'])
-                if nextVersionDict['Extra'] == baseVersionDict['Extra'] :
-                    continue
-            goodruns.append(build)
-            bailaftertwo += 1
-
-        failures_list = []
-        for module_name in sorted(failures.keys()):
-            failures_in_module = failures.get(module_name)
-            for test_name in sorted(failures_in_module.keys()):
-                failure = failures_in_module.get(test_name)
-                abi_stacktrace = failure.get('abi_stacktrace')
-                abis = sorted(abi_stacktrace.keys())
-
-                stacktrace_msg = ''
-                if (len(abis) == 2) and (abi_stacktrace.get(abis[0]) != abi_stacktrace.get(abis[1])):
-                    for abi in abis:
-                        stacktrace_msg = '%s\n\n%s:\n%s' % (stacktrace_msg, abi, abi_stacktrace.get(abi))
-                else:
-                    stacktrace_msg = abi_stacktrace.get(abis[0])
-
-                failure['abis'] = abis
-                failure['stacktrace'] = stacktrace_msg.strip()
-
-                failures_list.append(failure)
-
-        android_version = get_version_from_pname(pname=project.get('name'))
-        build['failures_list'] = failures_list
-
-    return goodruns
+    '''
 
 
 def find_regressions(goodruns):
@@ -401,52 +658,70 @@ def find_regressions(goodruns):
                      'OS' : 'Android10',
                      'branch' : 'Android-4.19-q',},
 """
-def print_androidresultheader(project_info, regressionCount):
-    if regressionCount > 0:
-        print("    " + project_info['OS'] + "/" + project_info['hardware'] + " - " + str(regressionCount) + " Regressions")
-    else:
-        print("    " + project_info['OS'] + "/" + project_info['hardware'] + " - No Regressions")
 
+def print_androidresultheader(output, project_info, run, priorrun ):
+        output.write("    " + project_info['OS'] + "/" + project_info['hardware'] + " - " )
+        output.write("Current:" + run['version'] + "  Prior:" + priorrun['version']+"\n")
 
 def add_unique_kernel(unique_kernels, kernel_version):
     if kernel_version not in unique_kernels:
         unique_kernels.append(kernel_version)
 
 
-def report_results(run, regressions, combo, priorrun):
+def report_results(output, run, regressions, combo, priorrun, flakes):
     jobs = run['jobs']
     job = jobs[0]
-    numbers = job['numbers']
+    #pdb.set_trace()
+    numbers = run['numbers']
     project_info = projectids[combo]
-    print(project_info['branch'])
-    print_androidresultheader(project_info, len(regressions))
-    print("    Current:" + run['version'] + "  Prior:" + priorrun['version'])
+    output.write(project_info['branch'] + "\n")
+    print_androidresultheader(output, project_info, run, priorrun)
+    #pdb.set_trace()
+    output.write("    " + str(len(regressions)) + " Regressions ")
+    output.write(str(numbers['failed_number']) + " Failures ") 
+    output.write(str(numbers['passed_number']) + " Passed ")
+    output.write( str(numbers['total_number']) + " Total - " )
+    output.write("Modules Run: " + str(numbers['modules_done']) + " Module Total: "+str(numbers['modules_total'])+"\n")
     for regression in regressions:
-        print("        " + regression['test_name'])
+        # pdb.set_trace()
+        if 'baseOS' in project_info: 
+            OS = project_info['baseOS']
+        else:
+            OS = project_info['OS']
+        testtype=classifyTest(flakes, regression['test_name'], project_info['hardware'], project_info['kern'], OS)
+        # def classifyTest(flakeDicts, testcasename, hardware, kernel, android):
+        output.write("        " + testtype + " " + regression['test_name'] + "\n")
 
-def report_kernels_in_report(unique_kernels): 
-    print(" ")
-    print(" ")
-    print("Kernels in this report:")
+
+def report_kernels_in_report(output, unique_kernels): 
+    output.write("\n")
+    output.write("\n")
+    output.write("Kernels in this report:\n")
     for kernel in unique_kernels:
-        print("    " + kernel)
+        output.write("    " + kernel+"\n")
+
 
 class Command(BaseCommand):
     help = 'returns Android Common Kernel Regression Report for specific kernels'
 
     def add_arguments(self, parser):
         parser.add_argument('kernel', type=str, help='Kernel version')
+        parser.add_argument('outputfile', type=str, help='Output File')
+        parser.add_argument('flake', type=str, help='flakey file')
 
     def handle(self, *args, **options):
         kernel = options['kernel']
-  #      try:
+        output = open(options['outputfile'], "w")
+        flakefile = open(options['flake'], "r")
+
         # map kernel to all available kernel, board, OS combos that match
         work = []
         unique_kernels=[]
 
         work = rawkernels[kernel]
+        flakes = process_flakey_file(flakefile)
 
-        do_boilerplate()
+        do_boilerplate(output)
 
         for combo in work:
             project_info = projectids[combo]
@@ -455,10 +730,15 @@ class Command(BaseCommand):
             builds = qa_report_api.get_all_builds(project_id)
             project_name = project.get('name')
             goodruns = find_best_two_runs(builds, project_name, project)
-            add_unique_kernel(unique_kernels, goodruns[0]['version'])
-            regressions = find_regressions(goodruns)
-            report_results(goodruns[0], regressions, combo, goodruns[1])
-        report_kernels_in_report(unique_kernels)
+            if len(goodruns) < 2 :
+                print("\nERROR project " + project_name+ " did not have 2 good runs\n")
+                output.write("\nERROR project " + project_name+ " did not have 2 good runs\n\n")
+            else:
+                add_unique_kernel(unique_kernels, goodruns[0]['version'])
+                regressions = find_regressions(goodruns)
+                report_results(output, goodruns[0], regressions, combo, goodruns[1], flakes)
+        report_kernels_in_report(output, unique_kernels)
+        output.close()
         
 """
         except:
