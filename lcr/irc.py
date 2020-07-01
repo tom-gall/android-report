@@ -32,11 +32,17 @@ class IRC:
     def getInstance():
         """ Static access method. """
         if IRC.__instance == None:
+            logger.info("new instance")
             return IRC()
+
+        logger.info("use existing instance")
         return IRC.__instance
 
     def __init__(self):
         """ Virtually private constructor. """
+
+        if IRC.__instance != None:
+            raise Exception("This class is a singleton!")
 
         if IRC_CONFIG is None \
             or IRC_CONFIG.get('enable') is None \
@@ -51,10 +57,9 @@ class IRC:
             self.botnick = configs.get('botnick')
             self.botpass = configs.get('botpass')
 
-        if IRC.__instance != None:
-            raise Exception("This class is a singleton!")
-        else:
             IRC.__instance = self
+            self.connect_lock = threading.Lock()
+            #self.connect_lock = threading.RLock()
 #            self.connect()
 #            self.addFunctions(func_dict={
 #                    'PING': self.func_pong,
@@ -81,7 +86,7 @@ class IRC:
     # TODO need to be thread safe
     def addFunctions(self, func_dict={}):
         for key in func_dict.keys():
-            logger.info("regiester irc founction: %s" % key)
+            logger.info("regiester irc function: %s" % key)
         self.func_listener.update(func_dict)
 
 
@@ -97,15 +102,27 @@ class IRC:
         if type(msgStrOrAry) == list:
             for msg in msgStrOrAry:
                 msg_out = "PRIVMSG %s : %s\r\n" % (self.channel, str(msg))
-                self.irc_socket.send(bytes(msg_out, "UTF-8"))
+                len_sent = self.irc_socket.send(bytes(msg_out, "UTF-8"))
+                #len_expect = len(bytes(msg_out, "UTF-8"))
+                time.sleep(1) # to workaround the excess flood problem
+                #if len_expect != len_sent:
+                #logger.info("not all bytes sent for msg: %s, sent %d, expected:%d" % (msg_out, len_sent, len_expect))
         else:
             msg_out = "PRIVMSG %s : %s\r\n" % (self.channel, str(msgStrOrAry))
-            self.irc_socket.send(bytes(msg_out, "UTF-8"))
+            len_sent = self.irc_socket.send(bytes(msg_out, "UTF-8")) # [Errno 32] Broken pipe
+            #len_expect = len(bytes(msg_out, "UTF-8"))
+            #if len_expect != len_sent:
+            #    logger.info("not all bytes sent for msg: %s, sent %d, expected:%d" % (msg_out, len_sent, len_expect))
 
 
     def quit(self):
         if self.irc_socket:
             self.irc_socket.send(bytes("QUIT", "UTF-8"))
+            logger.info("sent quit")
+            #time.sleep(1) # (Write error: Connection reset by peer)
+            self.irc_socket.close() # [Errno 106] (EISCONN) Transport endpoint is already connected
+            self.irc_socket = None  # [Errno 9] Bad file descriptor reported when the socket was closed
+            self.__instance = None  # [Errno 9] Bad file descriptor
 
 
     def sendAndQuit(self, msgStrOrAry=None):
@@ -113,8 +130,15 @@ class IRC:
             # should be only available when irc notification enabled
             return
         else:
+            # maybe need a system level lock, so that the management commands
+            # and the server instance could share the lock
+            #with self.connect_lock:
+            self.connect_lock.acquire() # OSError: [Errno 106] Transport endpoint is already connected
             self.connect()
+            self.connect_lock.release() # OSError: [Errno 106] Transport endpoint is already connected
+
             self.send(msgStrOrAry=msgStrOrAry)
+            time.sleep(3) # workaround for Ping timeout: 260 seconds
             self.quit()
 
 
@@ -123,22 +147,22 @@ class IRC:
             self.irc_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         # Connect to the server
-        logger.info("Connecting to: " + self.server)
-        self.irc_socket.connect((self.server, int(self.port)))
+        logger.info("Connecting to: " + server)
+        self.irc_socket.connect((server, int(port))) # OSError: [Errno 106] Transport endpoint is already connected
 
         # Perform user authentication
-        self.irc_socket.send(bytes("USER " + self.botnick + " " + self.botnick +" " + self.botnick + " :python\n", "UTF-8"))
-        logger.info("after send command USER to: " + self.server)
-        self.irc_socket.send(bytes("NICK " + self.botnick + "\n", "UTF-8"))
-        logger.info("after send command NICK to: " + self.server)
-        self.irc_socket.send(bytes("NICKSERV IDENTIFY " + self.botpass + "\n", "UTF-8"))
+        self.irc_socket.send(bytes("USER " + botnick + " " + botnick +" " + botnick + " :python\n", "UTF-8"))
+        logger.info("after send command USER to: " + server)
+        self.irc_socket.send(bytes("NICK " + botnick + "\n", "UTF-8"))
+        logger.info("after send command NICK to: " + server)
+        self.irc_socket.send(bytes("NICKSERV IDENTIFY " + botpass + "\n", "UTF-8"))
 
         str_idenfified = "You are now identified for"
         identified = False
         sleep_time = 0
         while not identified:
             if sleep_time > 25:
-                logger.info("Failed to identify for the account of %s after %d seconds" % (self.botnick, sleep_time))
+                logger.info("Failed to identify for the account of %s after %d seconds" % (botnick, sleep_time))
                 break
             text = self.irc_socket.recv(2040).decode("UTF-8")
             if text.find(str_idenfified) != -1:
@@ -151,8 +175,8 @@ class IRC:
 
         # continue to try, but the result won't be as expected
         # join the channel
-        logger.info("Try to join: " + self.channel)
-        self.irc_socket.send(bytes("JOIN " + self.channel + "\n", "UTF-8"))
+        logger.info("Try to join: " + channel)
+        self.irc_socket.send(bytes("JOIN " + channel + "\n", "UTF-8"))
         str_joined = ":End of /NAMES list"
         joined = False
         sleep_time = 0
@@ -168,7 +192,7 @@ class IRC:
                 logger.debug("%d not found joined message" % sleep_time)
                 time.sleep(3)
                 sleep_time = sleep_time + 3
-        logger.info("joined to: " + self.channel)
+        logger.info("joined to: " + channel)
 
 
     def connect(self):

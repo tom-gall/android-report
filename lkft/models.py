@@ -117,3 +117,36 @@ class ReportBuild(models.Model):
         return "%s#%s" % (self.qa_project, self.version)
 
     objects = models.Manager()
+
+
+class ReportJob(models.Model):
+    job_name = models.CharField(max_length=100)
+    job_url = models.URLField(null=True)
+    attachment_url = models.URLField(null=True)
+
+    qa_job_id = models.IntegerField(default=0)
+
+    report_build = models.ForeignKey(ReportBuild, on_delete=models.CASCADE, null=True)
+    parent_job = models.CharField(max_length=100, null=True)
+    resubmitted = models.BooleanField(default=False)
+
+    # JOBSNOTSUBMITTED / JOBSINPROGRESS / JOBSCOMPLETED
+    status = models.CharField(max_length=100, null=True, default="NOINFO")
+    failure_msg = models.TextField(null=True, blank=True)
+
+    submitted_at = models.DateTimeField(null=True)
+    fetched_at = models.DateTimeField(null=True)
+
+    number_passed = models.IntegerField(default=0)
+    number_failed = models.IntegerField(default=0)
+    number_total = models.IntegerField(default=0)
+    modules_done = models.IntegerField(default=0)
+    modules_total = models.IntegerField(default=0)
+
+    def __str__(self):
+        return "%s#%s" % (self.job_name, self.report_build.version)
+
+    def __unicode__(self):
+        return "%s#%s" % (self.job_name, self.report_build.version)
+
+    objects = models.Manager()

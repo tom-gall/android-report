@@ -31,9 +31,9 @@ from lcr.qa_report import DotDict, UrlNotFoundException
 from lcr.utils import download_urllib
 from lkft.lkft_config import find_citrigger, find_cibuild, get_hardware_from_pname, get_version_from_pname, get_kver_with_pname_env
 from lkft.lkft_config import find_expect_cibuilds
-from lkft.lkft_config import get_configs, get_qa_server_project
+from lkft.lkft_config import get_configs, get_qa_server_project, get_supported_branches
 
-from .models import KernelChange, CiBuild, ReportBuild, ReportProject
+from .models import KernelChange, CiBuild, ReportBuild, ReportProject, ReportJob
 
 qa_report_def = QA_REPORT[QA_REPORT_DEFAULT]
 qa_report_api = qa_report.QAReportApi(qa_report_def.get('domain'), qa_report_def.get('token'))
@@ -179,9 +179,9 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
     kernel_version = metadata.get('kernel_version')
     platform = metadata.get('platform')
     qa_job_id = metadata.get('qa_job_id')
-    total_number = 0
-    passed_number = 0
-    failed_number = 0
+    number_total = 0
+    number_passed = 0
+    number_failed = 0
     modules_done = 0
     modules_total = 0
 
@@ -192,9 +192,9 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
             root = ET.fromstring(f_zip_fd.read(TEST_RESULT_XML_NAME))
 
             summary_node = root.find('Summary')
-            passed_number = int(summary_node.attrib['pass'])
-            failed_number = int(summary_node.attrib['failed'])
-            total_number = passed_number + failed_number
+            number_passed = int(summary_node.attrib['pass'])
+            number_failed = int(summary_node.attrib['failed'])
+            number_total = number_passed + number_failed
             modules_done = int(summary_node.attrib['modules_done'])
             modules_total = int(summary_node.attrib['modules_total'])
 
@@ -252,9 +252,9 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
             logger.error('xml.etree.ElementTree.ParseError: %s' % e)
             logger.info('Please Check %s manually' % result_zip_path)
     return {
-                'total_number': total_number,
-                'passed_number': passed_number,
-                'failed_number': failed_number,
+                'number_total': number_total,
+                'number_passed': number_passed,
+                'number_failed': number_failed,
                 'modules_done': modules_done,
                 'modules_total': modules_total,
             }
@@ -354,7 +354,10 @@ def get_lkft_build_status(build, jobs):
         jobs = qa_report_api.get_jobs_for_build(build.get("id"))
 
     jobs_to_be_checked = get_classified_jobs(jobs=jobs).get('final_jobs')
-    last_fetched_timestamp = build.get('created_at')
+    if isinstance(build.get('created_at'), str):
+        last_fetched_timestamp = qa_report_api.get_aware_datetime_from_str(build.get('created_at'))
+    else:
+        last_fetched_timestamp = build.get('created_at')
     has_unsubmitted = False
     is_inprogress = False
     for job in jobs_to_be_checked:
@@ -362,9 +365,10 @@ def get_lkft_build_status(build, jobs):
             has_unsubmitted = True
             break
         if job.get('fetched'):
-            job_last_fetched_timestamp = qa_report_api.get_aware_datetime_from_str(job.get('fetched_at'))
-            if job_last_fetched_timestamp > last_fetched_timestamp:
-                last_fetched_timestamp = job_last_fetched_timestamp
+            if job.get('fetched_at'):
+                job_last_fetched_timestamp = qa_report_api.get_aware_datetime_from_str(job.get('fetched_at'))
+                if job_last_fetched_timestamp > last_fetched_timestamp:
+                    last_fetched_timestamp = job_last_fetched_timestamp
         else:
             is_inprogress = True
             break
@@ -566,9 +570,12 @@ def list_builds(request):
             ## For cases that the build information still not cached into database yet
             build_numbers = qa_report.TestNumbers()
             jobs = qa_report_api.get_jobs_for_build(build.get("id"))
+
+            build['created_at'] = qa_report_api.get_aware_datetime_from_str(build.get('created_at'))
+            get_lkft_build_status(build, jobs)
+
             temp_build_numbers = get_test_result_number_for_build(build, jobs)
             build_numbers.addWithHash(temp_build_numbers)
-            build['created_at'] = qa_report_api.get_aware_datetime_from_str(build.get('created_at'))
 
             build['numbers'] = {
                                 'number_passed': build_numbers.number_passed,
@@ -577,10 +584,7 @@ def list_builds(request):
                                 'modules_done': build_numbers.modules_done,
                                 'modules_total': build_numbers.modules_total,
                                 }
-            if build.get('finished'):
-                build['build_status'] = 'JOBSCOMPLETED'
-            else:
-                build['build_status'] = 'JOBSINPROGRESS'
+
 
         builds_result.append(build)
 
@@ -635,6 +639,9 @@ def find_bug_for_failure(failure, patterns=[], bugs=[]):
     return found_bug
 
 
+
+
+
 @login_required
 def list_jobs(request):
     build_id = request.GET.get('build_id', None)
@@ -648,14 +655,7 @@ def list_jobs(request):
     failures = {}
     resubmitted_job_urls = []
     for job in jobs:
-        if job.get('failure'):
-            failure = job.get('failure')
-            new_str = failure.replace('"', '\\"').replace('\'', '"')
-            try:
-                failure_dict = json.loads(new_str)
-            except ValueError:
-                failure_dict = {'error_msg': new_str}
-            job['failure'] = failure_dict
+        qa_report_api.reset_qajob_failure_msg(job)
 
         if job.get('parent_job'):
             resubmitted_job_urls.append(job.get('parent_job'))
@@ -1124,6 +1124,10 @@ def resubmit_job(request):
 
 def new_kernel_changes(request, branch, describe, trigger_name, trigger_number):
 
+    supported_branches = get_supported_branches()
+    if branch not in supported_branches:
+        return HttpResponse("ERROR: branch %s is not supported yet" % branch, status=200)
+
     remote_addr = request.META.get("REMOTE_ADDR")
     remote_host = request.META.get("REMOTE_HOST")
     logger.info('request from remote_host=%s,remote_addr=%s' % (remote_host, remote_addr))
@@ -1155,6 +1159,11 @@ def new_kernel_changes(request, branch, describe, trigger_name, trigger_number):
 
 
 def new_build(request, branch, describe, name, number):
+
+    supported_branches = get_supported_branches()
+    if branch not in supported_branches:
+        return HttpResponse("ERROR: branch %s is not supported yet" % branch, status=200)
+
     remote_addr = request.META.get("REMOTE_ADDR")
     remote_host = request.META.get("REMOTE_HOST")
     logger.info('request from %s %s' % (remote_host, remote_addr))
@@ -1280,6 +1289,9 @@ def get_kernel_changes_info(db_kernelchanges=[]):
         lkft_build_configs = {}
         ci_build_names = []
         has_build_inprogress = False
+        # success, inprogress, inqueue jobs are not failed jobs
+        all_builds_failed = True
+        all_builds_has_failed = False
         for dbci_build in dbci_builds:
             #if dbci_build.name == db_kernelchange.trigger_name:
             #    # ignore the trigger builds
@@ -1292,11 +1304,16 @@ def get_kernel_changes_info(db_kernelchanges=[]):
             jenkins_ci_builds.append(build)
             if build.get('status') == 'INPROGRESS':
                 has_build_inprogress = True
+                all_builds_failed = False
 
             if build.get('status') != 'SUCCESS':
                 # no need to check the build/job results as the ci build not finished successfully yet
                 # and the qa-report build is not created yet
+                all_builds_has_failed = True
                 continue
+            elif dbci_build.name != db_kernelchange.trigger_name:
+                # not the trigger build, and the ci build finished successfully
+                all_builds_failed = False
 
             configs = get_configs(ci_build=build)
             for lkft_build_config, ci_build in configs:
@@ -1336,13 +1353,17 @@ def get_kernel_changes_info(db_kernelchanges=[]):
 
         if queued_ci_builds:
             kernel_change_status = "CI_BUILDS_IN_QUEUE"
+        elif has_build_inprogress:
+            kernel_change_status = "CI_BUILDS_IN_PROGRESS"
         elif not_reported_ci_builds:
             kernel_change_status = "CI_BUILDS_NOT_REPORTED"
             logger.info("NOT REPORTED BUILDS: %s" % ' '.join(not_reported_ci_builds))
-        elif has_build_inprogress:
-            kernel_change_status = "CI_BUILDS_IN_PROGRESS"
+        elif all_builds_failed:
+            kernel_change_status = "CI_BUILDS_ALL_FAILED"
+        elif all_builds_has_failed:
+            kernel_change_status = "CI_BUILDS_HAS_FAILED"
         else:
-            kernel_change_status = "CI_BUILDS_COMPLETED"
+            kernel_change_status = "CI_BUILDS_COMPLETED" # might be the case that some failed, some passed
 
         qa_report_builds = []
         has_jobs_not_submitted = False
@@ -1557,6 +1578,7 @@ def list_describe_kernel_changes(request, branch, describe):
         ci_builds.append(ci_build)
 
     report_builds = []
+    db_report_jobs = []
     for db_report_build in db_report_builds:
         report_build = {}
         report_build['qa_project'] = db_report_build.qa_project
@@ -1573,12 +1595,51 @@ def list_describe_kernel_changes(request, branch, describe):
 
         report_builds.append(report_build)
 
+        db_report_jobs_of_build = ReportJob.objects.filter(report_build=db_report_build)
+        db_report_jobs.extend(db_report_jobs_of_build)
+
+    report_jobs = []
+    resubmitted_jobs = []
+    for db_report_job in db_report_jobs:
+        report_job = {}
+        db_report_build = db_report_job.report_build
+        db_report_project = db_report_build.qa_project
+        report_job['qaproject_full_name'] = "%s/%s" % (db_report_project.group, db_report_project.name)
+        report_job['qaproject_group'] = db_report_project.group
+        report_job['qaproject_name'] = db_report_project.name
+        report_job['qaproject_url'] = qa_report_api.get_project_url_with_group_slug(db_report_project.group, db_report_project.slug)
+        report_job['qabuild_version'] = db_report_build.version
+        report_job['qajob_id'] = db_report_job.qa_job_id
+        report_job['qabuild_url'] = qa_report_api.get_build_url_with_group_slug_buildVersion(db_report_project.group,
+                                                                                             db_report_project.slug,
+                                                                                             db_report_build.version)
+
+        report_job['lavajob_id'] = qa_report_api.get_qa_job_id_with_url(db_report_job.job_url)
+        report_job['lavajob_url'] = db_report_job.job_url
+        report_job['lavajob_name'] = db_report_job.job_name
+        report_job['lavajob_attachment_url'] = db_report_job.attachment_url
+        report_job['lavajob_status'] = db_report_job.status
+        report_job['failure_msg'] = db_report_job.failure_msg
+
+        report_job['number_passed'] = db_report_job.number_passed
+        report_job['number_failed'] = db_report_job.number_failed
+        report_job['number_total'] = db_report_job.number_total
+        report_job['modules_done'] = db_report_job.modules_done
+        report_job['modules_total'] = db_report_job.modules_total
+
+        if db_report_job.resubmitted:
+            resubmitted_jobs.append(report_job)
+        else:
+            report_jobs.append(report_job)
+
     return render(request, 'lkft-describe.html',
                        {
                             "kernel_change": kernel_change,
                             'report_builds': report_builds,
                             'trigger_build': trigger_build,
                             'ci_builds': ci_builds,
+                            'report_jobs': report_jobs,
+                            'resubmitted_jobs': resubmitted_jobs,
                         }
             )
 

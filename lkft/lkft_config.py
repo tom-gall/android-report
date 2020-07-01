@@ -6,20 +6,17 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+'''
+    {
+        trigger_build: {
+            qa_project: ci_build,
+        },
+    }
+'''
 citrigger_lkft = {
     'lkft-aosp-master-cts-vts': {
         'aosp-master-tracking':'lkft-aosp-master-tracking',
         'aosp-master-tracking-x15':'lkft-aosp-master-x15',
-        },
-
-    'trigger-lkft-android-common': {
-        '5.4-gki-aosp-master-hikey': 'lkft-hikey-aosp-master-5.4',
-        '5.4-gki-aosp-master-hikey960': 'lkft-hikey960-aosp-master-5.4',
-        '5.4-gki-aosp-master-db845c': 'lkft-db845c-aosp-master-5.4',
-
-        'mainline-aosp-master-x15': 'lkft-x15-aosp-master-mainline',
-        'mainline-gki-aosp-master-db845c': 'lkft-db845c-aosp-master-mainline',
-        'mainline-gki-aosp-master-hikey960': 'lkft-hikey960-aosp-master-mainline-gki',
         },
 
     # configs for TI 4.14 and 4.19 kernels
@@ -33,6 +30,37 @@ citrigger_lkft = {
 
     'trigger-lkft-x15-4.14': {
         '4.14-8.1-x15': 'lkft-x15-android-8.1-4.14',
+        },
+
+    # The above configs should be deleted
+    'trigger-lkft-omap': {
+        '4.14-master-x15': 'lkft-generic-omap-build',
+        '4.19-master-x15': 'lkft-generic-omap-build',
+        },
+
+    'trigger-lkft-linaro-omap': {
+        '4.14-stable-master-x15-lkft': 'lkft-generic-omap-build',
+        '4.19-master-x15-lkft': 'lkft-generic-omap-build',
+        },
+
+    'trigger-lkft-linaro-hikey': {
+        '4.14-stable-master-hikey-lkft': 'lkft-generic-mirror-build',
+        '4.14-stable-master-hikey960-lkft': 'lkft-generic-mirror-build',
+        '4.19-master-hikey-lkft': 'lkft-generic-mirror-build',
+        '4.19-master-hikey960-lkft': 'lkft-generic-mirror-build',
+        },
+
+    'trigger-lkft-android-common': {
+        '5.4-gki-aosp-master-hikey': 'lkft-hikey-aosp-master-5.4',
+        '5.4-gki-aosp-master-hikey960': 'lkft-generic-build',
+        '5.4-gki-aosp-master-db845c': 'lkft-generic-build',
+        '5.4-gki-aosp-master-db845c-presubmit': 'lkft-generic-build',
+
+        'mainline-aosp-master-x15': 'lkft-x15-aosp-master-mainline',
+        'mainline-gki-aosp-master-db845c': 'lkft-generic-build',
+        'mainline-gki-aosp-master-db845c-full-cts-vts': 'lkft-generic-build',
+        'mainline-gki-aosp-master-hikey960': 'lkft-generic-build',
+        'mainline-gki-aosp-master-hikey960-full-cts-vts': 'lkft-generic-build',
         },
 
     # configs for 4.14 kernels
@@ -82,6 +110,7 @@ citrigger_lkft = {
         '4.19q-10.0-gsi-hikey': 'lkft-hikey-android-10.0-gsi-4.19',
         '4.19q-10.0-gsi-hikey960': 'lkft-hikey-android-10.0-gsi-4.19',
         },
+
 }
 
 
@@ -151,7 +180,26 @@ trigger_branch_builds_info = {
         'android-hikey-linaro-4.14-stable-lkft': ['lkft-generic-mirror-build'],
         'android-hikey-linaro-4.19-lkft': ['lkft-generic-mirror-build'],
         },
+
+    # configs for omap kernels
+    'trigger-lkft-linaro-omap': {
+        'android-beagle-x15-4.14-stable-lkft': ['lkft-generic-omap-build'],
+        'android-beagle-x15-4.19-lkft': ['lkft-generic-omap-build'],
+        },
+
+    'trigger-lkft-omap': {
+        'android-beagle-x15-4.14': ['lkft-generic-omap-build'],
+        'android-beagle-x15-4.19': ['lkft-generic-omap-build'],
+        },
 }
+
+def get_supported_branches():
+    branches = []
+    triggers = trigger_branch_builds_info.keys()
+    for trigger in triggers:
+        trigger_branches = trigger_branch_builds_info.get(trigger)
+        branches.extend(trigger_branches.keys())
+    return branches
 
 def find_expect_cibuilds(trigger_name=None, branch_name=None):
     if not trigger_name:

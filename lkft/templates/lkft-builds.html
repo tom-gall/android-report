@@ -23,7 +23,15 @@
     <td>
         <a href="/lkft/jobs?build_id={{build.id}}">{{build.version}}</a>
     </td>
-    <td> {{ build.build_status }}</td>
+    <td>
+        {% if build.build_status == "JOBSNOTSUBMITTED" %}
+        <p style="background-color: yellow">{{ build.build_status}} </p>
+        {% elif build.build_status == "JOBSINPROGRESS" %}
+        <p style="background-color: green">{{ build.build_status}} </p>
+        {% else %}
+        <p>{{ build.build_status}} </p>
+        {% endif %}
+    </td>
     <td>
         {{ build.created_at|date:'M. d, Y, H:i'}}, &nbsp;{{ build.created_at|timesince}}
     </td>
@@ -32,7 +40,13 @@
     <td align="right">{{numbers.number_failed}}</td>
     <td align="right">{{numbers.number_total}}</td>
     <td align="right">{{numbers.modules_done}}</td>
-    <td align="right">{{numbers.modules_total}}</td>
+    <td align="right">
+        {% if numbers.modules_total == 0 %}
+        <p style="background-color: red">{{ numbers.modules_total}} </p>
+        {% else %}
+        <p>{{ numbers.modules_total}} </p>
+        {% endif %}
+    </td>
     {% endwith %}
 </tr>
 {% endfor %}
