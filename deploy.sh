@@ -71,7 +71,6 @@ if [ -d lcr-report ]; then
     cd lcr-report && git pull && cd -
 else
     git clone https://github.com/liuyq/android-report.git lcr-report
-
 fi
 
 cd lcr-report
