@@ -175,6 +175,37 @@ def download_attachments_save_result(jobs=[]):
                     logger.info("Failed to decompress %s with xz -d command for job: %s " % (temp_path, job_url))
 
 
+def remove_xml_unsupport_character(etree_content=""):
+    rx = re.compile("&#([0-9]+);|&#x([0-9a-fA-F]+);")
+    endpos = len(etree_content)
+    pos = 0
+    while pos < endpos:
+        # remove characters that don't conform to XML spec
+        m = rx.search(etree_content, pos)
+        if not m:
+            break
+        mstart, mend = m.span()
+        target = m.group(1)
+        if target:
+            num = int(target)
+        else:
+            num = int(m.group(2), 16)
+        # #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF]
+        if not(num in (0x9, 0xA, 0xD)
+                or 0x20 <= num <= 0xD7FF
+                or 0xE000 <= num <= 0xFFFD
+                or 0x10000 <= num <= 0x10FFFF):
+            etree_content = etree_content[:mstart] + etree_content[mend:]
+            endpos = len(etree_content)
+            # next time search again from the same position as this time
+            # as the detected pattern was removed here
+            pos = mstart
+        else:
+            # continue from the end of this match
+            pos = mend
+    return etree_content
+
+
 def extract(result_zip_path, failed_testcases_all={}, metadata={}):
     kernel_version = metadata.get('kernel_version')
     platform = metadata.get('platform')
@@ -189,8 +220,7 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
     vts_abi_suffix_pat = re.compile(r"_32bit$|_64bit$")
     with zipfile.ZipFile(result_zip_path, 'r') as f_zip_fd:
         try:
-            root = ET.fromstring(f_zip_fd.read(TEST_RESULT_XML_NAME))
-
+            root = ET.fromstring(remove_xml_unsupport_character(f_zip_fd.read(TEST_RESULT_XML_NAME).decode('utf-8')))
             summary_node = root.find('Summary')
             number_passed = int(summary_node.attrib['pass'])
             number_failed = int(summary_node.attrib['failed'])
@@ -278,7 +308,7 @@ def get_testcases_number_for_job(job):
     if result_file_path and os.path.exists(result_file_path):
         with zipfile.ZipFile(result_file_path, 'r') as f_zip_fd:
             try:
-                root = ET.fromstring(f_zip_fd.read(TEST_RESULT_XML_NAME))
+                root = ET.fromstring(remove_xml_unsupport_character(f_zip_fd.read(TEST_RESULT_XML_NAME).decode('utf-8')))
                 summary_node = root.find('Summary')
                 job_number_passed = summary_node.attrib['pass']
                 job_number_failed = summary_node.attrib['failed']
@@ -889,7 +919,7 @@ def file_bug(request):
             class_method = test_name.split('#')
             with zipfile.ZipFile(result_zip_path, 'r') as f_zip_fd:
                 try:
-                    root = ET.fromstring(f_zip_fd.read(TEST_RESULT_XML_NAME))
+                    root = ET.fromstring(remove_xml_unsupport_character(f_zip_fd.read(TEST_RESULT_XML_NAME).decode('utf-8')))
                     for elem in root.findall('.//Module[@name="%s"]' %(module_name)):
                         abi = elem.attrib['abi']
                         stacktrace_node = elem.find('.//TestCase[@name="%s"]/Test[@name="%s"]/Failure/StackTrace' %(class_method[0], class_method[1]))
