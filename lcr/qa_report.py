@@ -307,14 +307,17 @@ class QAReportApi(RESTFullApi):
             job['job_status'] = 'Submitted'
 
     def reset_qajob_failure_msg(self, job):
-        if job.get('failure'):
-            failure = job.get('failure')
-            new_str = failure.replace('"', '\\"').replace('\'', '"')
+        if type(job.get('failure')) == str:
+            failure_str = job.get('failure')
+            new_str = failure_str.replace('"', '\\"').replace('\'', '"')
             try:
                 failure_dict = json.loads(new_str)
             except ValueError:
                 failure_dict = {'error_msg': new_str}
             job['failure'] = failure_dict
+        else:
+            # already reset
+            pass
 
     def get_job_with_id(self, qa_job_id):
         api_url = 'api/testjobs/%s' % qa_job_id
@@ -352,8 +355,14 @@ class QAReportApi(RESTFullApi):
         import pytz
         # from python3.7, pytz is not necessary, we could use %z to get the timezone info
         #https://stackoverflow.com/questions/53291250/python-3-6-datetime-strptime-returns-error-while-python-3-7-works-well
-        navie_datetime = datetime.datetime.strptime(datetime_str, '%Y-%m-%dT%H:%M:%S.%fZ')
+        if type(datetime_str) is datetime.datetime:
+            return datetime_str
+        if type(datetime_str) is str:
+            navie_datetime = datetime.datetime.strptime(datetime_str, '%Y-%m-%dT%H:%M:%S.%fZ')
+        else:
+            navie_datetime = datetime.datetime.strptime(str(datetime_str), '%Y-%m-%dT%H:%M:%S.%fZ')
         return pytz.utc.localize(navie_datetime)
+
 
     def get_aware_datetime_from_timestamp(self, timestamp_in_secs):
         import datetime
