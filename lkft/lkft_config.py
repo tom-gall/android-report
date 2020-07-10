@@ -40,14 +40,14 @@ citrigger_lkft = {
 
     'trigger-lkft-linaro-omap': {
         '4.14-stable-master-x15-lkft': 'lkft-generic-omap-build',
-        '4.19-master-x15-lkft': 'lkft-generic-omap-build',
+        '4.19-stable-master-x15-lkft': 'lkft-generic-omap-build',
         },
 
     'trigger-lkft-linaro-hikey': {
         '4.14-stable-master-hikey-lkft': 'lkft-generic-mirror-build',
         '4.14-stable-master-hikey960-lkft': 'lkft-generic-mirror-build',
-        '4.19-master-hikey-lkft': 'lkft-generic-mirror-build',
-        '4.19-master-hikey960-lkft': 'lkft-generic-mirror-build',
+        '4.19-stable-master-hikey-lkft': 'lkft-generic-mirror-build',
+        '4.19-stable-master-hikey960-lkft': 'lkft-generic-mirror-build',
         },
 
     'trigger-lkft-android-common': {
