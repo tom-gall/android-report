@@ -140,10 +140,10 @@ citrigger_lkft_rcs = {
 '''
 trigger_branch_builds_info = {
     'trigger-lkft-android-common':{
-        'android-5.4': ['lkft-hikey-aosp-master-5.4',
+        'android12-5.4': ['lkft-hikey-aosp-master-5.4',
                         'lkft-generic-build'],
 
-        'android-5.4-stable': ['lkft-generic-build'],
+        'android11-5.4': ['lkft-generic-build'],
 
         'android-mainline': ['lkft-generic-build',
                              'lkft-x15-aosp-master-mainline'],
