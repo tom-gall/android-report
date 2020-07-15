@@ -87,6 +87,12 @@ def find_lava_config(job_url):
     return None
 
 def get_attachment_urls(jobs=[]):
+    '''
+        ALL JOBS must be belong to the same build
+    '''
+    if len(jobs) == 0:
+        return
+
     first_job = jobs[0]
     target_build = qa_report_api.get_build_with_url(first_job.get('target_build'))
     target_build_metadata = qa_report_api.get_build_meta_with_url(target_build.get('metadata'))
