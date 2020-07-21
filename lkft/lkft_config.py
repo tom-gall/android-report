@@ -51,10 +51,14 @@ citrigger_lkft = {
         },
 
     'trigger-lkft-android-common': {
-        '5.4-gki-aosp-master-hikey': 'lkft-hikey-aosp-master-5.4',
-        '5.4-gki-aosp-master-hikey960': 'lkft-generic-build',
-        '5.4-gki-aosp-master-db845c': 'lkft-generic-build',
-        '5.4-gki-aosp-master-db845c-presubmit': 'lkft-generic-build',
+        '5.4-android12-aosp-master-x15': 'lkft-generic-omap-build',
+        '5.4-gki-android12-aosp-master-hikey': 'lkft-hikey-aosp-master-5.4',
+        '5.4-gki-android12-aosp-master-hikey960': 'lkft-generic-build',
+        '5.4-gki-android12-aosp-master-db845c': 'lkft-generic-build',
+        '5.4-gki-android12-aosp-master-db845c-presubmit': 'lkft-generic-build',
+        '5.4-gki-android12-aosp-master-db845c-full-cts-vts': 'lkft-generic-build',
+        '5.4-gki-android12-aosp-master-hikey960-full-cts-vts': 'lkft-generic-build',
+
 
         'mainline-aosp-master-x15': 'lkft-x15-aosp-master-mainline',
         'mainline-gki-aosp-master-db845c': 'lkft-generic-build',
