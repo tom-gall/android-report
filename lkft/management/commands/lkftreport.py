@@ -38,6 +38,12 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('describe', type=str, nargs='?', default=None)
+        parser.add_argument("--irc-report-type",
+                        help="Specify which type record will be reported: ONLY_COMPLETED, ALL",
+                        dest="irc_report_type",
+                        default="ONLY_COMPLETED",
+                        required=False)
+
 
     def classify_bugs_and_failures(self, bugs=[], failures=[]):
         bugs_reproduced = []
@@ -127,7 +133,7 @@ class Command(BaseCommand):
 
 
     def handle(self, *args, **options):
-
+        irc_report_type = options.get('irc_report_type')
         describe = options['describe']
         if describe is not None:
             db_kernelchanges = KernelChange.objects_needs_report.all().filter(describe=describe)
@@ -331,15 +337,21 @@ class Command(BaseCommand):
             kernel_change = kernel_change_report.get('kernel_change')
             index = index + 1
             if status == "ALL_COMPLETED":
-                ircMsgList.append("%d/%d: %s %s %s %s, %s/%s passed, %s/%s done" % (index, num_kernelchanges,
+                ircMsg = "%d/%d: %s %s %s %s, %s/%s passed, %s/%s done" % (index, num_kernelchanges,
                                      kernel_change.branch,
                                      kernel_change.describe,
                                      kernel_change.result,
                                      timesince(kernel_change.timestamp),
                                      kernel_change.number_passed, kernel_change.number_total,
-                                     kernel_change.modules_done, kernel_change.modules_total))
+                                     kernel_change.modules_done, kernel_change.modules_total)
             else:
-                ircMsgList.append("%d/%d: %s %s %s %s" % (index, num_kernelchanges, kernel_change.branch, kernel_change.describe, kernel_change.result, timesince(kernel_change.timestamp)))
+                ircMsg = "%d/%d: %s %s %s %s" % (index, num_kernelchanges, kernel_change.branch, kernel_change.describe, kernel_change.result, timesince(kernel_change.timestamp))
+
+            if irc_report_type == 'ALL':
+                ircMsgList.append(ircMsg)
+            elif irc_report_type == 'ONLY_COMPLETED' and status == "ALL_COMPLETED":
+                ircMsgList.append(ircMsg)
+
             continue
 
             trigger_build = kernel_change_report.get('trigger_build')
@@ -448,4 +460,8 @@ class Command(BaseCommand):
                     print("\t\t\t\t %s %s: %s" % (failure.get('module_name'), failure.get('test_name'), failure.get('message')))
 
         ircMsgList.append("KERNEL CHANGES STATUS REPORT FINISHED: %d in total" % num_kernelchanges)
-        irc.sendAndQuit(msgStrOrAry=ircMsgList)
+        if len(ircMsgList) > 2:
+            irc.sendAndQuit(msgStrOrAry=ircMsgList)
+        else:
+            # no completed kernel changes or no kernel changes in progress
+            pass
