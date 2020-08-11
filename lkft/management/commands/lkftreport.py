@@ -358,7 +358,7 @@ class Command(BaseCommand):
 
             if irc_report_type == 'ALL':
                 ircMsgList.append(ircMsg)
-            elif irc_report_type == 'ONLY_COMPLETED' and status == "ALL_COMPLETED":
+            elif irc_report_type == 'ONLY_COMPLETED' and (status == "ALL_COMPLETED" or status == "CI_BUILDS_ALL_FAILED"):
                 ircMsgList.append(ircMsg)
 
             continue
