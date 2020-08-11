@@ -38,6 +38,11 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('describe', type=str, nargs='?', default=None)
+        parser.add_argument("--branch",
+                        help="Specify the branch for changes that to be checked",
+                        dest="branch",
+                        default="",
+                        required=False)
         parser.add_argument("--irc-report-type",
                         help="Specify which type record will be reported: ONLY_COMPLETED, ALL",
                         dest="irc_report_type",
@@ -134,9 +139,12 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         irc_report_type = options.get('irc_report_type')
+        option_branch = options.get('branch')
         describe = options['describe']
         if describe is not None:
             db_kernelchanges = KernelChange.objects_needs_report.all().filter(describe=describe)
+        elif option_branch is not None:
+            db_kernelchanges = KernelChange.objects_needs_report.all().filter(branch=option_branch)
         else:
             # db_kernelchanges = KernelChange.objects_needs_report.all().filter(branch="android-5.4")
             db_kernelchanges = KernelChange.objects_needs_report.all()
@@ -335,6 +343,7 @@ class Command(BaseCommand):
         ircMsgList.append("KERNEL CHANGES STATUS REPORT STARTED: %d in total" % num_kernelchanges)
         for kernel_change_report in kernelchanges:
             kernel_change = kernel_change_report.get('kernel_change')
+            status = kernel_change_report.get('kernel_change_status')
             index = index + 1
             if status == "ALL_COMPLETED":
                 ircMsg = "%d/%d: %s %s %s %s, %s/%s passed, %s/%s done" % (index, num_kernelchanges,
@@ -357,13 +366,8 @@ class Command(BaseCommand):
             trigger_build = kernel_change_report.get('trigger_build')
             jenkins_ci_builds = kernel_change_report.get('jenkins_ci_builds')
             qa_report_builds = kernel_change_report.get('qa_report_builds')
-            status = kernel_change_report.get('kernel_change_status')
             trigger_starttimestamp = trigger_build['start_timestamp']
             finished_timestamp = kernel_change_report.get('finished_timestamp')
-            if status == "ALL_COMPLETED":
-                print("%s started at %s, %s ago, took %s" % (kernel_change, trigger_starttimestamp, timesince(trigger_starttimestamp), finished_timestamp - trigger_starttimestamp))
-            else:
-                print("%s started at %s, %s ago, %s" % (kernel_change, trigger_starttimestamp, timesince(trigger_starttimestamp), status))
 
             print("\t Reports for CI Builds:")
             for build in jenkins_ci_builds:
