@@ -143,7 +143,7 @@ class Command(BaseCommand):
         describe = options['describe']
         if describe is not None:
             db_kernelchanges = KernelChange.objects_needs_report.all().filter(describe=describe)
-        elif option_branch is not None:
+        elif option_branch:
             db_kernelchanges = KernelChange.objects_needs_report.all().filter(branch=option_branch)
         else:
             # db_kernelchanges = KernelChange.objects_needs_report.all().filter(branch="android-5.4")
