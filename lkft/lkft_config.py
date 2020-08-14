@@ -67,6 +67,10 @@ citrigger_lkft = {
         'mainline-gki-aosp-master-hikey960-full-cts-vts': 'lkft-generic-build',
         },
 
+    'trigger-lkft-prebuilts': {
+        'mainline-gki-aosp-master-db845c-prebuilts': 'lkft-generic-build',
+        },
+
     # configs for 4.14 kernels
     'trigger-lkft-hikey-4.14': {
         '4.14-8.1-hikey': 'lkft-hikey-android-8.1-4.14',
@@ -145,7 +149,8 @@ citrigger_lkft_rcs = {
 trigger_branch_builds_info = {
     'trigger-lkft-android-common':{
         'android12-5.4': ['lkft-hikey-aosp-master-5.4',
-                        'lkft-generic-build'],
+                        'lkft-generic-build',
+                        'lkft-generic-omap-build'],
 
         'android11-5.4': ['lkft-generic-build'],
 
