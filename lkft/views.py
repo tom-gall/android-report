@@ -427,74 +427,68 @@ def get_lkft_build_status(build, jobs):
 def get_project_info(project):
 
     logger.info("%s: Start to get qa-build information for project", project.get('name'))
+    try:
+        db_report_project = ReportProject.objects.get(project_id=int(project.get('id')))
+    except ReportProject.DoesNotExist:
+        db_report_project = None
+
     builds = qa_report_api.get_all_builds(project.get('id'), only_first=True)
+    db_report_build = None
     if len(builds) > 0:
         last_build = builds[0]
-        last_build['created_at'] = qa_report_api.get_aware_datetime_from_str(last_build.get('created_at'))
 
+        if db_report_project is not None:
+            try:
+                db_report_build = ReportBuild.objects.get(version=last_build.get('version'), qa_project=db_report_project)
+            except ReportBuild.DoesNotExist:
+                db_report_build = None
+        else:
+            db_report_build = None
+
+        last_build['created_at'] = qa_report_api.get_aware_datetime_from_str(last_build.get('created_at'))
         jobs = qa_report_api.get_jobs_for_build(last_build.get("id"))
         last_build['numbers_of_result'] = get_test_result_number_for_build(last_build, jobs)
         build_status = get_lkft_build_status(last_build, jobs)
         project['last_build'] = last_build
 
-    logger.info("%s: Start to get ci trigger build information for project", project.get('name'))
-    last_trigger_build = get_last_trigger_build(project)
-    if last_trigger_build:
-        last_trigger_url = last_trigger_build.get('url')
-        last_trigger_build = jenkins_api.get_build_details_with_full_url(build_url=last_trigger_url)
-        last_trigger_build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(last_trigger_build['timestamp'])/1000)
-        last_trigger_build['duration'] = datetime.timedelta(milliseconds=last_trigger_build['duration'])
-        project['last_trigger_build'] = last_trigger_build
+        trigger_ci_build_url = None
+        if db_report_build:
+            db_ci_build = db_report_build.ci_build
+            last_build_ci_build_url = jenkins_api.get_job_url(name=db_ci_build.name, number=db_ci_build.number)
 
-    logger.info("%s: Start to get ci build information for project", project.get('name'))
-    ci_build_project_name = find_cibuild(project)
-    if ci_build_project_name:
-        ci_build_project = jenkins_api.get_build_details_with_job_url(ci_build_project_name)
+            db_ci_trigger_build = db_report_build.ci_trigger_build
+            trigger_ci_build_url = jenkins_api.get_job_url(name=db_ci_trigger_build.name, number=db_ci_trigger_build.number)
+        else:
+            last_build_meta = qa_report_api.get_build_meta_with_url(last_build.get('metadata'))
+            last_build_ci_build_url = last_build_meta.get("build-url")
 
-        isInQueue = ci_build_project.get('inQueue')
-        ci_build_last_duration = None
-        ci_build_last_start_timestamp = None
-        if isInQueue:
-            build_status = 'INQUEUE'
-            kernel_version = 'Unknown'
-            queueItem = ci_build_project.get('queueItem')
-            if queueItem:
-                # BUILD_DIR=lkft
-                # ANDROID_BUILD_CONFIG=lkft-hikey-android-9.0-mainline lkft-hikey-android-9.0-mainline-auto
-                # KERNEL_DESCRIBE=v5.3-rc7-223-g5da9f3fe49d4
-                # SRCREV_kernel=5da9f3fe49d47e313e397694c195c3b9b9b24134
-                # MAKE_KERNELVERSION=5.3.0-rc7
-                params = queueItem.get('params').strip().split('\n')
-                for param in params:
-                    if param.find('KERNEL_DESCRIBE') >= 0:
-                        kernel_version = param.split('=')[1]
-                        break
-            # case for aosp master tracking build
-            if kernel_version == 'dummy':
-                kernel_version = ci_build_project.get('nextBuildNumber')
-        elif ci_build_project.get('lastBuild') is not None:
-            ci_build_last_url = ci_build_project.get('lastBuild').get('url')
-            ci_build_last = jenkins_api.get_build_details_with_full_url(build_url=ci_build_last_url)
-            ci_build_last_start_timestamp = qa_report_api.get_aware_datetime_from_timestamp(int(ci_build_last['timestamp'])/1000)
-            ci_build_last_duration = datetime.timedelta(milliseconds=ci_build_last['duration'])
+        if last_build_ci_build_url:
+            last_build_ci_build = jenkins_api.get_build_details_with_full_url(build_url=last_build_ci_build_url)
+            last_build_ci_build_start_timestamp = qa_report_api.get_aware_datetime_from_timestamp(int(last_build_ci_build['timestamp'])/1000)
+            last_build_ci_build_duration = datetime.timedelta(milliseconds=last_build_ci_build['duration'])
 
-            kernel_version = ci_build_last.get('displayName') # #buildNo.-kernelInfo
-            if ci_build_last.get('building'):
+            kernel_version = last_build_ci_build.get('displayName') # #buildNo.-kernelInfo
+            if last_build_ci_build.get('building'):
                 build_status = 'INPROGRESS'
             else:
-                build_status = ci_build_last.get('result') # null or SUCCESS, FAILURE, ABORTED
-        else:
-            build_status = 'NOBUILDYET'
-            kernel_version = 'Unknown'
+                build_status = last_build_ci_build.get('result') # null or SUCCESS, FAILURE, ABORTED
+            last_ci_build= {
+                'build_status': build_status,
+                'kernel_version': kernel_version,
+                'ci_build_project_url':  last_build_ci_build_url,
+                'duration': last_build_ci_build_duration,
+                'start_timestamp': last_build_ci_build_start_timestamp,
+            }
+            project['last_ci_build'] = last_ci_build
 
-        last_ci_build= {
-            'build_status': build_status,
-            'kernel_version': kernel_version,
-            'ci_build_project_url': ci_build_project.get('url'),
-            'duration': ci_build_last_duration,
-            'start_timestamp': ci_build_last_start_timestamp,
-        }
-        project['last_ci_build'] = last_ci_build
+            if not trigger_ci_build_url:
+                trigger_ci_build_url = jenkins_api.get_trigger_url_from_ci_build(last_build_ci_build)
+
+        if trigger_ci_build_url:
+            last_trigger_build = jenkins_api.get_build_details_with_full_url(build_url=trigger_ci_build_url)
+            last_trigger_build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(last_trigger_build['timestamp'])/1000)
+            last_trigger_build['duration'] = datetime.timedelta(milliseconds=last_trigger_build['duration'])
+            project['last_trigger_build'] = last_trigger_build
 
     if project.get('last_build') and project.get('last_ci_build') and \
         project['last_build']['build_status'] == "JOBSCOMPLETED":

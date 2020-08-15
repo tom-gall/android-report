@@ -118,6 +118,24 @@ class JenkinsApi(RESTFullApi):
         full_api_url = '%s/api/json/' % build_url
         return self.call_with_full_url(request_url=full_api_url)
 
+    def get_trigger_url_from_ci_build(self, jenkins_build_json):
+        last_build_ci_build_actions = jenkins_build_json.get("actions")
+        for action in last_build_ci_build_actions:
+            action_class = action.get("_class")
+            if not action_class or action_class != "hudson.model.CauseAction":
+                continue
+
+            causes = action.get("causes")
+            for cause in causes:
+                cause_class = cause.get("_class")
+                if not cause_class or cause_class != "hudson.model.Cause$UpstreamCause":
+                    continue
+                upstreamBuild = cause.get("upstreamBuild") # 297
+                upstreamProject = cause.get("upstreamProject") # trigger-lkft-linaro-hikey
+                trigger_ci_build_url = self.get_job_url(name=upstreamProject, number=upstreamBuild)
+                return trigger_ci_build_url
+        return None
+
     def get_job_url(self, name=None, number=None):
         if name is None:
             return "https://%s" % (self.domain)
@@ -213,6 +231,10 @@ class QAReportApi(RESTFullApi):
             if build.get('version') == build_version:
                 return build
         return None
+
+
+    def get_build_meta_with_url(self, build_meta_url):
+        return self.call_with_full_url(request_url=build_meta_url)
 
 
     def get_jobs_for_build(self, build_id):
@@ -328,9 +350,6 @@ class QAReportApi(RESTFullApi):
     def get_job_api_url(self, qa_job_id):
         api_url = '%s/api/testjobs/%s' % (self.get_api_url_prefix().strip('/'), qa_job_id)
         return api_url
-
-    def get_build_meta_with_url(self, build_meta_url):
-        return self.call_with_full_url(request_url=build_meta_url)
 
     def get_qa_job_id_with_url(self, job_url):
         return job_url.strip('/').split('/')[-1]
