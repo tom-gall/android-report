@@ -103,7 +103,11 @@ class JenkinsApi(RESTFullApi):
             return None
 
     def is_build_disabled(self, cibuild_name):
-        build_details = self.get_build_details_with_cibuild_name(cibuild_name)
+        try:
+            build_details = self.get_build_details_with_cibuild_name(cibuild_name)
+        except UrlNotFoundException:
+            # Treat deleted builds as disabled
+            return True
         return not build_details.get('buildable')
 
     def get_build_details_with_cibuild_name(self, cibuild_name):
