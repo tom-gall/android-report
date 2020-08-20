@@ -26,7 +26,17 @@
     <td>{{ forloop.counter }}</td>
     <td><a href="/lkft/kernel-changes/{{kernelchange.branch}}/">{{kernelchange.branch}}</a></td>
     <td><a href="/lkft/kernel-changes/{{kernelchange.branch}}/{{kernelchange.describe}}/">{{kernelchange.describe}}</a></td>
-    <td>{{kernelchange.status}}</td>
+    <td>
+    {% if kernelchange.status == 'HAS_JOBS_IN_PROGRESS' %}
+        <p style="background-color: yellow">{{kernelchange.status}}</p>
+    {% elif kernelchange.status == 'CI_BUILDS_ALL_FAILED' %}
+        <p style="background-color: red">{{kernelchange.status}}</p>
+    {% elif kernelchange.status == 'CI_BUILDS_HAS_FAILED' %}
+        <p style="background-color: #FFAAAA">{{kernelchange.status}}</p>
+    {% else %}
+        {{kernelchange.status}}
+    {% endif %}
+    </td>
     <td><p>Started at {{ kernelchange.start_timestamp|date:'M. d, Y, H:i'}}, &nbsp;{{ kernelchange.start_timestamp|timesince}} ago</p></td>
     {% if kernelchange.status == 'ALL_COMPLETED' %}
         <td align='right'>Took {{kernelchange.duration}} to finish</td>
