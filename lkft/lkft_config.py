@@ -147,6 +147,14 @@ citrigger_lkft_rcs = {
     }
 '''
 trigger_branch_builds_info = {
+    'trigger-lkft-prebuilts':{
+        'android-mainline-prebuilts': ['lkft-generic-build'],
+    },
+
+    'trigger-lkft-android-common-weekly':{
+        'android12-5.4-weekly': ['lkft-generic-build'],
+    },
+
     'trigger-lkft-android-common':{
         'android12-5.4': ['lkft-hikey-aosp-master-5.4',
                         'lkft-generic-build',
@@ -155,7 +163,7 @@ trigger_branch_builds_info = {
         'android11-5.4': ['lkft-generic-build'],
 
         'android-mainline': ['lkft-generic-build',
-                             'lkft-x15-aosp-master-mainline'],
+                             'lkft-generic-omap-build'],
     },
 
     # configs for hikey kernels
