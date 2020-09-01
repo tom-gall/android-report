@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import yaml
 import json
 import logging
 import requests
@@ -197,6 +198,25 @@ class JenkinsApi(RESTFullApi):
         else:
             return []
 
+    def get_parameter_value_with_build_json(self, jenkins_build_json, para_name):
+        ci_build_actions = jenkins_build_json.get('actions')
+        for action in ci_build_actions:
+            class_name = action.get('_class')
+            if class_name != 'hudson.model.ParametersAction':
+                continue
+            parameters = action.get('parameters')
+            for parameter in parameters:
+                if parameter.get('_class') == 'hudson.model.StringParameterValue' \
+                        and parameter.get('name') == para_name :
+                    return parameter.get('value').strip()
+        return ""
+
+    def get_build_configs(self, jenkins_build_json):
+        return self.get_parameter_value_with_build_json(jenkins_build_json, 'ANDROID_BUILD_CONFIG')
+
+    def get_override_plans(self, jenkins_build_json):
+        return self.get_parameter_value_with_build_json(jenkins_build_json, 'TEST_OTHER_PLANS_OVERRIDE')
+
 
 class LAVAApi(RESTFullApi):
     def get_api_url_prefix(self):
@@ -378,7 +398,15 @@ class QAReportApi(RESTFullApi):
         return api_url
 
     def get_qa_job_id_with_url(self, job_url):
-        return job_url.strip('/').split('/')[-1]
+        if job_url:
+            return job_url.strip('/').split('/')[-1]
+        else:
+            return job_url
+
+    def get_job_definition(self, url_definition=None):
+        response = self.call_with_full_url(request_url=url_definition, returnResponse=True)
+        job_definition = yaml.load(response.content)
+        return job_definition
 
     def get_lkft_qa_report_projects(self):
         projects = []
@@ -388,6 +416,7 @@ class QAReportApi(RESTFullApi):
 
             project_full_name = project.get('full_name')
             if not project_full_name.startswith('android-lkft/') \
+                and not project_full_name.startswith('android-lkft-benchmarks/') \
                 and not project_full_name.startswith('android-lkft-rc/'):
                 continue
 

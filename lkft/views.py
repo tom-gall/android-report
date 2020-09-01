@@ -31,7 +31,7 @@ from lcr.qa_report import DotDict, UrlNotFoundException
 from lcr.utils import download_urllib
 from lkft.lkft_config import find_citrigger, find_cibuild, get_hardware_from_pname, get_version_from_pname, get_kver_with_pname_env
 from lkft.lkft_config import find_expect_cibuilds
-from lkft.lkft_config import get_configs, get_qa_server_project, get_supported_branches
+from lkft.lkft_config import get_qa_server_project, get_supported_branches
 
 from .models import KernelChange, CiBuild, ReportBuild, ReportProject, ReportJob
 
@@ -669,9 +669,6 @@ def find_bug_for_failure(failure, patterns=[], bugs=[]):
     return found_bug
 
 
-
-
-
 @login_required
 def list_jobs(request):
     build_id = request.GET.get('build_id', None)
@@ -1261,7 +1258,6 @@ def get_qareport_build(build_version, qaproject_name, cached_qaprojects=[], cach
     if target_qareport_project is None:
         return (None, None)
 
-
     target_qareport_project_id = target_qareport_project.get('id')
     builds = cached_qareport_builds.get(target_qareport_project_id)
     if builds is None:
@@ -1345,19 +1341,19 @@ def get_kernel_changes_info(db_kernelchanges=[]):
                 # not the trigger build, and the ci build finished successfully
                 all_builds_failed = False
 
-            configs = get_configs(ci_build=build)
-            for lkft_build_config, ci_build in configs:
-                if lkft_build_config.startswith('lkft-gki-'):
-                    # gki builds does not have any qa-preoject set
-                    continue
-                if lkft_build_configs.get(lkft_build_config) is not None:
-                    # only use the latest build(which might be triggered manually) for the same kernel change
-                    # even for the generic build that used the same lkft_build_config.
-                    # used the "-number" filter to make sure ci builds is sorted in descending,
-                    # and the first one is the latest
-                    continue
-
-                lkft_build_configs[lkft_build_config] = ci_build
+            str_configs = jenkins_api.get_build_configs(build)
+            if str_configs:
+                for lkft_build_config in str_configs.split():
+                    if lkft_build_config.startswith('lkft-gki-'):
+                        # gki builds does not have any qa-preoject set
+                        continue
+                    if lkft_build_configs.get(lkft_build_config) is not None:
+                        # only use the latest build(which might be triggered manually) for the same kernel change
+                        # even for the generic build that used the same lkft_build_config.
+                        # used the "-number" filter to make sure ci builds is sorted in descending,
+                        # and the first one is the latest
+                        continue
+                    lkft_build_configs[lkft_build_config] = build
 
         not_started_ci_builds = expect_build_names - set(ci_build_names)
 
@@ -1403,7 +1399,8 @@ def get_kernel_changes_info(db_kernelchanges=[]):
         qareport_project_not_found_configs = []
         qareport_build_not_found_configs = []
         for lkft_build_config, ci_build in lkft_build_configs.items():
-            projects = get_qa_server_project(lkft_build_config_name=lkft_build_config)
+            override_plans = jenkins_api.get_override_plans(ci_build)
+            projects = get_qa_server_project(lkft_build_config_name=lkft_build_config, override_plans=override_plans)
             for (project_group, project_name) in projects:
                 target_lkft_project_full_name = "%s/%s" % (project_group, project_name)
                 (target_qareport_project, target_qareport_build) = get_qareport_build(db_kernelchange.describe,

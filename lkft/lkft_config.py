@@ -313,34 +313,14 @@ def get_url_content(url=None):
     try:
         response = urlopen(url)
         return response.read().decode('utf-8')
-    except HTTPError:
+    except HTTPError as e:
+        logger.info(e)
         pass
 
     return None
 
 
-def get_configs(ci_build=None):
-    build_name = ci_build.get('name')
-    configs = []
-    ci_build_actions = ci_build.get('actions')
-    for action in ci_build_actions:
-        class_name = action.get('_class')
-        if class_name != 'hudson.model.ParametersAction':
-            continue
-        parameters = action.get('parameters')
-        for parameter in parameters:
-            para_class = parameter.get('_class')
-            para_name = parameter.get('name')
-            if para_class == 'hudson.model.StringParameterValue' \
-                and para_name == 'ANDROID_BUILD_CONFIG':
-                value = parameter.get('value')
-                for config in ' '.join(value.split()).split():
-                    configs.append((config, ci_build))
-
-    return configs
-
-
-def get_qa_server_project(lkft_build_config_name=None):
+def get_qa_server_project(lkft_build_config_name=None, override_plans=None):
     # TEST_QA_SERVER=https://qa-reports.linaro.org
     # TEST_QA_SERVER_PROJECT=mainline-gki-aosp-master-hikey960
     # TEST_QA_SERVER_TEAM=android-lkft-rc
@@ -354,6 +334,7 @@ def get_qa_server_project(lkft_build_config_name=None):
     content = get_url_content(url_build_config)
     if content is None:
         # the project had been deleted or not specified(like the gki build)
+        logger.info("Failed to get content for link: {}".format(url_build_config))
         return []
 
     content_dict={}
@@ -365,16 +346,24 @@ def get_qa_server_project(lkft_build_config_name=None):
         value = " ".join(key_value_array[1:]).strip('"')
         content_dict[key.strip()] = value.strip()
 
-    def_project = content_dict.get('TEST_QA_SERVER_PROJECT')
-    def_team = content_dict.get('TEST_QA_SERVER_TEAM', 'android-lkft')
-    if def_project is None:
-        return projects
+    if override_plans:
+        # when override_plans specified, no need to get the default qa-project
+        other_plans = override_plans
     else:
-        projects.append((def_team, def_project))
+        # when no override_plans specified, need to get the default qa-project,
+        # and qa-project for other test plans
+        def_project = content_dict.get('TEST_QA_SERVER_PROJECT')
+        def_team = content_dict.get('TEST_QA_SERVER_TEAM', 'android-lkft')
+        if def_project is None:
+            return projects
+        else:
+            projects.append((def_team, def_project))
+        other_plans = content_dict.get('TEST_OTHER_PLANS')
 
-    other_plans = content_dict.get('TEST_OTHER_PLANS')
     if other_plans is not None:
         for other_plan in other_plans.split(" "):
+            if other_plan.startswith('EXTRAS_'):
+                other_plan = other_plan.replace('EXTRAS_', '')
             project_key_name = "TEST_QA_SERVER_PROJECT_%s" % other_plan
             team_key_name = "TEST_QA_SERVER_TEAM_%s" % other_plan
             other_plan_project = content_dict.get(project_key_name)

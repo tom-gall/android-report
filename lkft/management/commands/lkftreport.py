@@ -20,6 +20,7 @@ from django.utils.timesince import timesince
 from lkft.models import KernelChange, CiBuild, ReportBuild, ReportProject, ReportJob
 
 from lcr import qa_report
+from lkft import lkft_config
 from lcr.irc import IRC
 
 from lcr.settings import QA_REPORT, QA_REPORT_DEFAULT
@@ -291,6 +292,16 @@ class Command(BaseCommand):
                         failure_msg = job.get('failure').get('error_msg')
                     else:
                         failure_msg = None
+
+                    if not job.get('name'):
+                        job_definition = qa_report_api.get_job_definition(job.get('definition'))
+                        if job_definition.get('job_name') is None:
+                            # the project had been deleted or not specified(like the gki build)
+                            logger.info("Failed to get job name from job definition: {}".format(job.get('definition')))
+                            job['name'] = 'qareport-id-{}'.format(job.get('id'))
+                        else:
+                            job['name'] = job_definition.get('job_name')
+                            logger.info("Job name set to {} with information from job definition".format(job.get('name')))
 
                     try:
                         report_job = ReportJob.objects.get(job_url=job.get('external_url'))
