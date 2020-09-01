@@ -1,0 +1,144 @@
+{% extends '_layouts/base.html' %}
+
+{% load static%}
+{% load escapesharp %}
+{% load startswith %}
+
+{% block title %} Jobs List for ALL Projects {% endblock %}
+
+{% block headline %}<h1>Jobs List for ALL Projects</h1>{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static "report/css/compatibility_result.css" %}">
+{% endblock %}
+
+{% block content %}
+<div>
+<h2>Final Job List:</h2>
+<table border="1">
+<tr>
+    <th> Index</th>
+    <th> Group</th>
+    <th> Project</th>
+    <th> Build</th>
+    <th> Job Id/Job Link</a> </th>
+    <th> Job Name/Attachment</a></th>
+    <th> Job Status </th>
+    <th> Resubmit </th>
+    <th> FailureMsg </th>
+    <th> Passed </th>
+    <th> Failed </th>
+    <th> Total </th>
+    <th> ModulesDone </th>
+    <th> ModulesTotal </th>
+    <th> Report Bug </th>
+</tr>
+{% for job in all_final_jobs %}
+<tr>
+    <td> {{ forloop.counter }}</td>
+    <td>
+        {% with job.qareport_project as qareport_project %}
+        {{ qareport_project.group_name }}
+        {% endwith %}
+    </td>
+    <td>
+        {% with job.qareport_project as qareport_project %}
+        {{ qareport_project.name }}
+        {% endwith %}
+    </td>
+    <td>
+        {% with job.qareport_build as qareport_build %}
+        {{ qareport_build.version }}
+        {% endwith %}
+    </td>
+    <td> <a href="{{job.external_url}}">{{job.job_id}}</a> </td>
+    {% if job.attachment_url %}
+    <td nowrap> <a target='_blank' href="{{job.attachment_url}}">{{job.name}} </a></td>
+    {% else %}
+    <td nowrap> {{job.name}}</td>
+    {% endif %}
+    <td>{{job.job_status}} </td>
+    {% if job.job_status == 'Running' or job.job_status == 'Submitted'%}
+    <td>&nbsp;</td>
+    {% else %}
+    <td><a target='_blank' href="/lkft/resubmit-job/?qa_job_id={{job.qa_job_id}}">Resubmit</a> </td>
+    {% endif %}
+    {% if job.failure %}
+    {% with job.failure as job_failure %}
+    <td>{{job_failure.error_msg}} </td>
+    {% endwith %}
+    {% else %}
+    <td> &nbsp;</td>
+    {% endif %}
+    {% if job.numbers %}
+    <td align="right">{{job.numbers.number_passed}}</td>
+    <td align="right">{{job.numbers.number_failed}}</td>
+    <td align="right">{{job.numbers.number_total}}</td>
+    <td align="right">{{job.numbers.modules_done}}</td>
+    <td align="right">{{job.numbers.modules_total}}</td>
+    {% else %}
+    <td align="right"> - </td>
+    <td align="right"> - </td>
+    <td align="right"> - </td>
+    <td align="right"> - </td>
+    <td align="right"> - </td>
+    {% endif %}
+    <td><a target='_blank' href="{{job.new_bug_url}}">Report Bug</a></td>
+</tr>
+{% endfor %}
+</table>
+</div>
+
+<div>
+<h2>Resubmitted Job List:</h2>
+<table border="1">
+<tr>
+    <th> Index</th>
+    <th> Group</th>
+    <th> Project</th>
+    <th> Build</th>
+    <th> Job Id/Job Link</a> </th>
+    <th> Job Name/Attachment</a></th>
+    <th> Job Status </th>
+    <th> FailureMsg </th>
+    <th> Report Bug </th>
+</tr>
+{% for job in all_resubmitted_jobs %}
+<tr>
+    <td> {{ forloop.counter }}</td>
+    <td>
+        {% with job.qareport_project as qareport_project %}
+        {{ qareport_project.group_name }}
+        {% endwith %}
+    </td>
+    <td>
+        {% with job.qareport_project as qareport_project %}
+        {{ qareport_project.name }}
+        {% endwith %}
+    </td>
+    <td>
+        {% with job.qareport_build as qareport_build %}
+        {{ qareport_build.version }}
+        {% endwith %}
+    </td>
+    <td> <a href="{{job.external_url}}">{{job.job_id}}</a> </td>
+    {% if job.attachment_url %}
+    <td nowrap> <a target='_blank' href="{{job.attachment_url}}">{{job.name}} </a></td>
+    {% else %}
+    <td nowrap> {{job.name}}</td>
+    {% endif %}
+    <td>{{job.job_status}} </td>
+    {% if job.failure %}
+    {% with job.failure as job_failure %}
+    <td>{{job_failure.error_msg}} </td>
+    {% endwith %}
+    {% else %}
+    <td> &nbsp;</td>
+    {% endif %}
+    <td><a target='_blank' href="{{job.new_bug_url}}">Report Bug</a></td>
+</tr>
+{% endfor %}
+</table>
+</div>
+
+{% endblock %}

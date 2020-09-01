@@ -246,6 +246,10 @@ class QAReportApi(RESTFullApi):
         return self.call_with_api_url(api_url=api_url)
 
 
+    def get_project_group(self, project_json):
+        return project_json.get('full_name').replace('/{}'.format(project_json.get('slug')), "")
+
+
     def get_project_url_with_group_slug(self, group, slug):
         return "https://%s/%s/%s" % (self.domain, group, slug)
 

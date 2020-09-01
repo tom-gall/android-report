@@ -556,6 +556,13 @@ def list_rc_projects(request):
 
 @login_required
 def list_projects(request):
+    group_name = "android-lkft-benchmarks"
+    title_head = "LKFT Benchmark Projects"
+    return list_group_projects(request, group_name=group_name, title_head=title_head)
+
+
+@login_required
+def list_projects(request):
     group_name = "android-lkft"
     title_head = "LKFT Projects"
     return list_group_projects(request, group_name=group_name, title_head=title_head)
@@ -667,6 +674,89 @@ def find_bug_for_failure(failure, patterns=[], bugs=[]):
                 break
 
     return found_bug
+
+
+def get_project_jobs(project):
+    local_all_final_jobs = []
+    local_all_resubmitted_jobs = []
+    logger.info('Start to get jobs for project: {}'.format(project.get('full_name')))
+    builds = qa_report_api.get_all_builds(project.get('id'), only_first=True)
+    if len(builds) > 0:
+        last_build = builds[0]
+        jobs = qa_report_api.get_jobs_for_build(last_build.get("id"))
+        classified_jobs = get_classified_jobs(jobs=jobs)
+
+        for job in classified_jobs.get('final_jobs'):
+            qa_report_api.reset_qajob_failure_msg(job)
+            job['qareport_build'] = last_build
+            job['qareport_project'] = project
+            local_all_final_jobs.append(job)
+
+        for job in classified_jobs.get('resubmitted_or_duplicated_jobs'):
+            qa_report_api.reset_qajob_failure_msg(job)
+            job['qareport_build'] = last_build
+            job['qareport_project'] = project
+            local_all_resubmitted_jobs.append(job)
+
+        project['last_build'] = last_build
+        project['all_final_jobs'] = local_all_final_jobs
+        project['all_resubmitted_jobs'] = local_all_resubmitted_jobs
+    else:
+        project['last_build'] = None
+        project['all_final_jobs'] = []
+        project['all_resubmitted_jobs'] = []
+
+    logger.info('Finished to get jobs for project: {}'.format(project.get('full_name')))
+
+
+@login_required
+def list_all_jobs(request):
+    import threading
+    threads = list()
+
+    projects = []
+    for project in qa_report_api.get_projects():
+        project_full_name = project.get('full_name')
+        if project.get('is_archived'):
+            continue
+        project['group_name'] = qa_report_api.get_project_group(project)
+
+        if not project_full_name.startswith("android-lkft/") \
+                and not project_full_name.startswith("android-lkft-benchmarks/") \
+                and not project_full_name.startswith("android-lkft-rc/"):
+            continue
+
+        projects.append(project)
+        t = threading.Thread(target=get_project_jobs, args=(project,))
+        threads.append(t)
+        t.start()
+
+    for t in threads:
+        t.join()
+
+    all_final_jobs = []
+    all_resubmitted_jobs = []
+    for project in projects:
+        if project.get('last_build'):
+            all_final_jobs.extend(project.get('all_final_jobs'))
+            all_resubmitted_jobs.extend(project.get('all_resubmitted_jobs'))
+
+    def get_key(item):
+        project_full_name = item.get('qareport_project').get('full_name')
+        build_name = item.get('qareport_build').get('version')
+        job_name = item.get('name')
+        job_lava_id = qa_report_api.get_qa_job_id_with_url(item.get('external_url'))
+        return "{}#{}#{}#{}".format(project_full_name, build_name, job_name, job_lava_id)
+
+    sorted_final_jobs = sorted(all_final_jobs, key=get_key)
+    sorted_resubmitted_jobs = sorted(all_resubmitted_jobs, key=get_key)
+
+    return render(request, 'lkft-all-jobs.html',
+                           {
+                                'all_final_jobs': sorted_final_jobs,
+                                'all_resubmitted_jobs': sorted_resubmitted_jobs,
+                            }
+                )
 
 
 @login_required
