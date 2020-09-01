@@ -482,7 +482,7 @@ def get_project_info(project):
             project['last_ci_build'] = last_ci_build
 
             if not trigger_ci_build_url:
-                trigger_ci_build_url = jenkins_api.get_trigger_url_from_ci_build(last_build_ci_build)
+                trigger_ci_build_url = jenkins_api.get_final_trigger_from_ci_build(last_build_ci_build)
 
         if trigger_ci_build_url:
             last_trigger_build = jenkins_api.get_build_details_with_full_url(build_url=trigger_ci_build_url)
@@ -1411,10 +1411,12 @@ def get_kernel_changes_info(db_kernelchanges=[]):
                                                                         cached_qaprojects=lkft_projects,
                                                                         cached_qareport_builds=project_builds)
                 if target_qareport_project is None:
+                    logger.info("target_qareport_project is not found for project:{}, for build config:{}".format(target_lkft_project_full_name, lkft_build_config))
                     qareport_project_not_found_configs.append(lkft_build_config)
                     continue
 
                 if target_qareport_build is None:
+                    logger.info("target_qareport_build is not found for project:{}, for build config:{}".format(target_lkft_project_full_name, lkft_build_config))
                     qareport_build_not_found_configs.append(lkft_build_config)
                     continue
 

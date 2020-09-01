@@ -132,13 +132,35 @@ class JenkinsApi(RESTFullApi):
             causes = action.get("causes")
             for cause in causes:
                 cause_class = cause.get("_class")
-                if not cause_class or cause_class != "hudson.model.Cause$UpstreamCause":
+                if not cause_class:
                     continue
+
+                if cause_class == "hudson.triggers.SCMTrigger$SCMTriggerCause":
+                    trigger_ci_build_url = jenkins_build_json.get('url').strip('/')
+                    return trigger_ci_build_url
+                elif cause_class != "hudson.model.Cause$UpstreamCause":
+                    continue
+
                 upstreamBuild = cause.get("upstreamBuild") # 297
                 upstreamProject = cause.get("upstreamProject") # trigger-lkft-linaro-hikey
                 trigger_ci_build_url = self.get_job_url(name=upstreamProject, number=upstreamBuild)
                 return trigger_ci_build_url
         return None
+
+    def get_final_trigger_from_ci_build(self, jenkins_build_json):
+        build_url = jenkins_build_json.get('url')
+        trigger_url = self.get_trigger_url_from_ci_build(jenkins_build_json)
+        if trigger_url is None:
+            return None
+        elif build_url != trigger_url:
+            try:
+                new_jenkins_build_json = self.get_build_details_with_full_url(trigger_url)
+                return self.get_trigger_url_from_ci_build(new_jenkins_build_json)
+            except UrlNotFoundException:
+                logger.info("build job url is not found:{}".format(build_url))
+                return None
+        else:
+            return build_url
 
     def get_job_url(self, name=None, number=None):
         if name is None:
