@@ -783,6 +783,9 @@ def list_jobs(request):
     failures = {}
     resubmitted_job_urls = []
     for job in jobs_to_be_checked:
+        qa_job_id = qa_report_api.get_qa_job_id_with_url(job_url=job.get('url'))
+        job['qa_job_id'] = qa_job_id
+
         qa_report_api.reset_qajob_failure_msg(job)
 
         short_desc = "%s: %s job failed to get test result with %s" % (project_name, job.get('name'), build.get('version'))
@@ -799,8 +802,6 @@ def list_jobs(request):
         kernel_version = get_kver_with_pname_env(prj_name=project_name, env=job.get('environment'))
 
         platform = job.get('environment').split('_')[0]
-        qa_job_id = qa_report_api.get_qa_job_id_with_url(job_url=job.get('url'))
-        job['qa_job_id'] = qa_job_id
 
         metadata = {
             'job_id': job.get('job_id'),
