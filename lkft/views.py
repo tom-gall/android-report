@@ -344,7 +344,14 @@ def get_classified_jobs(jobs=[]):
     job_names = []
     jobs_to_be_checked = []
     resubmitted_or_duplicated_jobs = []
-    for job in jobs:
+
+    def get_job_external_url(item):
+        return item.get('external_url')
+
+    # sorted with the job id in lava server
+    # to get the latest jobs to use
+    sorted_jobs = sorted(jobs, key=get_job_external_url, reverse=True)
+    for job in sorted_jobs:
         if job.get('url') in resubmitted_job_urls:
             # ignore jobs which were resubmitted
             job['resubmitted'] = True
@@ -768,14 +775,15 @@ def list_jobs(request):
 
     project_name = project.get('name')
 
+    classified_jobs = get_classified_jobs(jobs=jobs)
+    jobs_to_be_checked = classified_jobs.get('final_jobs')
+    resubmitted_duplicated_jobs = classified_jobs.get('resubmitted_or_duplicated_jobs')
+
     download_attachments_save_result(jobs=jobs)
     failures = {}
     resubmitted_job_urls = []
-    for job in jobs:
+    for job in jobs_to_be_checked:
         qa_report_api.reset_qajob_failure_msg(job)
-
-        if job.get('parent_job'):
-            resubmitted_job_urls.append(job.get('parent_job'))
 
         short_desc = "%s: %s job failed to get test result with %s" % (project_name, job.get('name'), build.get('version'))
         new_bug_url = '%s&rep_platform=%s&version=%s&short_desc=%s' % ( bugzilla_instance.get_new_bug_url_prefix(),
@@ -864,15 +872,8 @@ def list_jobs(request):
         else:
             return ""
 
-    sorted_jobs = sorted(jobs, key=get_job_name)
-    final_jobs = []
-    failed_jobs = []
-    for job in sorted_jobs:
-        job['qa_job_id'] = qa_report_api.get_qa_job_id_with_url(job.get('url'))
-        if job.get('url') in resubmitted_job_urls:
-            failed_jobs.append(job)
-        else:
-            final_jobs.append(job)
+    final_jobs = sorted(jobs_to_be_checked, key=get_job_name)
+    failed_jobs = sorted(resubmitted_duplicated_jobs, key=get_job_name)
 
     return render(request, 'lkft-jobs.html',
                            {
