@@ -332,13 +332,6 @@ def find_best_two_runs(builds, project_name, project):
               job['job_status'] = 'Submitted'
               jobisacceptable = 0
 
-           if job.get('failure'):
-              failure = job.get('failure')
-              new_str = failure.replace('"', '\\"').replace('\'', '"')
-              try:
-                 failure_dict = json.loads(new_str)
-              except ValueError:
-                 failure_dict = {'error_msg': new_str}
            if job.get('parent_job'):
               resubmitted_job_urls.append(job.get('parent_job'))
 

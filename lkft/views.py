@@ -761,13 +761,11 @@ def get_project_jobs(project):
         classified_jobs = get_classified_jobs(jobs=jobs)
 
         for job in classified_jobs.get('final_jobs'):
-            qa_report_api.reset_qajob_failure_msg(job)
             job['qareport_build'] = last_build
             job['qareport_project'] = project
             local_all_final_jobs.append(job)
 
         for job in classified_jobs.get('resubmitted_or_duplicated_jobs'):
-            qa_report_api.reset_qajob_failure_msg(job)
             job['qareport_build'] = last_build
             job['qareport_project'] = project
             local_all_resubmitted_jobs.append(job)
@@ -852,8 +850,6 @@ def list_jobs(request):
     for job in jobs_to_be_checked:
         qa_job_id = qa_report_api.get_qa_job_id_with_url(job_url=job.get('url'))
         job['qa_job_id'] = qa_job_id
-
-        qa_report_api.reset_qajob_failure_msg(job)
 
         short_desc = "%s: %s job failed to get test result with %s" % (project_name, job.get('name'), build.get('version'))
         new_bug_url = '%s&rep_platform=%s&version=%s&short_desc=%s' % ( bugzilla_instance.get_new_bug_url_prefix(),

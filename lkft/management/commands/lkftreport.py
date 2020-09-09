@@ -99,14 +99,6 @@ class Command(BaseCommand):
     def get_failures_for_build(self, project_name="", jobs=[]):
         failures = {}
         for job in jobs:
-            if job.get('failure'):
-                failure = job.get('failure')
-                new_str = failure.replace('"', '\\"').replace('\'', '"')
-                try:
-                    failure_dict = json.loads(new_str)
-                except ValueError:
-                    failure_dict = {'error_msg': new_str}
-
             result_file_path = get_result_file_path(job=job)
             if not result_file_path or not os.path.exists(result_file_path):
                 continue
@@ -287,7 +279,6 @@ class Command(BaseCommand):
                     else:
                         resubmitted = False
 
-                    qa_report_api.reset_qajob_failure_msg(job)
                     if job.get('failure'):
                         failure_msg = job.get('failure').get('error_msg')
                     else:

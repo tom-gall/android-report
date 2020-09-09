@@ -294,6 +294,7 @@ class QAReportApi(RESTFullApi):
         jobs = self.get_list_results(api_url=api_url)
         for job in jobs:
             self.set_job_status(job)
+            self.reset_qajob_failure_msg(job)
         return jobs
 
 
