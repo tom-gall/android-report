@@ -40,7 +40,7 @@
         {% if build.trigger_build %}
         {% with build.trigger_build as trigger_build %}
             <a href="{{trigger_build.url}}">{{ trigger_build.displayName}} (Changes:{{trigger_build.changes_num}})</a><br/>
-            Started at {{ trigger_build.start_timestamp|date:'M. d, Y, H:i'}}, &nbsp;{{ trigger_build.start_timestamp|timesince}} ago<
+            Started at {{ trigger_build.start_timestamp|date:'M. d, Y, H:i'}}, &nbsp;{{ trigger_build.start_timestamp|timesince}} ago
         {% endwith %}
         {% else %}
             No Trigger Build Setup Yet
