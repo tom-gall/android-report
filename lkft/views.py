@@ -431,6 +431,29 @@ def get_lkft_build_status(build, jobs):
         }
 
 
+def get_trigger_url_from_db_report_build(db_report_build):
+    db_ci_trigger_build = db_report_build.ci_trigger_build
+    trigger_ci_build_url = jenkins_api.get_job_url(name=db_ci_trigger_build.name, number=db_ci_trigger_build.number)
+    return trigger_ci_build_url
+
+
+def get_trigger_from_qareport_build(qareport_build):
+    build_meta = qa_report_api.get_build_meta_with_url(qareport_build.get('metadata'))
+    if not build_meta:
+        return None
+
+    ci_build_url = build_meta.get("build-url")
+    if not ci_build_url:
+        return None
+
+    try:
+        ci_build = jenkins_api.get_build_details_with_full_url(build_url=ci_build_url)
+        trigger_ci_build = jenkins_api.get_final_trigger_from_ci_build(ci_build)
+        return trigger_ci_build
+    except UrlNotFoundException:
+        return None
+
+
 def get_project_info(project):
 
     logger.info("%s: Start to get qa-build information for project", project.get('name'))
@@ -462,9 +485,7 @@ def get_project_info(project):
         if db_report_build:
             db_ci_build = db_report_build.ci_build
             last_build_ci_build_url = jenkins_api.get_job_url(name=db_ci_build.name, number=db_ci_build.number)
-
-            db_ci_trigger_build = db_report_build.ci_trigger_build
-            trigger_ci_build_url = jenkins_api.get_job_url(name=db_ci_trigger_build.name, number=db_ci_trigger_build.number)
+            trigger_ci_build_url =  get_trigger_url_from_db_report_build(db_report_build)
         else:
             last_build_meta = qa_report_api.get_build_meta_with_url(last_build.get('metadata'))
             last_build_ci_build_url = last_build_meta.get("build-url")
@@ -489,12 +510,19 @@ def get_project_info(project):
             project['last_ci_build'] = last_ci_build
 
             if not trigger_ci_build_url:
-                trigger_ci_build_url = jenkins_api.get_final_trigger_from_ci_build(last_build_ci_build)
+                trigger_ci_build = jenkins_api.get_final_trigger_from_ci_build(last_build_ci_build)
+                if trigger_ci_build:
+                    trigger_ci_build_url = trigger_ci_build.get('url')
 
         if trigger_ci_build_url:
             last_trigger_build = jenkins_api.get_build_details_with_full_url(build_url=trigger_ci_build_url)
             last_trigger_build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(last_trigger_build['timestamp'])/1000)
             last_trigger_build['duration'] = datetime.timedelta(milliseconds=last_trigger_build['duration'])
+            change_items = []
+            changes = last_trigger_build.get('changeSet')
+            if changes:
+                change_items = changes.get('items')
+            last_trigger_build['changes_num'] = len(change_items)
             project['last_trigger_build'] = last_trigger_build
 
     if project.get('last_build') and project.get('last_ci_build') and \
@@ -610,6 +638,22 @@ def list_builds(request):
                 }
             build['created_at'] = db_report_build.started_at
             build['build_status'] = db_report_build.status
+
+            trigger_build_db = db_report_build.ci_trigger_build
+            trigger_build_url = jenkins_api.get_job_url(name=trigger_build_db.name, number=trigger_build_db.number)
+            try:
+                trigger_build = jenkins_api.get_build_details_with_full_url(build_url=trigger_build_url)
+            except UrlNotFoundException:
+                trigger_build = None
+
+            # Need to cache the ci build information into result
+            #build['trigger_build'] = {
+            #    'name': trigger_build.name,
+            #    'url':  jenkins_api.get_job_url(name=trigger_build.name, number=trigger_build.number),
+            #    'displayName': "{}-{}".format(trigger_build.number, db_report_build.get('version')),
+            #    'start_timestamp': trigger_build.timestamp,
+            #    'changes_num': '-',
+            #}
         else:
             ## For cases that the build information still not cached into database yet
             build_numbers = qa_report.TestNumbers()
@@ -629,6 +673,22 @@ def list_builds(request):
                                 'modules_total': build_numbers.modules_total,
                                 }
 
+            trigger_build = get_trigger_from_qareport_build(build)
+
+        if trigger_build:
+            trigger_build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(trigger_build['timestamp'])/1000)
+            trigger_build['duration'] = datetime.timedelta(milliseconds=trigger_build['duration'])
+            change_items = []
+            changes = trigger_build.get('changeSet')
+            if changes:
+                change_items = changes.get('items')
+            build['trigger_build'] = {
+                'name': trigger_build.get('name'),
+                'url': trigger_build.get('url'),
+                'displayName': trigger_build.get('displayName'),
+                'start_timestamp': trigger_build.get('start_timestamp'),
+                'changes_num': len(change_items),
+            }
 
         builds_result.append(build)
 

@@ -123,8 +123,8 @@ class JenkinsApi(RESTFullApi):
         full_api_url = '%s/api/json/' % build_url
         return self.call_with_full_url(request_url=full_api_url)
 
-    def get_trigger_url_from_ci_build(self, jenkins_build_json):
-        last_build_ci_build_actions = jenkins_build_json.get("actions")
+    def get_trigger_from_ci_build(self, jenkins_build):
+        last_build_ci_build_actions = jenkins_build.get("actions")
         for action in last_build_ci_build_actions:
             action_class = action.get("_class")
             if not action_class or action_class != "hudson.model.CauseAction":
@@ -137,31 +137,33 @@ class JenkinsApi(RESTFullApi):
                     continue
 
                 if cause_class == "hudson.triggers.SCMTrigger$SCMTriggerCause":
-                    trigger_ci_build_url = jenkins_build_json.get('url').strip('/')
-                    return trigger_ci_build_url
+                    return jenkins_build
                 elif cause_class != "hudson.model.Cause$UpstreamCause":
                     continue
 
                 upstreamBuild = cause.get("upstreamBuild") # 297
                 upstreamProject = cause.get("upstreamProject") # trigger-lkft-linaro-hikey
                 trigger_ci_build_url = self.get_job_url(name=upstreamProject, number=upstreamBuild)
-                return trigger_ci_build_url
+                trigger_build = self.get_build_details_with_full_url(trigger_ci_build_url)
+                return trigger_build
         return None
 
-    def get_final_trigger_from_ci_build(self, jenkins_build_json):
-        build_url = jenkins_build_json.get('url')
-        trigger_url = self.get_trigger_url_from_ci_build(jenkins_build_json)
-        if trigger_url is None:
+    def get_final_trigger_from_ci_build(self, jenkins_build):
+        build_url = jenkins_build.get('url')
+        trigger_build = self.get_trigger_from_ci_build(jenkins_build)
+        if trigger_build is None:
             return None
-        elif build_url != trigger_url:
+
+        trigger_url = trigger_build.get('url')
+        if build_url != trigger_url:
             try:
-                new_jenkins_build_json = self.get_build_details_with_full_url(trigger_url)
-                return self.get_trigger_url_from_ci_build(new_jenkins_build_json)
+                new_trigger_build = self.get_build_details_with_full_url(trigger_url)
+                return self.get_trigger_from_ci_build(new_trigger_build)
             except UrlNotFoundException:
                 logger.info("build job url is not found:{}".format(build_url))
                 return None
         else:
-            return build_url
+            return jenkins_build
 
     def get_job_url(self, name=None, number=None):
         if name is None:
