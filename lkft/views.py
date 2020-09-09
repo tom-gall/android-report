@@ -445,6 +445,13 @@ def get_trigger_from_qareport_build(qareport_build):
     ci_build_url = build_meta.get("build-url")
     if not ci_build_url:
         return None
+    elif type(ci_build_url)  == str:
+        ci_build_url = ci_build_url
+    elif type(ci_build_url)  == list:
+        ci_build_url = ci_build_url[-1]
+    else:
+        # not sure what might be  here now
+        pass
 
     try:
         ci_build = jenkins_api.get_build_details_with_full_url(build_url=ci_build_url)
