@@ -652,8 +652,98 @@ def list_projects(request):
     return list_group_projects(request, groups=groups, title_head=title_head)
 
 
+def get_build_info(build=None, db_reportproject=None):
+    if not build:
+        return
+
+    logger.info("Start to get information for build: %s ", build.get('version'))
+    db_report_build = None
+    if db_reportproject:
+        try:
+            db_report_build = ReportBuild.objects.get(version=build.get('version'), qa_project=db_reportproject)
+        except ReportBuild.DoesNotExist:
+            pass
+
+    if db_report_build:
+        build['numbers'] = {
+            'number_passed': db_report_build.number_passed,
+            'number_failed': db_report_build.number_failed,
+            'number_total': db_report_build.number_total,
+            'modules_done': db_report_build.modules_done,
+            'modules_total': db_report_build.modules_total,
+            'jobs_finished': 0,
+            'jobs_total': 0,
+            }
+        build['created_at'] = db_report_build.started_at
+        build['build_status'] = db_report_build.status
+
+        trigger_build_db = db_report_build.ci_trigger_build
+        trigger_build_url = jenkins_api.get_job_url(name=trigger_build_db.name, number=trigger_build_db.number)
+        try:
+            trigger_build = jenkins_api.get_build_details_with_full_url(build_url=trigger_build_url)
+        except UrlNotFoundException:
+            trigger_build = None
+
+        # Need to cache the ci build information into result
+        #build['trigger_build'] = {
+        #    'name': trigger_build.name,
+        #    'url':  jenkins_api.get_job_url(name=trigger_build.name, number=trigger_build.number),
+        #    'displayName': "{}-{}".format(trigger_build.number, db_report_build.get('version')),
+        #    'start_timestamp': trigger_build.timestamp,
+        #    'changes_num': '-',
+        #}
+    else:
+        ## For cases that the build information still not cached into database yet
+        build_numbers = qa_report.TestNumbers()
+        jobs = qa_report_api.get_jobs_for_build(build.get("id"))
+
+        build['created_at'] = qa_report_api.get_aware_datetime_from_str(build.get('created_at'))
+        get_lkft_build_status(build, jobs)
+
+        temp_build_numbers = get_test_result_number_for_build(build, jobs)
+        build_numbers.addWithHash(temp_build_numbers)
+
+        build['numbers'] = {
+                            'number_passed': build_numbers.number_passed,
+                            'number_failed': build_numbers.number_failed,
+                            'number_total': build_numbers.number_total,
+                            'modules_done': build_numbers.modules_done,
+                            'modules_total': build_numbers.modules_total,
+                            'jobs_finished': build_numbers.jobs_finished,
+                            'jobs_total': build_numbers.jobs_total,
+                            }
+
+        trigger_build = get_trigger_from_qareport_build(build)
+
+    if trigger_build:
+        trigger_build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(trigger_build['timestamp'])/1000)
+        trigger_build['duration'] = datetime.timedelta(milliseconds=trigger_build['duration'])
+        change_items = []
+        changes = trigger_build.get('changeSet')
+        if changes:
+            change_items = changes.get('items')
+        build['trigger_build'] = {
+            'name': trigger_build.get('name'),
+            'url': trigger_build.get('url'),
+            'displayName': trigger_build.get('displayName'),
+            'start_timestamp': trigger_build.get('start_timestamp'),
+            'changes_num': len(change_items),
+        }
+
+    if  build['build_status'] == "JOBSCOMPLETED":
+        if trigger_build and trigger_build.get('start_timestamp'):
+            build['duration'] = build.get('last_fetched_timestamp') - trigger_build.get('start_timestamp')
+        else:
+            build['duration'] = build.get('last_fetched_timestamp') - build.get('created_at')
+
+    logger.info("Finished getting information for build: %s ", build.get('version'))
+
+
 @login_required
 def list_builds(request):
+    import threading
+    threads = list()
+
     project_id = request.GET.get('project_id', None)
     project =  qa_report_api.get_project(project_id)
     builds = qa_report_api.get_all_builds(project_id)
@@ -670,76 +760,13 @@ def list_builds(request):
         if number_of_build_with_jobs > BUILD_WITH_JOBS_NUMBER:
             continue
 
-        db_report_build = None
-        if db_reportproject:
-            try:
-                db_report_build = ReportBuild.objects.get(version=build.get('version'), qa_project=db_reportproject)
-            except ReportBuild.DoesNotExist:
-                pass
-
-        if db_report_build:
-            build['numbers'] = {
-                'number_passed': db_report_build.number_passed,
-                'number_failed': db_report_build.number_failed,
-                'number_total': db_report_build.number_total,
-                'modules_done': db_report_build.modules_done,
-                'modules_total': db_report_build.modules_total,
-                }
-            build['created_at'] = db_report_build.started_at
-            build['build_status'] = db_report_build.status
-
-            trigger_build_db = db_report_build.ci_trigger_build
-            trigger_build_url = jenkins_api.get_job_url(name=trigger_build_db.name, number=trigger_build_db.number)
-            try:
-                trigger_build = jenkins_api.get_build_details_with_full_url(build_url=trigger_build_url)
-            except UrlNotFoundException:
-                trigger_build = None
-
-            # Need to cache the ci build information into result
-            #build['trigger_build'] = {
-            #    'name': trigger_build.name,
-            #    'url':  jenkins_api.get_job_url(name=trigger_build.name, number=trigger_build.number),
-            #    'displayName': "{}-{}".format(trigger_build.number, db_report_build.get('version')),
-            #    'start_timestamp': trigger_build.timestamp,
-            #    'changes_num': '-',
-            #}
-        else:
-            ## For cases that the build information still not cached into database yet
-            build_numbers = qa_report.TestNumbers()
-            jobs = qa_report_api.get_jobs_for_build(build.get("id"))
-
-            build['created_at'] = qa_report_api.get_aware_datetime_from_str(build.get('created_at'))
-            get_lkft_build_status(build, jobs)
-
-            temp_build_numbers = get_test_result_number_for_build(build, jobs)
-            build_numbers.addWithHash(temp_build_numbers)
-
-            build['numbers'] = {
-                                'number_passed': build_numbers.number_passed,
-                                'number_failed': build_numbers.number_failed,
-                                'number_total': build_numbers.number_total,
-                                'modules_done': build_numbers.modules_done,
-                                'modules_total': build_numbers.modules_total,
-                                }
-
-            trigger_build = get_trigger_from_qareport_build(build)
-
-        if trigger_build:
-            trigger_build['start_timestamp'] = qa_report_api.get_aware_datetime_from_timestamp(int(trigger_build['timestamp'])/1000)
-            trigger_build['duration'] = datetime.timedelta(milliseconds=trigger_build['duration'])
-            change_items = []
-            changes = trigger_build.get('changeSet')
-            if changes:
-                change_items = changes.get('items')
-            build['trigger_build'] = {
-                'name': trigger_build.get('name'),
-                'url': trigger_build.get('url'),
-                'displayName': trigger_build.get('displayName'),
-                'start_timestamp': trigger_build.get('start_timestamp'),
-                'changes_num': len(change_items),
-            }
-
         builds_result.append(build)
+        t = threading.Thread(target=get_build_info, args=(build, db_reportproject,))
+        threads.append(t)
+        t.start()
+
+    for t in threads:
+        t.join()
 
     return render(request, 'lkft-builds.html',
                            {

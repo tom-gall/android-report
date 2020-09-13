@@ -458,6 +458,9 @@ class TestNumbers():
     number_total = 0
     modules_done = 0
     modules_total = 0
+    jobs_finished = 0
+    jobs_total = 0
+
 
     def addWithHash(self, numbers_of_result):
         self.number_passed = self.number_passed + numbers_of_result.get('number_passed')
@@ -465,6 +468,9 @@ class TestNumbers():
         self.number_total = self.number_total + numbers_of_result.get('number_total')
         self.modules_done = self.modules_done + numbers_of_result.get('modules_done')
         self.modules_total = self.modules_total + numbers_of_result.get('modules_total')
+        self.jobs_finished = self.jobs_finished + numbers_of_result.get('jobs_finished', 0)
+        self.jobs_total = self.jobs_total + numbers_of_result.get('jobs_total', 0)
+
 
     def addWithTestNumbers(self, testNumbers):
         self.number_passed = self.number_passed + testNumbers.number_passed
@@ -472,3 +478,5 @@ class TestNumbers():
         self.number_total = self.number_total + testNumbers.number_total
         self.modules_done = self.modules_done + testNumbers.modules_done
         self.modules_total = self.modules_total + testNumbers.modules_total
+        self.jobs_finished = self.jobs_finished + testNumbers.jobs_finished
+        self.jobs_total = self.jobs_total + testNumbers.jobs_total

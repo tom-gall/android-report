@@ -11,7 +11,7 @@
         <th>Index</th>
         <th>Build No.</th>
         <th>Status</th>
-        <th>Created Time</th>
+        <th>Duration</th>
         <th>Trigger Build</th>
         <th>Pass</th>
         <th>Fail</th>
@@ -30,11 +30,15 @@
         {% elif build.build_status == "JOBSINPROGRESS" %}
         <p style="background-color: green">{{ build.build_status}} </p>
         {% else %}
-        <p>{{ build.build_status}} </p>
+        <p>{{ build.build_status}}</p>
         {% endif %}
     </td>
     <td>
-        {{ build.created_at|date:'M. d, Y, H:i'}}, &nbsp;{{ build.created_at|timesince}}
+        {% if build.build_status == "JOBSCOMPLETED" %}
+            <p>{{ build.duration}} </p>
+        {% else %}
+            <p>{{ build.build_status}} </p>
+        {% endif %}
     </td>
     <td>
         {% if build.trigger_build %}
