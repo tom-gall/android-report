@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 
 from django import forms
+from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import render
 
@@ -665,15 +666,21 @@ def get_build_info(build=None, db_reportproject=None):
             pass
 
     if db_report_build:
+        final_jobs = ReportJob.objects.filter(report_build=db_report_build, resubmitted=False)
+        final_jobs_finished = final_jobs.filter(status='Complete')
+        finished_cts_vts_jobs = final_jobs_finished.filter(Q(job_name__icontains='cts')|Q(job_name__icontains='vts')).filter(modules_total__gt=0).count()
+        finished_other_jobs = final_jobs_finished.exclude(Q(job_name__icontains='cts')|Q(job_name__icontains='vts')).count()
+
         build['numbers'] = {
             'number_passed': db_report_build.number_passed,
             'number_failed': db_report_build.number_failed,
             'number_total': db_report_build.number_total,
             'modules_done': db_report_build.modules_done,
             'modules_total': db_report_build.modules_total,
-            'jobs_finished': 0,
-            'jobs_total': 0,
+            'jobs_finished': finished_cts_vts_jobs + finished_other_jobs,
+            'jobs_total': len(final_jobs),
             }
+
         build['created_at'] = db_report_build.started_at
         build['build_status'] = db_report_build.status
         build['last_fetched_timestamp'] = db_report_build.fetched_at

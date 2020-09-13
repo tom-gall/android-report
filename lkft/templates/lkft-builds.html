@@ -13,6 +13,7 @@
         <th>Status</th>
         <th>Duration</th>
         <th>Trigger Build</th>
+        <th>Jobs Finished/Total</th>
         <th>Pass</th>
         <th>Fail</th>
         <th>Total</th>
@@ -51,6 +52,7 @@
         {% endif %}
     </td>
     {% with build.numbers as numbers %}
+    <td align="right">{{numbers.jobs_finished}}/{{numbers.jobs_total}}</td>
     <td align="right">{{numbers.number_passed}}</td>
     <td align="right">{{numbers.number_failed}}</td>
     <td align="right">{{numbers.number_total}}</td>
