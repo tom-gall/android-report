@@ -26,11 +26,11 @@
     </td>
     <td>
         {% if build.build_status == "JOBSNOTSUBMITTED" %}
-        <p style="background-color: yellow">{{ build.build_status}} </p>
+        <p style="background-color: yellow">{{ build.build_status}} <br/>{{ build.created_at|date:'M. d, Y, H:i'}}, &nbsp;{{ build.created_at|timesince}} </p>
         {% elif build.build_status == "JOBSINPROGRESS" %}
-        <p style="background-color: green">{{ build.build_status}} </p>
+        <p style="background-color: green">{{ build.build_status}} <br/>{{ build.created_at|date:'M. d, Y, H:i'}}, &nbsp;{{ build.created_at|timesince}} </p>
         {% else %}
-        <p>{{ build.build_status}}</p>
+        <p>{{ build.build_status}} <br/>{{ build.created_at|date:'M. d, Y, H:i'}}, &nbsp;{{ build.created_at|timesince}} </p>
         {% endif %}
     </td>
     <td>
