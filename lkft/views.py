@@ -676,6 +676,7 @@ def get_build_info(build=None, db_reportproject=None):
             }
         build['created_at'] = db_report_build.started_at
         build['build_status'] = db_report_build.status
+        build['last_fetched_timestamp'] = db_report_build.fetched_at
 
         trigger_build_db = db_report_build.ci_trigger_build
         trigger_build_url = jenkins_api.get_job_url(name=trigger_build_db.name, number=trigger_build_db.number)
