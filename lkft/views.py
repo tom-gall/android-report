@@ -309,27 +309,36 @@ def get_testcases_number_for_job(job):
     job_number_total = 0
     modules_total = 0
     modules_done = 0
+    finished_successfully = False
 
-    result_file_path = get_result_file_path(job=job)
-    if result_file_path and os.path.exists(result_file_path):
-        with zipfile.ZipFile(result_file_path, 'r') as f_zip_fd:
-            try:
-                root = ET.fromstring(remove_xml_unsupport_character(f_zip_fd.read(TEST_RESULT_XML_NAME).decode('utf-8')))
-                summary_node = root.find('Summary')
-                job_number_passed = summary_node.attrib['pass']
-                job_number_failed = summary_node.attrib['failed']
-                modules_total = summary_node.attrib['modules_total']
-                modules_done = summary_node.attrib['modules_done']
-            except ET.ParseError as e:
-                logger.error('xml.etree.ElementTree.ParseError: %s' % e)
-                logger.info('Please Check %s manually' % result_zip_path)
+    job_name = job.get('name')
+    #'benchmark', 'boottime', '-boot', '-vts', 'cts', 'cts-presubmit'
+    is_cts_vts_job = job_name.find('cts') >= 0 or job_name.find('vts') >= 0
+    if is_cts_vts_job:
+        result_file_path = get_result_file_path(job=job)
+        if result_file_path and os.path.exists(result_file_path):
+            with zipfile.ZipFile(result_file_path, 'r') as f_zip_fd:
+                try:
+                    root = ET.fromstring(remove_xml_unsupport_character(f_zip_fd.read(TEST_RESULT_XML_NAME).decode('utf-8')))
+                    summary_node = root.find('Summary')
+                    job_number_passed = summary_node.attrib['pass']
+                    job_number_failed = summary_node.attrib['failed']
+                    modules_total = summary_node.attrib['modules_total']
+                    modules_done = summary_node.attrib['modules_done']
+                    finished_successfully = True
+                except ET.ParseError as e:
+                    logger.error('xml.etree.ElementTree.ParseError: %s' % e)
+                    logger.info('Please Check %s manually' % result_zip_path)
+    else:
+         finished_successfully = True
 
     job['numbers'] = {
             'number_passed': int(job_number_passed),
             'number_failed': int(job_number_failed),
             'number_total': int(job_number_passed) + int(job_number_failed),
             'modules_total': int(modules_total),
-            'modules_done': int(modules_done)
+            'modules_done': int(modules_done),
+            'finished_successfully': finished_successfully
             }
 
     return job['numbers']
@@ -380,9 +389,13 @@ def get_test_result_number_for_build(build, jobs=None):
 
     jobs_to_be_checked = get_classified_jobs(jobs=jobs).get('final_jobs')
     download_attachments_save_result(jobs=jobs_to_be_checked)
+
+    jobs_finished = 0
     for job in jobs_to_be_checked:
         numbers = get_testcases_number_for_job(job)
         test_numbers.addWithHash(numbers)
+        if numbers.get('finished_successfully'):
+            jobs_finished = jobs_finished + 1
 
     return {
         'number_passed': test_numbers.number_passed,
@@ -390,6 +403,8 @@ def get_test_result_number_for_build(build, jobs=None):
         'number_total': test_numbers.number_total,
         'modules_done': test_numbers.modules_done,
         'modules_total': test_numbers.modules_total,
+        'jobs_total': len(jobs_to_be_checked),
+        'jobs_finished': jobs_finished,
         }
 
 def get_lkft_build_status(build, jobs):
@@ -542,18 +557,31 @@ def get_project_info(project):
     logger.info("%s: finished to get information for project", project.get('name'))
 
 
-def get_projects_info(group_name=""):
+def get_projects_info(groups=[]):
     import threading
     threads = list()
-    prefix_group = "%s/" % group_name
+    group_hash = {}
+    for group in groups:
+        group_hash[group.get('group_name')] = group
 
     projects = []
     for project in qa_report_api.get_projects():
-        project_full_name = project.get('full_name')
         if project.get('is_archived'):
             continue
-        if not project_full_name.startswith(prefix_group):
+
+        group_name = project.get('full_name').split('/')[0]
+        if not group_name in group_hash.keys():
             continue
+
+        group = group_hash.get(group_name)
+        group['qareport_url'] = project.get('group')
+        group_projects = group.get('projects')
+        if group_projects:
+            group_projects.append(project)
+        else:
+            group['projects'] = [project]
+
+        project['group'] = group
 
         projects.append(project)
         t = threading.Thread(target=get_project_info, args=(project,))
@@ -566,13 +594,15 @@ def get_projects_info(group_name=""):
     def get_project_name(item):
         return item.get('name')
 
-    sorted_projects = sorted(projects, key=get_project_name)
-    return sorted_projects
+    for group in groups:
+        sorted_projects = sorted(group['projects'], key=get_project_name)
+        group['projects'] = sorted_projects
+
+    return groups
 
 
-def list_group_projects(request, group_name="android-lkft", title_head="LKFT Projects"):
-    sorted_projects = get_projects_info(group_name=group_name)
-
+def list_group_projects(request, groups=[], title_head="LKFT Projects"):
+    groups = get_projects_info(groups=groups)
     bugs = get_lkft_bugs()
     open_bugs = []
     for bug in bugs:
@@ -580,34 +610,46 @@ def list_group_projects(request, group_name="android-lkft", title_head="LKFT Pro
             continue
         open_bugs.append(bug)
 
-    return render(request, 'lkft-projects.html',
-                           {
-                                "projects": sorted_projects,
-                                'open_bugs': open_bugs,
-                                'group_name': group_name,
-                                'title_head': title_head,
-                            }
-                )
+    response_data = {
+        'open_bugs': open_bugs,
+        'title_head': title_head,
+        'groups': groups,
+    }
+
+    return render(request, 'lkft-projects.html', response_data)
+
 
 @login_required
 def list_rc_projects(request):
-    group_name = "android-lkft-rc"
+    groups = [
+                {
+                    'group_name': 'android-lkft-rc',
+                    'display_title': "RC Projects",
+                },
+            ]
     title_head = "LKFT RC Projects"
-    return list_group_projects(request, group_name=group_name, title_head=title_head)
+    return list_group_projects(request, groups=groups, title_head=title_head)
 
 
 @login_required
 def list_projects(request):
-    group_name = "android-lkft-benchmarks"
-    title_head = "LKFT Benchmark Projects"
-    return list_group_projects(request, group_name=group_name, title_head=title_head)
+    groups = [
+                {
+                    'group_name': 'android-lkft',
+                    'display_title': "LKFT Projects",
+                },
+                {
+                    'group_name': 'android-lkft-benchmarks',
+                    'display_title': "Benchmark Projects",
+                },
+                {
+                    'group_name': 'android-lkft-rc',
+                    'display_title': "RC Projects",
+                },
+            ]
 
-
-@login_required
-def list_projects(request):
-    group_name = "android-lkft"
     title_head = "LKFT Projects"
-    return list_group_projects(request, group_name=group_name, title_head=title_head)
+    return list_group_projects(request, groups=groups, title_head=title_head)
 
 
 @login_required
