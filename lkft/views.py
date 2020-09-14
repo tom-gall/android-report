@@ -326,7 +326,11 @@ def get_testcases_number_for_job(job):
                     job_number_failed = summary_node.attrib['failed']
                     modules_total = summary_node.attrib['modules_total']
                     modules_done = summary_node.attrib['modules_done']
-                    finished_successfully = True
+                    if int(modules_total) > 0:
+                        # treat job as not finished successfully when no modules to be reported
+                        finished_successfully = True
+                    else:
+                        finished_successfully = False
                 except ET.ParseError as e:
                     logger.error('xml.etree.ElementTree.ParseError: %s' % e)
                     logger.info('Please Check %s manually' % result_zip_path)

@@ -93,25 +93,25 @@
     {% if project.last_build %}
         {% with project.last_build as last_build %}
         {% with last_build.numbers_of_result as numbers_of_result %}
-        <td><a href="/lkft/jobs/?build_id={{last_build.id}}">{{ numbers_of_result.jobs_finished }}/{{ numbers_of_result.jobs_total }}</a></td>
-        <td><a href="/lkft/jobs/?build_id={{last_build.id}}">{{ numbers_of_result.number_passed }}</a></td>
-        <td><a href="/lkft/jobs/?build_id={{last_build.id}}">{{ numbers_of_result.number_failed }}</a></td>
-        <td><a href="/lkft/jobs/?build_id={{last_build.id}}">{{ numbers_of_result.number_total }}</a></td>
-        <td><a href="/lkft/jobs/?build_id={{last_build.id}}">{{ numbers_of_result.modules_done }}</a></td>
+        <td align="right"><a href="/lkft/jobs/?build_id={{last_build.id}}">{{ numbers_of_result.jobs_finished }}/{{ numbers_of_result.jobs_total }}</a></td>
+        <td align="right"><a href="/lkft/jobs/?build_id={{last_build.id}}">{{ numbers_of_result.number_passed }}</a></td>
+        <td align="right"><a href="/lkft/jobs/?build_id={{last_build.id}}">{{ numbers_of_result.number_failed }}</a></td>
+        <td align="right"><a href="/lkft/jobs/?build_id={{last_build.id}}">{{ numbers_of_result.number_total }}</a></td>
+        <td align="right"><a href="/lkft/jobs/?build_id={{last_build.id}}">{{ numbers_of_result.modules_done }}</a></td>
         {% if last_build.build_status == 'JOBSCOMPLETED' and numbers_of_result.modules_total == 0 %}
-        <td><a href="/lkft/jobs/?build_id={{last_build.id}}"><p style="background-color: red">{{ numbers_of_result.modules_total }}</p></a></td>
+        <td align="right"><a href="/lkft/jobs/?build_id={{last_build.id}}"><p style="background-color: red">{{ numbers_of_result.modules_total }}</p></a></td>
         {% else %}
-        <td><a href="/lkft/jobs/?build_id={{last_build.id}}">{{ numbers_of_result.modules_total }}</a></td>
+        <td align="right"><a href="/lkft/jobs/?build_id={{last_build.id}}">{{ numbers_of_result.modules_total }}</a></td>
         {% endif %}
         {% endwith %}
         {% endwith %}
     {% else %}
-        <td>-/-</td>
-        <td>Please</td>
-        <td>Refresh</td>
-        <td>To</td>
-        <td>Try</td>
-        <td>Again</td>
+        <td align="right">-/-</td>
+        <td align="right">Please</td>
+        <td align="right">Refresh</td>
+        <td align="right">To</td>
+        <td align="right">Try</td>
+        <td align="right">Again</td>
     {% endif %}
 </tr>
 {% endfor %}
