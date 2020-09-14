@@ -10,8 +10,7 @@
         <th>Pass</th>
         <th>Fail</th>
         <th>Total</th>
-        <th>Modules Done</th>
-        <th>Modules Total</th>
+        <th>Modules Done/Total</th>
 </tr>
 {% for project in projects %}
 <tr>
@@ -93,20 +92,18 @@
     {% if project.last_build %}
         {% with project.last_build as last_build %}
         {% with last_build.numbers_of_result as numbers_of_result %}
-        <td align="right"><a href="/lkft/jobs/?build_id={{last_build.id}}">{{ numbers_of_result.jobs_finished }}/{{ numbers_of_result.jobs_total }}</a></td>
+        <td align="right"><a href="/lkft/jobs/?build_id={{last_build.id}}">{{ numbers_of_result.jobs_finished }} / {{ numbers_of_result.jobs_total }}</a></td>
         <td align="right"><a href="/lkft/jobs/?build_id={{last_build.id}}">{{ numbers_of_result.number_passed }}</a></td>
         <td align="right"><a href="/lkft/jobs/?build_id={{last_build.id}}">{{ numbers_of_result.number_failed }}</a></td>
         <td align="right"><a href="/lkft/jobs/?build_id={{last_build.id}}">{{ numbers_of_result.number_total }}</a></td>
-        <td align="right"><a href="/lkft/jobs/?build_id={{last_build.id}}">{{ numbers_of_result.modules_done }}</a></td>
         {% if last_build.build_status == 'JOBSCOMPLETED' and numbers_of_result.modules_total == 0 %}
-        <td align="right"><a href="/lkft/jobs/?build_id={{last_build.id}}"><p style="background-color: red">{{ numbers_of_result.modules_total }}</p></a></td>
+        <td align="right"><a href="/lkft/jobs/?build_id={{last_build.id}}"><p style="background-color: red">{{ numbers_of_result.modules_done }} / {{ numbers_of_result.modules_total }}</p></a></td>
         {% else %}
-        <td align="right"><a href="/lkft/jobs/?build_id={{last_build.id}}">{{ numbers_of_result.modules_total }}</a></td>
+        <td align="right"><a href="/lkft/jobs/?build_id={{last_build.id}}">{{ numbers_of_result.modules_done }} / {{ numbers_of_result.modules_total }}</a></td>
         {% endif %}
         {% endwith %}
         {% endwith %}
     {% else %}
-        <td align="right">-/-</td>
         <td align="right">Please</td>
         <td align="right">Refresh</td>
         <td align="right">To</td>
