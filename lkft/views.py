@@ -8,7 +8,9 @@ from django.http import HttpResponse
 from django.shortcuts import render
 
 import collections
+import concurrent.futures
 import datetime
+import functools
 import json
 import logging
 import os
@@ -318,22 +320,26 @@ def get_testcases_number_for_job(job):
     if is_cts_vts_job:
         result_file_path = get_result_file_path(job=job)
         if result_file_path and os.path.exists(result_file_path):
-            with zipfile.ZipFile(result_file_path, 'r') as f_zip_fd:
-                try:
-                    root = ET.fromstring(remove_xml_unsupport_character(f_zip_fd.read(TEST_RESULT_XML_NAME).decode('utf-8')))
-                    summary_node = root.find('Summary')
-                    job_number_passed = summary_node.attrib['pass']
-                    job_number_failed = summary_node.attrib['failed']
-                    modules_total = summary_node.attrib['modules_total']
-                    modules_done = summary_node.attrib['modules_done']
-                    if int(modules_total) > 0:
-                        # treat job as not finished successfully when no modules to be reported
-                        finished_successfully = True
-                    else:
-                        finished_successfully = False
-                except ET.ParseError as e:
-                    logger.error('xml.etree.ElementTree.ParseError: %s' % e)
-                    logger.info('Please Check %s manually' % result_zip_path)
+            try:
+                with zipfile.ZipFile(result_file_path, 'r') as f_zip_fd:
+                    try:
+                        root = ET.fromstring(remove_xml_unsupport_character(f_zip_fd.read(TEST_RESULT_XML_NAME).decode('utf-8')))
+                        summary_node = root.find('Summary')
+                        job_number_passed = summary_node.attrib['pass']
+                        job_number_failed = summary_node.attrib['failed']
+                        modules_total = summary_node.attrib['modules_total']
+                        modules_done = summary_node.attrib['modules_done']
+                        if int(modules_total) > 0:
+                            # treat job as not finished successfully when no modules to be reported
+                            finished_successfully = True
+                        else:
+                            finished_successfully = False
+                    except ET.ParseError as e:
+                        logger.error('xml.etree.ElementTree.ParseError: %s' % e)
+                        logger.info('Please Check %s manually' % result_file_path)
+            except zipfile.BadZipFile:
+                logger.info("File is not a zip file: %s" % result_file_path)
+
     else:
          finished_successfully = True
 
@@ -657,7 +663,7 @@ def list_projects(request):
     return list_group_projects(request, groups=groups, title_head=title_head)
 
 
-def get_build_info(build=None, db_reportproject=None):
+def get_build_info(db_reportproject=None, build=None):
     if not build:
         return
 
@@ -748,14 +754,12 @@ def get_build_info(build=None, db_reportproject=None):
         else:
             build['duration'] = build.get('last_fetched_timestamp') - build.get('created_at')
 
-    logger.info("Finished getting information for build: %s ", build.get('version'))
+    logger.info("Finished getting information for build: %s %s", build.get('version'), build.get('build_status'))
+    return build
 
 
 @login_required
 def list_builds(request):
-    import threading
-    threads = list()
-
     project_id = request.GET.get('project_id', None)
     project =  qa_report_api.get_project(project_id)
     builds = qa_report_api.get_all_builds(project_id)
@@ -765,21 +769,22 @@ def list_builds(request):
     except ReportProject.DoesNotExist:
         db_reportproject = None
 
-    number_of_build_with_jobs = 0
     builds_result = []
-    for build in builds:
-        number_of_build_with_jobs = number_of_build_with_jobs + 1
-        if number_of_build_with_jobs > BUILD_WITH_JOBS_NUMBER:
-            continue
+    for build in builds[:BUILD_WITH_JOBS_NUMBER]:
+        builds_result.append(get_build_info(db_reportproject, build))
 
-        builds_result.append(build)
-        t = threading.Thread(target=get_build_info, args=(build, db_reportproject,))
-        threads.append(t)
-        t.start()
+    #func = functools.partial(get_build_info, db_reportproject)
+    #with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
+    #    builds_result = list(executor.map(func, builds[:BUILD_WITH_JOBS_NUMBER]))
 
-    for t in threads:
-        t.join()
+#   ## The following two method cause Segmentation fault (core dumped)
+#   ## Sep 23 11:01:18 laptop kernel: [13401.895696] traps: python[26374] general protection fault ip:7f7e62987ac2 sp:7f7e6113b3f0 error:0 in _queue.cpython-37m-x86_64-linux-gnu.so[7f7e62987000+1000]
+#    with multiprocessing.Pool(10) as pool:
+#        pool.map(func, builds_result)
+#    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+#        executor.map(func, builds_result)
 
+    logger.info("Finished getting information for all builds: %d ", len(builds_result))
     return render(request, 'lkft-builds.html',
                            {
                                 "builds": builds_result,
