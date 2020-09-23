@@ -1522,7 +1522,7 @@ def get_kernel_changes_info(db_kernelchanges=[]):
         return []
 
     queued_ci_items = jenkins_api.get_queued_items()
-    lkft_projects = qa_report_api.get_lkft_qa_report_projects()
+    lkft_projects = qa_report_api.get_lkft_qa_report_projects(include_archived=True)
     kernelchanges = []
     # add the same project might have several kernel changes not finished yet
     project_builds = {} # cache builds for the project

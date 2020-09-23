@@ -415,10 +415,10 @@ class QAReportApi(RESTFullApi):
         job_definition = yaml.load(response.content)
         return job_definition
 
-    def get_lkft_qa_report_projects(self):
+    def get_lkft_qa_report_projects(self, include_archived=False):
         projects = []
         for project in self.get_projects():
-            if project.get('is_archived'):
+            if (not include_archived) and (project.get('is_archived')):
                 continue
 
             project_full_name = project.get('full_name')
