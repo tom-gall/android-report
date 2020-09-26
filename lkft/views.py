@@ -13,11 +13,13 @@ import datetime
 import functools
 import json
 import logging
+import math
 import os
 import re
 import requests
 import sys
 import tarfile
+import threading
 import tempfile
 import xml.etree.ElementTree as ET
 import zipfile
@@ -573,9 +575,28 @@ def get_project_info(project):
     logger.info("%s: finished to get information for project", project.get('name'))
 
 
+def thread_pool(func=None, elements=[]):
+    subgroup_count = 5
+    number_of_elements = len(elements)
+    number_of_subgroup = math.ceil(number_of_elements/subgroup_count)
+    finished_count = 0
+    for i in range(number_of_subgroup):
+        subgroup_elements = elements[i*subgroup_count: (i+1)*subgroup_count]
+        finished_count = finished_count + len(subgroup_elements)
+
+        threads = list()
+        for element in subgroup_elements:
+            t = threading.Thread(target=func, args=(element,))
+            threads.append(t)
+            t.start()
+
+        for t in threads:
+            t.join()
+
+    logger.info("Finished getting information for all elements: number_of_elements=%d, number_of_subgroup=%d, finished_count=%d" % (number_of_elements, number_of_subgroup, finished_count))
+
+
 def get_projects_info(groups=[]):
-    import threading
-    threads = list()
     group_hash = {}
     for group in groups:
         group_hash[group.get('group_name')] = group
@@ -600,19 +621,18 @@ def get_projects_info(groups=[]):
         project['group'] = group
 
         projects.append(project)
-        t = threading.Thread(target=get_project_info, args=(project,))
-        threads.append(t)
-        t.start()
 
-    for t in threads:
-        t.join()
+    thread_pool(func=get_project_info, elements=projects)
 
     def get_project_name(item):
         return item.get('name')
 
     for group in groups:
-        sorted_projects = sorted(group['projects'], key=get_project_name)
-        group['projects'] = sorted_projects
+        if group.get('projects'):
+            sorted_projects = sorted(group['projects'], key=get_project_name)
+            group['projects'] = sorted_projects
+        else:
+            group['projects'] = []
 
     return groups
 
