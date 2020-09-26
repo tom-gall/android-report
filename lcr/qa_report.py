@@ -293,8 +293,14 @@ class QAReportApi(RESTFullApi):
         api_url = "api/builds/%s/testjobs" % build_id
         jobs = self.get_list_results(api_url=api_url)
         for job in jobs:
+            job_name = job.get('name')
+            if job_name is None:
+                job_definition = self.get_job_definition(job.get('definition'))
+                job_name = job_definition.get('job_name')
+                job['name'] = job_name
             self.set_job_status(job)
             self.reset_qajob_failure_msg(job)
+
         return jobs
 
 
