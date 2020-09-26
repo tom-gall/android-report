@@ -366,7 +366,12 @@ def get_classified_jobs(jobs=[]):
     resubmitted_or_duplicated_jobs = []
 
     def get_job_external_url(item):
-        return item.get('external_url')
+        external_url = item.get('external_url')
+        if external_url:
+            return external_url
+        # when the job is not submitted to lava server, external_url will be None
+        # unorderable types: NoneType() < NoneType()
+        return ""
 
     # sorted with the job id in lava server
     # to get the latest jobs to use
