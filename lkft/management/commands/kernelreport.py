@@ -57,6 +57,7 @@ rawkernels = {
    '4.14':[ 
             '4.14-stable-master-hikey960-lkft',
             '4.14-stable-master-hikey-lkft',
+            '4.14-stable-aosp-x15',
             '4.14q-10.0-gsi-hikey960',
             '4.14q-10.0-gsi-hikey',
             '4.14p-10.0-gsi-hikey960',
@@ -67,12 +68,14 @@ rawkernels = {
    '4.19':[ 
             '4.19q-10.0-gsi-hikey960',
             '4.19q-10.0-gsi-hikey',
+            '4.19-stable-aosp-x15',
             ],
    '5.4':[ 
             '5.4-stable-gki-aosp-master-db845c',
             '5.4-stable-gki-aosp-master-hikey960',
             '5.4-gki-aosp-master-db845c',
             '5.4-gki-aosp-master-hikey960',
+            '5.4-aosp-master-x15',
             ],
 }
 
@@ -212,6 +215,12 @@ projectids = {
                      'OS' : 'Android10',
                      'kern' : '4.14',
                      'branch' : 'Android-4.14-q',},
+   '4.14-stable-aosp-x15':
+                    {'project_id': 320,
+                     'hardware': 'X15',
+                     'OS' : 'AOSP',
+                     'kern' : '4.14',
+                     'branch' : 'Android-4.14-stable',},
    '4.14-stable-master-hikey-lkft':
                     {'project_id': 297, 
                      'hardware': 'HiKey',
@@ -236,6 +245,12 @@ projectids = {
                      'OS' : 'Android10',
                      'kern' : '4.19',
                      'branch' : 'Android-4.19-q',},
+   '4.19-stable-aosp-x15':
+                    {'project_id': 215, 
+                     'hardware': 'x15',
+                     'OS' : 'AOSP',
+                     'kern' : '4.19',
+                     'branch' : 'Android-4.19-stable',},
    '5.4-gki-aosp-master-hikey960':
                     {'project_id': 257, 
                      'hardware': 'HiKey960',
@@ -260,6 +275,12 @@ projectids = {
                      'OS' : 'AOSP',
                      'kern' : '5.4',
                      'branch' : 'Android-5.4-stable',},
+   '5.4-aosp-master-x15':
+                    {'project_id': 339,
+                     'hardware': 'x15',
+                     'OS' : 'AOSP',
+                     'kern' : '5.4',
+                     'branch' : 'Android-5.4',},
 }
 
 def do_boilerplate(output):
@@ -284,6 +305,7 @@ def process_flakey_file(flakefile):
     #pdb.set_trace()
     Lines = flakefile.readlines()
     for Line in Lines:
+        newstate = ' '
         if Line[0] == '#':
             continue
         if Line[0] == 'I' or Line[0] == 'F' or Line[0] == 'B' or Line[0] == 'E':
@@ -302,7 +324,7 @@ def process_flakey_file(flakefile):
                Dict419['flakelist'].append(testentry)
                Dict54['flakelist'].append(testentry)
             else:
-               n = kernelsmatch.findall(Line)
+               n = kernelsmatch.match(Line)
                if n:
                   Line = Line[n.end():]
                   for kernel in n:
@@ -311,7 +333,7 @@ def process_flakey_file(flakefile):
                               Dict['flakelist'].append(testentry)
                else:
                    continue 
-            if Line[0:2] == 'ALL':
+            if Line[0:3] == 'ALL':
                Line = Line[4:]
                testentry['board'].append("HiKey")
                testentry['board'].append("HiKey960")
@@ -544,7 +566,8 @@ def find_best_two_runs(builds, project_name, project):
         # now let's see what we have. Do we have a complete yet?
         print("vts: "+ jobTransactionStatus['vts'] + " cts: "+jobTransactionStatus['cts'] + " boot: " +jobTransactionStatus['boot'] +'\n')
 
-        if jobTransactionStatus['vts'] == 'true' and jobTransactionStatus['cts'] == 'true' and jobTransactionStatus['boot'] == 'true' :
+        if jobTransactionStatus['vts'] == 'true' and jobTransactionStatus['cts'] == 'true':
+           # and jobTransactionStatus['boot'] == 'true' :
            #pdb.set_trace()
            if bailaftertwo == 0 :
                baseVersionDict = versiontoMME(build['version'])
@@ -609,8 +632,13 @@ def find_best_two_runs(builds, project_name, project):
               job['job_status'] = 'Submitted'
               jobisaacceptable = 0
 
-           qa_report_api.reset_qajob_failure_msg(job)
-
+           if job.get('failure'):
+              failure = job.get('failure')
+              new_str = failure.replace('"', '\\"').replace('\'', '"')
+              try:
+                 failure_dict = json.loads(new_str)
+              except ValueError:
+                 failure_dict = {'error_msg': new_str}
            if job.get('parent_job'):
               resubmitted_job_urls.append(job.get('parent_job'))
 
