@@ -76,6 +76,8 @@ rawkernels = {
             '5.4-gki-aosp-master-db845c',
             '5.4-gki-aosp-master-hikey960',
             '5.4-aosp-master-x15',
+            '5.4-gki-android11-android11-hikey960',
+            '5.4-gki-android11-android11-db845c',
             ],
 }
 
@@ -281,6 +283,18 @@ projectids = {
                      'OS' : 'AOSP',
                      'kern' : '5.4',
                      'branch' : 'Android-5.4',},
+   '5.4-gki-android11-android11-db845c':
+                    {'project_id': 414,
+                     'hardware': 'db845',
+                     'OS' : 'Android11',
+                     'kern' : '5.4',
+                     'branch' : 'Android-5.4',},
+   '5.4-gki-android11-android11-hikey960':
+                    {'project_id': 409,
+                     'hardware': 'hikey960',
+                     'OS' : 'Android11',
+                     'kern' : '5.4',
+                     'branch' : 'Android-5.4',},
 }
 
 def do_boilerplate(output):
@@ -350,6 +364,7 @@ def process_flakey_file(flakefile):
                testentry['androidrel'].append('Android8')
                testentry['androidrel'].append('Android9')
                testentry['androidrel'].append('Android10')
+               testentry['androidrel'].append('Android11')
                testentry['androidrel'].append('AOSP')
             else:
                a = androidmatch.findall(Line)
@@ -674,6 +689,25 @@ def find_regressions(goodruns):
     
     return regressions
 
+def find_antiregressions(goodruns):
+    runA = goodruns[0]
+    failuresA = runA['failures_list']
+    runB = goodruns[1]
+    failuresB = runB['failures_list']
+    antiregressions = []
+    for failureB in failuresB:
+        match = 0
+        for failureA in failuresA:
+            testAname = failureA['test_name']
+            testBname = failureB['test_name']
+            if testAname == testBname:
+                match = 1
+                break
+        if match != 1 :
+            antiregressions.append(failureB)
+    
+    return antiregressions
+
 
 """  Example project_info dict
                     {'project_id': 210, 
@@ -691,7 +725,7 @@ def add_unique_kernel(unique_kernels, kernel_version):
         unique_kernels.append(kernel_version)
 
 
-def report_results(output, run, regressions, combo, priorrun, flakes):
+def report_results(output, run, regressions, combo, priorrun, flakes, antiregressions):
     jobs = run['jobs']
     job = jobs[0]
     #pdb.set_trace()
@@ -705,6 +739,7 @@ def report_results(output, run, regressions, combo, priorrun, flakes):
     output.write(str(numbers['passed_number']) + " Passed ")
     output.write( str(numbers['total_number']) + " Total - " )
     output.write("Modules Run: " + str(numbers['modules_done']) + " Module Total: "+str(numbers['modules_total'])+"\n")
+    output.write("    "+str(len(antiregressions)) + " Prior Failures now pass\n")
     for regression in regressions:
         # pdb.set_trace()
         if 'baseOS' in project_info: 
@@ -759,7 +794,8 @@ class Command(BaseCommand):
             else:
                 add_unique_kernel(unique_kernels, goodruns[0]['version'])
                 regressions = find_regressions(goodruns)
-                report_results(output, goodruns[0], regressions, combo, goodruns[1], flakes)
+                antiregressions = find_antiregressions(goodruns)
+                report_results(output, goodruns[0], regressions, combo, goodruns[1], flakes, antiregressions)
         report_kernels_in_report(output, unique_kernels)
         output.close()
         
