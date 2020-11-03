@@ -155,12 +155,18 @@ trigger_branch_builds_info = {
         'android12-5.4-weekly': ['lkft-generic-build'],
     },
 
+    'trigger-lkft-android-common-weekly-android11':{
+        'android11-5.4-weekly': ['lkft-generic-build'],
+    },
+
     'trigger-lkft-android-common':{
         'android12-5.4': ['lkft-hikey-aosp-master-5.4',
                         'lkft-generic-build',
                         'lkft-generic-omap-build'],
 
         'android11-5.4': ['lkft-generic-build'],
+
+        'android11-5.4-lts': ['lkft-generic-build'],
 
         'android-mainline': ['lkft-generic-build',
                              'lkft-generic-omap-build'],
