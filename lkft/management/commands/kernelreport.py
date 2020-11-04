@@ -8,6 +8,7 @@
 import pdb
 import datetime
 import json
+import logging
 import os
 import re
 import yaml
@@ -29,6 +30,8 @@ from lkft.views import extract
 from lkft.views import get_result_file_path
 from lkft.views import download_attachments_save_result
 from lkft.lkft_config import get_version_from_pname, get_kver_with_pname_env
+
+logger = logging.getLogger(__name__)
 
 qa_report_def = QA_REPORT[QA_REPORT_DEFAULT]
 qa_report_api = qa_report.QAReportApi(qa_report_def.get('domain'), qa_report_def.get('token'))
@@ -71,13 +74,13 @@ rawkernels = {
             '4.19-stable-aosp-x15',
             ],
    '5.4':[ 
-            '5.4-stable-gki-aosp-master-db845c',
-            '5.4-stable-gki-aosp-master-hikey960',
             '5.4-gki-aosp-master-db845c',
             '5.4-gki-aosp-master-hikey960',
             '5.4-aosp-master-x15',
             '5.4-gki-android11-android11-hikey960',
             '5.4-gki-android11-android11-db845c',
+            '5.4-lts-gki-android11-android11-hikey960',
+            '5.4-lts-gki-android11-android11-db845c',
             ],
 }
 
@@ -295,6 +298,18 @@ projectids = {
                      'OS' : 'Android11',
                      'kern' : '5.4',
                      'branch' : 'Android-5.4',},
+   '5.4-lts-gki-android11-android11-db845c':
+                    {'project_id': 524,
+                     'hardware': 'db845',
+                     'OS' : 'Android11',
+                     'kern' : '5.4',
+                     'branch' : 'Android-5.4-lts',},
+   '5.4-lts-gki-android11-android11-hikey960':
+                    {'project_id': 519,
+                     'hardware': 'hikey960',
+                     'OS' : 'Android11',
+                     'kern' : '5.4',
+                     'branch' : 'Android-5.4-lts',},
 }
 
 def do_boilerplate(output):
@@ -430,18 +445,9 @@ def versiontoMME(versionString):
 def tallyNumbers(build, jobTransactionStatus):
     buildNumbers = build['numbers']
     if 'numbers' in jobTransactionStatus['vts-job']:
-        buildNumbers['failed_number'] += jobTransactionStatus['vts-job']['numbers']['failed_number']
-        buildNumbers['passed_number'] += jobTransactionStatus['vts-job']['numbers']['passed_number']
-        buildNumbers['total_number'] += jobTransactionStatus['vts-job']['numbers']['total_number']
-        buildNumbers['modules_done'] += jobTransactionStatus['vts-job']['numbers']['modules_done']
-        buildNumbers['modules_total'] += jobTransactionStatus['vts-job']['numbers']['modules_total']
+        buildNumbers.addWithTestNumbers(jobTransactionStatus['vts-job']['numbers'])
     if 'numbers' in jobTransactionStatus['cts-job']:
-        buildNumbers['failed_number'] += jobTransactionStatus['cts-job']['numbers']['failed_number']
-        buildNumbers['passed_number'] += jobTransactionStatus['cts-job']['numbers']['passed_number']
-        buildNumbers['total_number'] += jobTransactionStatus['cts-job']['numbers']['total_number']
-        buildNumbers['modules_done'] += jobTransactionStatus['cts-job']['numbers']['modules_done']
-        buildNumbers['modules_total'] += jobTransactionStatus['cts-job']['numbers']['modules_total']
-
+        buildNumbers.addWithTestNumbers(jobTransactionStatus['cts-job']['numbers'])
 
 def markjob(job, jobTransactionStatus):
     vtsSymbol = re.compile('-vts-')
@@ -493,11 +499,6 @@ def find_best_two_runs(builds, project_name, project):
     for build in builds:
         if bailaftertwo == 2:
             break
-        build_number_passed = 0
-        build_number_failed = 0
-        build_number_total = 0
-        build_modules_total = 0
-        build_modules_done = 0
         build['created_at'] = qa_report_api.get_aware_datetime_from_str(build.get('created_at'))
         jobs = qa_report_api.get_jobs_for_build(build.get("id"))
         build_status = get_lkft_build_status(build, jobs)
@@ -528,13 +529,8 @@ def find_best_two_runs(builds, project_name, project):
                            'modules_total': build_modules_total,
                            }
         '''
-        build['numbers'] = {
-                           'passed_number': 0,
-                           'failed_number': 0,
-                           'total_number': 0,
-                           'modules_done': 0,
-                           'modules_total': 0,
-                           }
+
+        build['numbers'] = qa_report.TestNumbers()
         build['jobs'] = jobs
         #if build_number_passed == 0:
         #    continue
@@ -735,10 +731,10 @@ def report_results(output, run, regressions, combo, priorrun, flakes, antiregres
     print_androidresultheader(output, project_info, run, priorrun)
     #pdb.set_trace()
     output.write("    " + str(len(regressions)) + " Regressions ")
-    output.write(str(numbers['failed_number']) + " Failures ") 
-    output.write(str(numbers['passed_number']) + " Passed ")
-    output.write( str(numbers['total_number']) + " Total - " )
-    output.write("Modules Run: " + str(numbers['modules_done']) + " Module Total: "+str(numbers['modules_total'])+"\n")
+    output.write(str(numbers.number_failed) + " Failures ")
+    output.write(str(numbers.number_passed) + " Passed ")
+    output.write( str(numbers.number_total) + " Total - " )
+    output.write("Modules Run: " + str(numbers.modules_done) + " Module Total: "+str(numbers.modules_total)+"\n")
     output.write("    "+str(len(antiregressions)) + " Prior Failures now pass\n")
     for regression in regressions:
         # pdb.set_trace()

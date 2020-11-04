@@ -292,13 +292,17 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
         except ET.ParseError as e:
             logger.error('xml.etree.ElementTree.ParseError: %s' % e)
             logger.info('Please Check %s manually' % result_zip_path)
-    return {
+
+    numbers_hash = {
                 'number_total': number_total,
                 'number_passed': number_passed,
                 'number_failed': number_failed,
                 'modules_done': modules_done,
                 'modules_total': modules_total,
             }
+    test_numbers = qa_report.TestNumbers()
+    test_numbers.addWithHash(numbers_hash)
+    return test_numbers
 
 
 def get_last_trigger_build(project=None):
