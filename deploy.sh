@@ -25,7 +25,7 @@ instance_name="lcr-report"
 instance_report_app="report"
 instance_dir="${work_root}/${instance_name}"
 
-virenv_dir="${work_root}/workspace"
+virenv_dir="${work_root}/workspace-python3"
 mkdir -p ${virenv_dir}
 cd ${virenv_dir}
 # https://pip.pypa.io/en/latest/installing/#installing-with-get-pip-py
