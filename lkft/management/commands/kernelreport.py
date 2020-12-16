@@ -8,7 +8,6 @@
 import pdb
 import datetime
 import json
-import logging
 import os
 import re
 import yaml
@@ -28,10 +27,8 @@ from lcr.settings import QA_REPORT, QA_REPORT_DEFAULT, BUILD_WITH_JOBS_NUMBER
 from lkft.views import get_test_result_number_for_build, get_lkft_build_status
 from lkft.views import extract
 from lkft.views import get_result_file_path
-from lkft.views import download_attachments_save_result, get_classified_jobs
+from lkft.views import download_attachments_save_result
 from lkft.lkft_config import get_version_from_pname, get_kver_with_pname_env
-
-logger = logging.getLogger(__name__)
 
 qa_report_def = QA_REPORT[QA_REPORT_DEFAULT]
 qa_report_api = qa_report.QAReportApi(qa_report_def.get('domain'), qa_report_def.get('token'))
@@ -72,17 +69,15 @@ rawkernels = {
             '4.19q-10.0-gsi-hikey960',
             '4.19q-10.0-gsi-hikey',
             '4.19-stable-aosp-x15',
-            '4.19-stable-master-hikey-lkft',
-            '4.19-stable-master-hikey960-lkft',
             ],
    '5.4':[ 
             '5.4-gki-aosp-master-db845c',
             '5.4-gki-aosp-master-hikey960',
             '5.4-aosp-master-x15',
-            '5.4-gki-android11-android11-hikey960',
-            '5.4-gki-android11-android11-db845c',
             '5.4-lts-gki-android11-android11-hikey960',
             '5.4-lts-gki-android11-android11-db845c',
+            '5.4-gki-android11-android11-hikey960',
+            '5.4-gki-android11-android11-db845c',
             ],
 }
 
@@ -253,20 +248,8 @@ projectids = {
                      'kern' : '4.19',
                      'branch' : 'Android-4.19-q',},
    '4.19-stable-aosp-x15':
-                    {'project_id': 335,
+                    {'project_id': 335, 
                      'hardware': 'x15',
-                     'OS' : 'AOSP',
-                     'kern' : '4.19',
-                     'branch' : 'Android-4.19-stable',},
-    '4.19-stable-master-hikey-lkft':
-                    {'project_id': 299,
-                     'hardware': 'hikey',
-                     'OS' : 'AOSP',
-                     'kern' : '4.19',
-                     'branch' : 'Android-4.19-stable',},
-    '4.19-stable-master-hikey960-lkft':
-                    {'project_id': 300,
-                     'hardware': 'hikey960',
                      'OS' : 'AOSP',
                      'kern' : '4.19',
                      'branch' : 'Android-4.19-stable',},
@@ -282,22 +265,22 @@ projectids = {
                      'OS' : 'AOSP',
                      'kern' : '5.4',
                      'branch' : 'Android-5.4',},
-   '5.4-stable-gki-aosp-master-hikey960':
-                    {'project_id': 296, 
-                     'hardware': 'HiKey960',
-                     'kern' : '5.4',
-                     'OS' : 'AOSP',
-                     'branch' : 'Android-5.4-stable',},
-   '5.4-stable-gki-aosp-master-db845c':
-                    {'project_id': 295,
-                     'hardware': 'db845',
-                     'OS' : 'AOSP',
-                     'kern' : '5.4',
-                     'branch' : 'Android-5.4-stable',},
    '5.4-aosp-master-x15':
                     {'project_id': 339,
                      'hardware': 'x15',
                      'OS' : 'AOSP',
+                     'kern' : '5.4',
+                     'branch' : 'Android-5.4',},
+   '5.4-lts-gki-android11-android11-db845c':
+                    {'project_id': 524,
+                     'hardware': 'db845',
+                     'OS' : 'Android11',
+                     'kern' : '5.4',
+                     'branch' : 'Android-5.4',},
+   '5.4-lts-gki-android11-android11-hikey960':
+                    {'project_id': 519,
+                     'hardware': 'hikey960',
+                     'OS' : 'Android11',
                      'kern' : '5.4',
                      'branch' : 'Android-5.4',},
    '5.4-gki-android11-android11-db845c':
@@ -312,18 +295,6 @@ projectids = {
                      'OS' : 'Android11',
                      'kern' : '5.4',
                      'branch' : 'Android-5.4',},
-   '5.4-lts-gki-android11-android11-db845c':
-                    {'project_id': 524,
-                     'hardware': 'db845',
-                     'OS' : 'Android11',
-                     'kern' : '5.4',
-                     'branch' : 'Android-5.4-lts',},
-   '5.4-lts-gki-android11-android11-hikey960':
-                    {'project_id': 519,
-                     'hardware': 'hikey960',
-                     'OS' : 'Android11',
-                     'kern' : '5.4',
-                     'branch' : 'Android-5.4-lts',},
 }
 
 def do_boilerplate(output):
@@ -456,17 +427,73 @@ def versiontoMME(versionString):
     return versionDict
 
 
-# set the last finished job for boot/cts/vts types
+def tallyNumbers(build, jobTransactionStatus):
+    buildNumbers = build['numbers']
+    if 'numbers' in jobTransactionStatus['vts-job']:
+        buildNumbers['failed_number'] += jobTransactionStatus['vts-job']['numbers']['failed_number']
+        buildNumbers['passed_number'] += jobTransactionStatus['vts-job']['numbers']['passed_number']
+        buildNumbers['total_number'] += jobTransactionStatus['vts-job']['numbers']['total_number']
+        buildNumbers['modules_done'] += jobTransactionStatus['vts-job']['numbers']['modules_done']
+        buildNumbers['modules_total'] += jobTransactionStatus['vts-job']['numbers']['modules_total']
+    else:
+        buildNumbers['failed_number'] += jobTransactionStatus['vts-v8-job']['numbers']['failed_number']
+        buildNumbers['passed_number'] += jobTransactionStatus['vts-v8-job']['numbers']['passed_number']
+        buildNumbers['total_number'] += jobTransactionStatus['vts-v8-job']['numbers']['total_number']
+        buildNumbers['modules_done'] += jobTransactionStatus['vts-v8-job']['numbers']['modules_done']
+        buildNumbers['modules_total'] += jobTransactionStatus['vts-v8-job']['numbers']['modules_total']
+        buildNumbers['failed_number'] += jobTransactionStatus['vts-v7-job']['numbers']['failed_number']
+        buildNumbers['passed_number'] += jobTransactionStatus['vts-v7-job']['numbers']['passed_number']
+        buildNumbers['total_number'] += jobTransactionStatus['vts-v7-job']['numbers']['total_number']
+        buildNumbers['modules_done'] += jobTransactionStatus['vts-v7-job']['numbers']['modules_done']
+        buildNumbers['modules_total'] += jobTransactionStatus['vts-v7-job']['numbers']['modules_total']
+
+    if 'numbers' in jobTransactionStatus['cts-job']:
+        buildNumbers['failed_number'] += jobTransactionStatus['cts-job']['numbers']['failed_number']
+        buildNumbers['passed_number'] += jobTransactionStatus['cts-job']['numbers']['passed_number']
+        buildNumbers['total_number'] += jobTransactionStatus['cts-job']['numbers']['total_number']
+        buildNumbers['modules_done'] += jobTransactionStatus['cts-job']['numbers']['modules_done']
+        buildNumbers['modules_total'] += jobTransactionStatus['cts-job']['numbers']['modules_total']
+
+
 def markjob(job, jobTransactionStatus):
     vtsSymbol = re.compile('-vts-')
+    vtsv8Symbol = re.compile('-vts-kernel-arm64-v8a')
+    vtsv7Symbol = re.compile('-vts-kernel-armeabi-v7a')
     bootSymbol = re.compile('boot')
     ctsSymbol = re.compile('-cts')
 
     vtsresult = vtsSymbol.search(job['name'])
+    vtsv8result = vtsv8Symbol.search(job['name'])
+    vtsv7result = vtsv7Symbol.search(job['name'])
     bootresult = bootSymbol.search(job['name'])
     ctsresult = ctsSymbol.search(job['name'])
 
     newjobTime = parser.parse(job['created_at'])
+
+    if vtsv8result is not None: 
+       jobTransactionStatus['vts-v8'] = 'true'
+       # take the later of the two results
+       if jobTransactionStatus['vts-v8-job'] is None:
+           jobTransactionStatus['vts-v8-job'] = job
+       else:
+           origjobTime = parser.parse(jobTransactionStatus['vts-v8-job']['created_at'])
+           if newjobTime > origjobTime :
+               jobTransactionStatus['vts-v8-job'] = job
+       if jobTransactionStatus['vts-v7'] == 'true':
+           jobTransactionStatus['vts'] = 'true'
+
+    if vtsv7result is not None: 
+       jobTransactionStatus['vts-v7'] = 'true'
+       # take the later of the two results
+       if jobTransactionStatus['vts-v7-job'] is None:
+           jobTransactionStatus['vts-v7-job'] = job
+       else:
+           origjobTime = parser.parse(jobTransactionStatus['vts-v7-job']['created_at'])
+           if newjobTime > origjobTime :
+               jobTransactionStatus['vts-v7-job'] = job
+       if jobTransactionStatus['vts-v8'] == 'true':
+           jobTransactionStatus['vts'] = 'true'
+
     if vtsresult is not None:
        jobTransactionStatus['vts'] = 'true'
        # take the later of the two results
@@ -495,49 +522,86 @@ def markjob(job, jobTransactionStatus):
            if newjobTime > origjobTime :
                jobTransactionStatus['boot-job'] = job
 
-    
 
-def find_best_two_runs(builds, project_name, project):
+def find_best_two_runs(builds, project_name, project, exact):
     goodruns = []
     bailaftertwo = 0
     number_of_build_with_jobs = 0
-    baseVersionDict = None
-    nextVersionDict = None
+    baseExactVersionDict=None
+
+    if exact!='No':
+        baseExactVersionDict = versiontoMME(exact) 
 
     for build in builds:
         if bailaftertwo == 2:
             break
+        build_number_passed = 0
+        build_number_failed = 0
+        build_number_total = 0
+        build_modules_total = 0
+        build_modules_done = 0
         build['created_at'] = qa_report_api.get_aware_datetime_from_str(build.get('created_at'))
         jobs = qa_report_api.get_jobs_for_build(build.get("id"))
-        jobs_to_be_checked = get_classified_jobs(jobs=jobs).get('final_jobs')
-        build_status = get_lkft_build_status(build, jobs_to_be_checked)
+        build_status = get_lkft_build_status(build, jobs)
         if build_status['has_unsubmitted']:
             #print "has unsubmitted"
             continue
         elif build_status['is_inprogress']:
             #print "in progress"
             continue
-
-        build['numbers'] = qa_report.TestNumbers()
+           
+        # print "ok great should be complete" 
+        '''
+        if number_of_build_with_jobs < BUILD_WITH_JOBS_NUMBER:
+            build_numbers = get_test_result_number_for_build(build, jobs)
+            build_number_passed = build_number_passed + build_numbers.get('number_passed')
+            build_number_failed = build_number_failed + build_numbers.get('number_failed')
+            build_number_total = build_number_total + build_numbers.get('number_total')
+            build_modules_total = build_modules_total + build_numbers.get('modules_total')
+            build_modules_done = build_modules_done + build_numbers.get('modules_done')
+            number_of_build_with_jobs = number_of_build_with_jobs + 1
+            #print "numbers passed in build" + str(build_number_passed)
+        number_of_build_with_jobs = number_of_build_with_jobs + 1
+        build['numbers'] = {
+                           'passed_number': build_number_passed,
+                           'failed_number': build_number_failed,
+                           'total_number': build_number_total,
+                           'modules_done': build_modules_done,
+                           'modules_total': build_modules_total,
+                           }
+        '''
+        build['numbers'] = {
+                           'passed_number': 0,
+                           'failed_number': 0,
+                           'total_number': 0,
+                           'modules_done': 0,
+                           'modules_total': 0,
+                           }
         build['jobs'] = jobs
         #if build_number_passed == 0:
         #    continue
 
-        download_attachments_save_result(jobs=jobs_to_be_checked)
-
-        temp_build_numbers = get_test_result_number_for_build(build, jobs_to_be_checked)
-        jobs_finished = temp_build_numbers.get('jobs_finished')
-        jobs_total = temp_build_numbers.get('jobs_total')
-        if jobs_finished != jobs_total:
-          # not all jobs finished successfully, this build will be ignored
-          print("build ignored as not all jobs finished successfully: project_name=%s, build['version']=%s, jobs_finished=%d, jobs_total=%d" % (project_name, build['version'], jobs_finished, jobs_total))
-          continue
-
-        build['numbers'].addWithHash(temp_build_numbers)
-
+        download_attachments_save_result(jobs=jobs)
+            
         failures = {}
+        resubmitted_job_urls = []
+       
+        jobisacceptable=1 
+        jobTransactionStatus = { 'vts' : 'maybe', 'cts' : 'maybe', 'boot': 'maybe', 'vts-v7' : 'maybe', 'vts-v8' : 'maybe',
+                                 'vts-job' : None, 'cts-job' : None, 'boot-job' : None, 'vts-v7-job': None, 'vts-v8-job': None }
+
         # pdb.set_trace()
-        for job in jobs_to_be_checked:
+        for job in jobs:
+           ctsSymbol = re.compile('-cts')
+
+           ctsresult = ctsSymbol.search(job['name'])
+           jobstatus = job['job_status']
+           jobfailure = job['failure']
+           if ctsresult is not None:
+               print("cts job" + str(jobfailure) + '\n')
+           if jobstatus == 'Complete' and jobfailure is None :
+              markjob(job, jobTransactionStatus)
+
            result_file_path = get_result_file_path(job=job)
            if not result_file_path or not os.path.exists(result_file_path):
               continue
@@ -553,19 +617,47 @@ def find_best_two_runs(builds, project_name, project):
               'kernel_version': kernel_version,
               'platform': platform,
            }
-           extract(result_file_path, failed_testcases_all=failures, metadata=metadata)
+           numbers = extract(result_file_path, failed_testcases_all=failures, metadata=metadata)
+           job['numbers'] = numbers
 
-        if bailaftertwo == 0 :
-          baseVersionDict = versiontoMME(build['version'])
-          # print "baseset"
-        elif bailaftertwo == 1 :
-          nextVersionDict = versiontoMME(build['version'])
-          if nextVersionDict['Extra'] == baseVersionDict['Extra'] :
-            continue
+        # now let's see what we have. Do we have a complete yet?
+        print("vts: "+ jobTransactionStatus['vts'] + " cts: "+jobTransactionStatus['cts'] + " boot: " +jobTransactionStatus['boot'] +'\n')
 
-        goodruns.append(build)
-        bailaftertwo += 1
+        if jobTransactionStatus['vts'] == 'true' and jobTransactionStatus['cts'] == 'true':
+           # and jobTransactionStatus['boot'] == 'true' :
+           #pdb.set_trace()
+           if bailaftertwo == 0 :
+               baseVersionDict = versiontoMME(build['version'])
+               if baseExactVersionDict is not None:
+                   if baseVersionDict['Extra'] != baseExactVersionDict['Extra']:
+                       continue
+               # print "baseset"
+           elif bailaftertwo == 1 :
+               nextVersionDict = versiontoMME(build['version'])
+               if nextVersionDict['Extra'] == baseVersionDict['Extra'] :
+                   continue
+           tallyNumbers(build, jobTransactionStatus)
+           goodruns.append(build)
+           bailaftertwo += 1
+        else:
+           continue
 
+        #if 'run_status' in build:
+        #   # print "found run status" + "build " + str(build.get("id")) + " NOT selected"
+        #    continue
+        #else:
+        #   # print "run status NOT found" + "build " + str(build.get("id")) + " selected"
+        #   if bailaftertwo == 0 :
+        #       baseVersionDict = versiontoMME(build['version'])
+        #       # print "baseset"
+        #   elif bailaftertwo == 1 :
+        #       nextVersionDict = versiontoMME(build['version'])
+        #       if nextVersionDict['Extra'] == baseVersionDict['Extra'] :
+        #           continue
+        #   goodruns.append(build)
+        #   bailaftertwo += 1
+
+        #pdb.set_trace()
         failures_list = []
         for module_name in sorted(failures.keys()):
             failures_in_module = failures.get(module_name)
@@ -583,16 +675,48 @@ def find_best_two_runs(builds, project_name, project):
 
                 failure['abis'] = abis
                 failure['stacktrace'] = stacktrace_msg.strip()
-
+                failure['module_name'] = module_name
                 failures_list.append(failure)
 
+        #pdb.set_trace()
         android_version = get_version_from_pname(pname=project.get('name'))
         build['failures_list'] = failures_list
 
     return goodruns
 
-# found the failures that in goodruns[0], but not in goodruns[1]
-# return goodruns[0]-goodruns[1]
+    '''
+              if jobstatus == 'Incomplete' :
+        for job in jobs:
+           pdb.set_trace()
+           if job.get('job_status') is None and \
+              job.get('submitted') and \
+              not job.get('fetched'):
+              job['job_status'] = 'Submitted'
+              jobisaacceptable = 0
+
+           if job.get('failure'):
+              failure = job.get('failure')
+              new_str = failure.replace('"', '\\"').replace('\'', '"')
+              try:
+                 failure_dict = json.loads(new_str)
+              except ValueError:
+                 failure_dict = {'error_msg': new_str}
+           if job.get('parent_job'):
+              resubmitted_job_urls.append(job.get('parent_job'))
+
+           if job['job_status'] == 'Submitted':
+              jobisacceptable = 0
+           if jobisacceptable == 0:
+              build['run_status'] = 'Submitted'
+
+           # print "job " + job.get('job_id') + " " + job['job_status']
+
+           result_file_path = get_result_file_path(job=job)
+           if not result_file_path or not os.path.exists(result_file_path):
+              continue
+    '''
+
+
 def find_regressions(goodruns):
     runA = goodruns[0]
     failuresA = runA['failures_list']
@@ -601,18 +725,17 @@ def find_regressions(goodruns):
     regressions = []
     for failureA in failuresA:
         match = 0
-        testAname = failureA['test_name']
         for failureB in failuresB:
+            testAname = failureA['test_name']
             testBname = failureB['test_name']
             if testAname == testBname:
                 match = 1
                 break
         if match != 1 :
             regressions.append(failureA)
+    
     return regressions
 
-# found the failures that in goodruns[1], but not in goodruns[0]
-# return goodruns[1] - goodruns[0]
 def find_antiregressions(goodruns):
     runA = goodruns[0]
     failuresA = runA['failures_list']
@@ -629,6 +752,7 @@ def find_antiregressions(goodruns):
                 break
         if match != 1 :
             antiregressions.append(failureB)
+    
     return antiregressions
 
 
@@ -658,10 +782,10 @@ def report_results(output, run, regressions, combo, priorrun, flakes, antiregres
     print_androidresultheader(output, project_info, run, priorrun)
     #pdb.set_trace()
     output.write("    " + str(len(regressions)) + " Regressions ")
-    output.write(str(numbers.number_failed) + " Failures ")
-    output.write(str(numbers.number_passed) + " Passed ")
-    output.write( str(numbers.number_total) + " Total - " )
-    output.write("Modules Run: " + str(numbers.modules_done) + " Module Total: "+str(numbers.modules_total)+"\n")
+    output.write(str(numbers['failed_number']) + " Failures ") 
+    output.write(str(numbers['passed_number']) + " Passed ")
+    output.write( str(numbers['total_number']) + " Total - " )
+    output.write("Modules Run: " + str(numbers['modules_done']) + " Module Total: "+str(numbers['modules_total'])+"\n")
     output.write("    "+str(len(antiregressions)) + " Prior Failures now pass\n")
     for regression in regressions:
         # pdb.set_trace()
@@ -671,7 +795,8 @@ def report_results(output, run, regressions, combo, priorrun, flakes, antiregres
             OS = project_info['OS']
         testtype=classifyTest(flakes, regression['test_name'], project_info['hardware'], project_info['kern'], OS)
         # def classifyTest(flakeDicts, testcasename, hardware, kernel, android):
-        output.write("        " + testtype + " " + regression['test_name'] + "\n")
+        #output.write("        " + testtype + " " + regression['test_name'] + "\n")
+        output.write("        " + testtype + " " + regression['module_name'] +"." + regression['test_name'] + "\n")
 
 
 def report_kernels_in_report(output, unique_kernels): 
@@ -689,11 +814,13 @@ class Command(BaseCommand):
         parser.add_argument('kernel', type=str, help='Kernel version')
         parser.add_argument('outputfile', type=str, help='Output File')
         parser.add_argument('flake', type=str, help='flakey file')
+        parser.add_argument('exact', default='No', type=str, help='exact kernel version')
 
     def handle(self, *args, **options):
         kernel = options['kernel']
         output = open(options['outputfile'], "w")
         flakefile = open(options['flake'], "r")
+        exact = options['exact']
 
         # map kernel to all available kernel, board, OS combos that match
         work = []
@@ -710,7 +837,7 @@ class Command(BaseCommand):
             project =  qa_report_api.get_project(project_id)
             builds = qa_report_api.get_all_builds(project_id)
             project_name = project.get('name')
-            goodruns = find_best_two_runs(builds, project_name, project)
+            goodruns = find_best_two_runs(builds, project_name, project, exact)
             if len(goodruns) < 2 :
                 print("\nERROR project " + project_name+ " did not have 2 good runs\n")
                 output.write("\nERROR project " + project_name+ " did not have 2 good runs\n\n")
