@@ -28,7 +28,7 @@ from lcr.settings import QA_REPORT, QA_REPORT_DEFAULT, BUILD_WITH_JOBS_NUMBER
 from lkft.views import get_test_result_number_for_build, get_lkft_build_status
 from lkft.views import extract
 from lkft.views import get_result_file_path
-from lkft.views import download_attachments_save_result
+from lkft.views import download_attachments_save_result, get_classified_jobs
 from lkft.lkft_config import get_version_from_pname, get_kver_with_pname_env
 
 logger = logging.getLogger(__name__)
@@ -72,6 +72,8 @@ rawkernels = {
             '4.19q-10.0-gsi-hikey960',
             '4.19q-10.0-gsi-hikey',
             '4.19-stable-aosp-x15',
+            '4.19-stable-master-hikey-lkft',
+            '4.19-stable-master-hikey960-lkft',
             ],
    '5.4':[ 
             '5.4-gki-aosp-master-db845c',
@@ -251,8 +253,20 @@ projectids = {
                      'kern' : '4.19',
                      'branch' : 'Android-4.19-q',},
    '4.19-stable-aosp-x15':
-                    {'project_id': 215, 
+                    {'project_id': 335,
                      'hardware': 'x15',
+                     'OS' : 'AOSP',
+                     'kern' : '4.19',
+                     'branch' : 'Android-4.19-stable',},
+    '4.19-stable-master-hikey-lkft':
+                    {'project_id': 299,
+                     'hardware': 'hikey',
+                     'OS' : 'AOSP',
+                     'kern' : '4.19',
+                     'branch' : 'Android-4.19-stable',},
+    '4.19-stable-master-hikey960-lkft':
+                    {'project_id': 300,
+                     'hardware': 'hikey960',
                      'OS' : 'AOSP',
                      'kern' : '4.19',
                      'branch' : 'Android-4.19-stable',},
@@ -442,13 +456,7 @@ def versiontoMME(versionString):
     return versionDict
 
 
-def tallyNumbers(build, jobTransactionStatus):
-    buildNumbers = build['numbers']
-    if 'numbers' in jobTransactionStatus['vts-job']:
-        buildNumbers.addWithTestNumbers(jobTransactionStatus['vts-job']['numbers'])
-    if 'numbers' in jobTransactionStatus['cts-job']:
-        buildNumbers.addWithTestNumbers(jobTransactionStatus['cts-job']['numbers'])
-
+# set the last finished job for boot/cts/vts types
 def markjob(job, jobTransactionStatus):
     vtsSymbol = re.compile('-vts-')
     bootSymbol = re.compile('boot')
@@ -501,61 +509,35 @@ def find_best_two_runs(builds, project_name, project):
             break
         build['created_at'] = qa_report_api.get_aware_datetime_from_str(build.get('created_at'))
         jobs = qa_report_api.get_jobs_for_build(build.get("id"))
-        build_status = get_lkft_build_status(build, jobs)
+        jobs_to_be_checked = get_classified_jobs(jobs=jobs).get('final_jobs')
+        build_status = get_lkft_build_status(build, jobs_to_be_checked)
         if build_status['has_unsubmitted']:
             #print "has unsubmitted"
             continue
         elif build_status['is_inprogress']:
             #print "in progress"
             continue
-           
-        # print "ok great should be complete" 
-        '''
-        if number_of_build_with_jobs < BUILD_WITH_JOBS_NUMBER:
-            build_numbers = get_test_result_number_for_build(build, jobs)
-            build_number_passed = build_number_passed + build_numbers.get('number_passed')
-            build_number_failed = build_number_failed + build_numbers.get('number_failed')
-            build_number_total = build_number_total + build_numbers.get('number_total')
-            build_modules_total = build_modules_total + build_numbers.get('modules_total')
-            build_modules_done = build_modules_done + build_numbers.get('modules_done')
-            number_of_build_with_jobs = number_of_build_with_jobs + 1
-            #print "numbers passed in build" + str(build_number_passed)
-        number_of_build_with_jobs = number_of_build_with_jobs + 1
-        build['numbers'] = {
-                           'passed_number': build_number_passed,
-                           'failed_number': build_number_failed,
-                           'total_number': build_number_total,
-                           'modules_done': build_modules_done,
-                           'modules_total': build_modules_total,
-                           }
-        '''
 
         build['numbers'] = qa_report.TestNumbers()
         build['jobs'] = jobs
         #if build_number_passed == 0:
         #    continue
 
-        download_attachments_save_result(jobs=jobs)
-            
+        download_attachments_save_result(jobs=jobs_to_be_checked)
+
+        temp_build_numbers = get_test_result_number_for_build(build, jobs_to_be_checked)
+        jobs_finished = temp_build_numbers.get('jobs_finished')
+        jobs_total = temp_build_numbers.get('jobs_total')
+        if jobs_finished != jobs_total:
+          # not all jobs finished successfully, this build will be ignored
+          print("build ignored as not all jobs finished successfully: project_name=%s, build['version']=%s, jobs_finished=%d, jobs_total=%d" % (project_name, build['version'], jobs_finished, jobs_total))
+          continue
+
+        build['numbers'].addWithHash(temp_build_numbers)
+
         failures = {}
-        resubmitted_job_urls = []
-       
-        jobisacceptable=1 
-        jobTransactionStatus = { 'vts' : 'maybe', 'cts' : 'maybe', 'boot': 'maybe',
-                                 'vts-job' : None, 'cts-job' : None, 'boot-job' : None }
-
         # pdb.set_trace()
-        for job in jobs:
-           ctsSymbol = re.compile('-cts')
-
-           ctsresult = ctsSymbol.search(job['name'])
-           jobstatus = job['job_status']
-           jobfailure = job['failure']
-           if ctsresult is not None:
-               print("cts job" + str(jobfailure) + '\n')
-           if jobstatus == 'Complete' and jobfailure is None :
-              markjob(job, jobTransactionStatus)
-
+        for job in jobs_to_be_checked:
            result_file_path = get_result_file_path(job=job)
            if not result_file_path or not os.path.exists(result_file_path):
               continue
@@ -571,42 +553,18 @@ def find_best_two_runs(builds, project_name, project):
               'kernel_version': kernel_version,
               'platform': platform,
            }
-           numbers = extract(result_file_path, failed_testcases_all=failures, metadata=metadata)
-           job['numbers'] = numbers
+           extract(result_file_path, failed_testcases_all=failures, metadata=metadata)
 
-        # now let's see what we have. Do we have a complete yet?
-        print("vts: "+ jobTransactionStatus['vts'] + " cts: "+jobTransactionStatus['cts'] + " boot: " +jobTransactionStatus['boot'] +'\n')
+        if bailaftertwo == 0 :
+          baseVersionDict = versiontoMME(build['version'])
+          # print "baseset"
+        elif bailaftertwo == 1 :
+          nextVersionDict = versiontoMME(build['version'])
+          if nextVersionDict['Extra'] == baseVersionDict['Extra'] :
+            continue
 
-        if jobTransactionStatus['vts'] == 'true' and jobTransactionStatus['cts'] == 'true':
-           # and jobTransactionStatus['boot'] == 'true' :
-           #pdb.set_trace()
-           if bailaftertwo == 0 :
-               baseVersionDict = versiontoMME(build['version'])
-               # print "baseset"
-           elif bailaftertwo == 1 :
-               nextVersionDict = versiontoMME(build['version'])
-               if nextVersionDict['Extra'] == baseVersionDict['Extra'] :
-                   continue
-           tallyNumbers(build, jobTransactionStatus)
-           goodruns.append(build)
-           bailaftertwo += 1
-        else:
-           continue
-
-        #if 'run_status' in build:
-        #   # print "found run status" + "build " + str(build.get("id")) + " NOT selected"
-        #    continue
-        #else:
-        #   # print "run status NOT found" + "build " + str(build.get("id")) + " selected"
-        #   if bailaftertwo == 0 :
-        #       baseVersionDict = versiontoMME(build['version'])
-        #       # print "baseset"
-        #   elif bailaftertwo == 1 :
-        #       nextVersionDict = versiontoMME(build['version'])
-        #       if nextVersionDict['Extra'] == baseVersionDict['Extra'] :
-        #           continue
-        #   goodruns.append(build)
-        #   bailaftertwo += 1
+        goodruns.append(build)
+        bailaftertwo += 1
 
         failures_list = []
         for module_name in sorted(failures.keys()):
@@ -633,39 +591,8 @@ def find_best_two_runs(builds, project_name, project):
 
     return goodruns
 
-    '''
-              if jobstatus == 'Incomplete' :
-        for job in jobs:
-           pdb.set_trace()
-           if job.get('job_status') is None and \
-              job.get('submitted') and \
-              not job.get('fetched'):
-              job['job_status'] = 'Submitted'
-              jobisaacceptable = 0
-
-           if job.get('failure'):
-              failure = job.get('failure')
-              new_str = failure.replace('"', '\\"').replace('\'', '"')
-              try:
-                 failure_dict = json.loads(new_str)
-              except ValueError:
-                 failure_dict = {'error_msg': new_str}
-           if job.get('parent_job'):
-              resubmitted_job_urls.append(job.get('parent_job'))
-
-           if job['job_status'] == 'Submitted':
-              jobisacceptable = 0
-           if jobisacceptable == 0:
-              build['run_status'] = 'Submitted'
-
-           # print "job " + job.get('job_id') + " " + job['job_status']
-
-           result_file_path = get_result_file_path(job=job)
-           if not result_file_path or not os.path.exists(result_file_path):
-              continue
-    '''
-
-
+# found the failures that in goodruns[0], but not in goodruns[1]
+# return goodruns[0]-goodruns[1]
 def find_regressions(goodruns):
     runA = goodruns[0]
     failuresA = runA['failures_list']
@@ -674,17 +601,18 @@ def find_regressions(goodruns):
     regressions = []
     for failureA in failuresA:
         match = 0
+        testAname = failureA['test_name']
         for failureB in failuresB:
-            testAname = failureA['test_name']
             testBname = failureB['test_name']
             if testAname == testBname:
                 match = 1
                 break
         if match != 1 :
             regressions.append(failureA)
-    
     return regressions
 
+# found the failures that in goodruns[1], but not in goodruns[0]
+# return goodruns[1] - goodruns[0]
 def find_antiregressions(goodruns):
     runA = goodruns[0]
     failuresA = runA['failures_list']
@@ -701,7 +629,6 @@ def find_antiregressions(goodruns):
                 break
         if match != 1 :
             antiregressions.append(failureB)
-    
     return antiregressions
 
 
