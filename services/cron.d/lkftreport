@@ -1,0 +1,3 @@
+# !!MANAGED BY ANSIBLE!!
+*/30 * * * * www-data /android/django_postgres/lcr-report/lkftreport.sh
+15 23 * * * www-data /android/django_postgres/lcr-report/lkftreport.sh --irc-report-type ALL
