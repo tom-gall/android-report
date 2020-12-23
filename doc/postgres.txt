@@ -1,0 +1,81 @@
+1. download and install documents
+    https://www.postgresql.org/download/linux/ubuntu/
+
+    # Create the file repository configuration:
+    $ sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+
+    # Import the repository signing key:
+    $ wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+
+    # Update the package lists:
+    $ sudo apt-get update
+
+    # Install the latest version of PostgreSQL.
+    # If you want a specific version, use 'postgresql-12' or similar instead of 'postgresql':
+    $ sudo apt-get -y install postgresql
+
+2. postgres documents:
+    https://www.postgresql.org/docs/
+
+3. create the database for django application
+    refered to document here: https://www.digitalocean.com/community/tutorials/how-to-use-postgresql-with-your-django-application-on-ubuntu-14-04
+
+    # switch to the postgres user
+    $ sudo su - postgres
+
+    # run psql to open the postgres sql command session
+    $ psql
+
+3.1 create the database
+    # create the database of lkftreport
+    postgres=# CREATE DATABASE lkftreport;
+
+3.2 create the user for that database access
+    # create the user with password
+    postgres=# CREATE USER lkftreportuser WITH PASSWORD 'password';
+
+3.3 database global settings for operations
+    * We are setting the default encoding to UTF-8, which Django expects.
+    * We are also setting the default transaction isolation scheme to “read committed”,
+        which blocks reads from uncommitted transactions.
+    * Lastly, we are setting the timezone. By default, our Django projects will
+        be set to use UTC:
+
+    postgres=# ALTER ROLE lkftreportuser SET client_encoding TO 'utf8';
+    postgres=# ALTER ROLE lkftreportuser SET default_transaction_isolation TO 'read committed';
+    postgres=# ALTER ROLE lkftreportuser SET timezone TO 'UTC';
+
+3.4 give the database user lkftreportuser access rights to the database lkftreport
+    postgres=# GRANT ALL PRIVILEGES ON DATABASE lkftreport TO lkftreportuser;
+
+3.5 exit the SQL prompt
+    postgres=# \q
+
+3.6 config files:
+    * /etc/postgresql/9.6/main/postgresql.conf
+        defines the database directory and configuration file path
+3.7 backup and restart
+    $pg_dump db_name > dumpfile
+    $psql db_name < dumpfile
+
+    example for restore and backup
+        pg_dump lkftproject > /tmp/dumpfile
+        postgres-# DROP DATABASE IF EXISTS lkftproject;
+        postgres-# CREATE DATABASE lkftproject;
+        postgres=# CREATE USER lkftreport WITH PASSWORD 'password';
+        psql lkftproject < /tmp/dumpfile
+        postgres=# ALTER ROLE lkftreport SET client_encoding TO 'utf8';
+        postgres=# ALTER ROLE lkftreport SET default_transaction_isolation TO 'read committed';
+        postgres=# ALTER ROLE lkftreport SET timezone TO 'UTC';
+        postgres=# GRANT ALL PRIVILEGES ON DATABASE lkftproject TO lkftreport;
+
+4. cheatsheet
+   \l or \list to show all database in postgressql
+   \c dbname or \connect dbname to change to a new database
+   \dt display all the tables in currect database
+   select * from table_name ;  to show records in that table
+   \h help
+   \q exit
+   select * from report_testcase where job_id  = '299593';
+   delete from report_testcase where job_id  = '299593';
+
