@@ -32,7 +32,6 @@ logger = logging.getLogger(__name__)
 
 qa_report_def = QA_REPORT[QA_REPORT_DEFAULT]
 qa_report_api = qa_report.QAReportApi(qa_report_def.get('domain'), qa_report_def.get('token'))
-irc = IRC.getInstance()
 
 class Command(BaseCommand):
     help = 'Check the build and test results for kernel changes, and send report if the jobs finished'
@@ -467,6 +466,7 @@ class Command(BaseCommand):
 
         ircMsgList.append("KERNEL CHANGES STATUS REPORT FINISHED: %d in total" % num_kernelchanges)
         if len(ircMsgList) > 2:
+            irc = IRC.getInstance()
             irc.sendAndQuit(msgStrOrAry=ircMsgList)
         else:
             # no completed kernel changes or no kernel changes in progress
