@@ -42,7 +42,8 @@ from .models import KernelChange, CiBuild, ReportBuild, ReportProject, ReportJob
 
 qa_report_def = QA_REPORT[QA_REPORT_DEFAULT]
 qa_report_api = qa_report.QAReportApi(qa_report_def.get('domain'), qa_report_def.get('token'))
-jenkins_api = qa_report.JenkinsApi('ci.linaro.org', None)
+jenkins_def = JENKINS[JENKINS_DEFAULT]
+jenkins_api = qa_report.JenkinsApi(jenkins_def.get('domain'), jenkins_def.get('token'), user=jenkins_def.get('user'))
 irc = IRC.getInstance()
 
 DIR_ATTACHMENTS = os.path.join(FILES_DIR, 'lkft')
