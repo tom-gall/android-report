@@ -44,6 +44,14 @@ bind_passwd="" ## TO BE UPDATED
 
 BUGZILLA_API_KEY = '' ## TO BE UPDATED
 
+JENKINS = {
+    'default': {
+                'domain': 'ci.linaro.org',
+                'user': '', ## TO BE UPDATED
+                'token': '', ## TO BE UPDATED
+                },
+}
+
 QA_REPORT = {
     'production': {
                     'nick': 'production',
@@ -106,6 +114,7 @@ if ENABLE_APP_REPORT:
 ########################################################################
 
 QA_REPORT_DEFAULT = 'production'
+JENKINS_DEFAULT = 'default'
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.11/howto/deployment/checklist/

@@ -28,7 +28,7 @@ from django.contrib.auth.decorators import login_required
 from django.utils.timesince import timesince
 
 from lcr.settings import FILES_DIR, LAVA_SERVERS, BUGZILLA_API_KEY, BUILD_WITH_JOBS_NUMBER
-from lcr.settings import QA_REPORT, QA_REPORT_DEFAULT
+from lcr.settings import QA_REPORT, QA_REPORT_DEFAULT, JENKINS, JENKINS_DEFAULT
 from lcr.irc import IRC
 
 from lcr import qa_report, bugzilla

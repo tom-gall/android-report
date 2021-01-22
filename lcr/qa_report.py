@@ -34,9 +34,10 @@ class ParameterInvalidException(Exception):
 
 
 class RESTFullApi():
-    def __init__(self, domain, api_token):
+    def __init__(self, domain, api_token, auth=None):
         self.domain = domain
         self.api_token = api_token
+        self.auth = auth
 
     def call_with_full_url(self, request_url='', method='GET', returnResponse=False, post_data=None):
         headers = {
@@ -47,10 +48,10 @@ class RESTFullApi():
             headers['Auth-Token'] = self.api_token
 
         if method == 'GET':
-            r = requests.get(request_url, headers=headers)
+            r = requests.get(request_url, headers=headers, auth=self.auth)
         else:
             headers['Content-Type'] = 'application/x-www-form-urlencoded'
-            r = requests.post(request_url, headers=headers, data=post_data)
+            r = requests.post(request_url, headers=headers, data=post_data, auth=self.auth)
 
         if returnResponse:
             return r
@@ -89,6 +90,14 @@ class RESTFullApi():
 
 
 class JenkinsApi(RESTFullApi):
+    def __init__(self, domain, api_token, user=None):
+        from requests.auth import HTTPBasicAuth
+        if user is not None:
+            auth = HTTPBasicAuth(user, api_token)
+        else:
+            auth = None
+        super().__init__(domain, api_token, auth=HTTPBasicAuth(user, api_token))
+
     def get_api_url_prefix(self, detail_url):
         # https://ci.linaro.org/job/trigger-lkft-aosp-mainline/api/json
         return 'https://%s/job/%s/api/json/' % (self.domain, detail_url)
@@ -477,6 +486,8 @@ class TestNumbers():
         self.jobs_finished = self.jobs_finished + numbers_of_result.get('jobs_finished', 0)
         self.jobs_total = self.jobs_total + numbers_of_result.get('jobs_total', 0)
 
+        return self
+
 
     def addWithTestNumbers(self, testNumbers):
         self.number_passed = self.number_passed + testNumbers.number_passed
@@ -486,3 +497,5 @@ class TestNumbers():
         self.modules_total = self.modules_total + testNumbers.modules_total
         self.jobs_finished = self.jobs_finished + testNumbers.jobs_finished
         self.jobs_total = self.jobs_total + testNumbers.jobs_total
+
+        return self
