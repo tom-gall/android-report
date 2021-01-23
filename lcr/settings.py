@@ -21,7 +21,42 @@ FILES_DIR = os.path.join(DATA_FILE_DIR, "files/cts-vts")
 
 
 ######################################################################
-############INFO TO BE UPDATED########################################
+############ DEFAULT SETTINGS ########################################
+######################################################################
+
+db_name = "" ## TO BE UPDATED
+db_username = "" ## TO BE UPDATED
+db_passwd = "" ## TO BE UPDATED
+bind_user = "" ## TO BE UPDATED
+bind_passwd = "" ## TO BE UPDATED
+jenkins_user = None ## TO BE UPDATED
+jenkins_token = "" ## TO BE UPDATED
+qareport_token = "" ## TO BE UPDATED
+lava_production_user = "" ## TO BE UPDATED
+lava_production_token = "" ## TO BE UPDATED
+lava_lkft_user = "" ## TO BE UPDATED
+lava_lkft_token = "" ## TO BE UPDATED
+lava_staging_user = "" ## TO BE UPDATED
+lava_stagin_token = "" ## TO BE UPDATED
+irc_channel = "#linaro-lkft-report" ## TO BE UPDATED
+irc_botnick = "android-bot" ## TO BE UPDATED
+irc_botpass = "" ## TO BE UPDATED
+
+BUGZILLA_API_KEY = '' ## TO BE UPDATED
+
+# old file might be removed from archive.validation.linaro.org already
+# so only list numbers for the recent 20 builds
+BUILD_WITH_JOBS_NUMBER = 10
+
+# indicate if the instance is deployed with apache or run as single django instance
+DEPLOYED_WITH_APACHE = False
+
+######################################################################
+############VALUE TO OVERRIDE THE DEFAULT SETTINGS     ###############
+######################################################################
+
+######################################################################
+############BETTER TO NOT UPDATE THE FOLLOWING SETTINGS###############
 ######################################################################
 IRC_CONFIG = {
     'enable': False,
@@ -29,26 +64,17 @@ IRC_CONFIG = {
         'server': "chat.freenode.net", # Provide a valid server IP/Hostname
         #port = 6697
         'port': 6667,
-        'channel': "#liuyq-test",
-        'botnick':"lkft-android-bot",
-        'botnickpass': "botnickpass",
-        'botpass': "botpass"
+        'channel': irc_channel,
+        'botnick': irc_botnick,
+        'botpass': irc_botpass,
     }
 }
-
-db_name = "" ## TO BE UPDATED
-db_username = "" ## TO BE UPDATED
-db_passwd = "" ## TO BE UPDATED
-bind_user="" ## TO BE UPDATED
-bind_passwd="" ## TO BE UPDATED
-
-BUGZILLA_API_KEY = '' ## TO BE UPDATED
 
 JENKINS = {
     'default': {
                 'domain': 'ci.linaro.org',
-                'user': '', ## TO BE UPDATED
-                'token': '', ## TO BE UPDATED
+                'user': jenkins_user, ## TO BE UPDATED
+                'token': jenkins_token, ## TO BE UPDATED
                 },
 }
 
@@ -56,27 +82,27 @@ QA_REPORT = {
     'production': {
                     'nick': 'production',
                     'domain': 'qa-reports.linaro.org',
-                    'token': '', ## TO BE UPDATED
+                    'token': qareport_token, ## TO BE UPDATED
                     },
     }
 LAVA_SERVERS = {
     'lkft': {
                 'nick':'lkft',
                 'hostname': 'lkft.validation.linaro.org',
-                'username': '', ## TO BE UPDATED
-                'token': '', ## TO BE UPDATED
+                'username': lava_lkft_user, ## TO BE UPDATED
+                'token': lava_lkft_token, ## TO BE UPDATED
             },
     'production': {
                 'nick': 'production',
                 'hostname': 'validation.linaro.org',
-                'username': '', ## TO BE UPDATED
-                'token': '', ## TO BE UPDATED
+                'username': lava_production_user, ## TO BE UPDATED
+                'token': lava_production_token, ## TO BE UPDATED
                 },
     'staging': {
                 'nick': 'staging',
                 'hostname': 'staging.validation.linaro.org',
-                'username': '', ## TO BE UPDATED
-                'token': '', ## TO BE UPDATED
+                'username': lava_staging_user, ## TO BE UPDATED
+                'token': lava_stagin_token, ## TO BE UPDATED
                 },
 }
 
@@ -122,22 +148,12 @@ JENKINS_DEFAULT = 'default'
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'dr663lyqjd_b-a*0ttwcycp5wfm7&$0-#l6odw#^==ewq!s51s'
 
-
-
-# old file might be removed from archive.validation.linaro.org already
-# so only list numbers for the recent 20 builds
-BUILD_WITH_JOBS_NUMBER = 20
-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
 ALLOWED_HOSTS = [u'127.0.0.1',
-                 u'192.168.0.104',
-                 u'192.168.31.221',
-                 u'213.146.155.43',
                  u'android.linaro.org',
-                 u'192.168.0.106']
-
+                 ]
 
 # Application definition
 
@@ -219,12 +235,14 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/1.11/howto/static-files/
 
-# python  manage.py collectstatic
-STATIC_ROOT = os.path.join(BASE_DIR, "static")
-STATIC_URL = '/static/'
-#STATICFILES_DIRS = [
-#    os.path.join(BASE_DIR, "static"),
-#]
+if DEPLOYED_WITH_APACHE:
+    # python  manage.py collectstatic
+    STATIC_ROOT = os.path.join(BASE_DIR, "static")
+else:
+    STATIC_URL = '/static/'
+    STATICFILES_DIRS = [
+        os.path.join(BASE_DIR, "static"),
+    ]
 
 LOGGING = {
     'version': 1,

@@ -51,7 +51,7 @@ class RESTFullApi():
             r = requests.get(request_url, headers=headers, auth=self.auth)
         else:
             headers['Content-Type'] = 'application/x-www-form-urlencoded'
-            r = requests.post(request_url, headers=headers, data=post_data, auth=self.auth)
+            r = requests.post(request_url, headers=headers, data=post_data)
 
         if returnResponse:
             return r
@@ -96,7 +96,7 @@ class JenkinsApi(RESTFullApi):
             auth = HTTPBasicAuth(user, api_token)
         else:
             auth = None
-        super().__init__(domain, api_token, auth=HTTPBasicAuth(user, api_token))
+        super().__init__(domain, api_token, auth=auth)
 
     def get_api_url_prefix(self, detail_url):
         # https://ci.linaro.org/job/trigger-lkft-aosp-mainline/api/json
