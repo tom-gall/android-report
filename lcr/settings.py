@@ -51,6 +51,7 @@ BUILD_WITH_JOBS_NUMBER = 10
 # indicate if the instance is deployed with apache or run as single django instance
 DEPLOYED_WITH_APACHE = False
 
+DB_USE_POSTGRES = False
 ######################################################################
 ############VALUE TO OVERRIDE THE DEFAULT SETTINGS     ###############
 ######################################################################
@@ -108,22 +109,24 @@ LAVA_SERVERS = {
 
 # Database
 # https://docs.djangoproject.com/en/1.11/ref/settings/#databases
-
-DATABASES = { ## TO BE UPDATED
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(DATA_FILE_DIR, 'db.sqlite3'),
+if DB_USE_POSTGRES:
+    DATABASES = { ## TO BE UPDATED
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql_psycopg2',
+            'NAME': '%s' % db_name,
+            'USER': '%s' % db_username,
+            'PASSWORD': '%s' % db_passwd,
+            'HOST': 'localhost',
+            'PORT': '',
+        }
     }
-    #'default': {
-    #    'ENGINE': 'django.db.backends.postgresql_psycopg2',
-    #    'NAME': '%s' % db_name,
-    #    'USER': '%s' % db_username,
-    #    'PASSWORD': '%s' % db_passwd,
-    #    'HOST': 'localhost',
-    #    'PORT': '',
-    #}
-}
-
+else:
+    DATABASES = { ## TO BE UPDATED
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': os.path.join(DATA_FILE_DIR, 'db.sqlite3'),
+        }
+    }
 
 APPS_TOBE_ADDED = [
     'lkft',
@@ -268,7 +271,7 @@ LOGGING = {
             'level':'DEBUG',
             'class':'logging.handlers.RotatingFileHandler',
             'filename': os.path.join(DATA_FILE_DIR, "logfiles/logfile"),
-            'maxBytes': 50000,
+            'maxBytes': 5000000,
             'backupCount': 2,
             'formatter': 'standard',
         },
