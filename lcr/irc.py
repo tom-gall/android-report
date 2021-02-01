@@ -4,9 +4,12 @@
 # https://linuxacademy.com/blog/linux-academy/creating-an-irc-bot-with-python3/
 # https://tools.ietf.org/html/rfc1459
 # https://freenode.net/kb/answer/registration
+
+import base64
 import datetime
 import logging
 import socket
+import ssl
 import sys
 import threading
 import time
@@ -76,7 +79,7 @@ class IRC:
 
     def dealWithFunctions(self):
         while True:
-            text = self.get_response()
+            text = self.getPingOrPRIMSG()
             for key_word, irc_func in self.getFuncions().items():
                 #if resp.find('PING') != -1:
                 if text and (text.find(key_word) != -1):
@@ -125,7 +128,7 @@ class IRC:
             self.__instance = None  # [Errno 9] Bad file descriptor
 
 
-    def sendAndQuit(self, msgStrOrAry=None):
+    def sendAndQuit(self, msgStrOrAry=None, using_sasl=True):
         if self.server is None:
             # should be only available when irc notification enabled
             return
@@ -134,7 +137,7 @@ class IRC:
             # and the server instance could share the lock
             #with self.connect_lock:
             self.connect_lock.acquire() # OSError: [Errno 106] Transport endpoint is already connected
-            self.connect()
+            self.connect(using_sasl=using_sasl)
             self.connect_lock.release() # OSError: [Errno 106] Transport endpoint is already connected
 
             self.send(msgStrOrAry=msgStrOrAry)
@@ -142,14 +145,40 @@ class IRC:
             self.quit()
 
 
-    def connectWithConfigs(self, server, port, channel, botnick, botpass):
-        if self.irc_socket is None:
-            self.irc_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    def authenticateWithASAL(self, botnick, botpass):
+        # https://ircv3.net/
+        # https://ircv3.net/specs/core/capability-negotiation
+        # https://tools.ietf.org/search/rfc4616
+        # https://en.wikipedia.org/wiki/List_of_Internet_Relay_Chat_commands#USER
+        # https://tools.ietf.org/html/rfc2812
+        self.sendCommand("CAP REQ :sasl")
+        self.sendCommand("NICK %s" % botnick)
+        self.sendCommand("USER %s 0 * :%s" % (botnick, botnick))
 
-        # Connect to the server
-        logger.info("Connecting to: " + server)
-        self.irc_socket.connect((server, int(port))) # OSError: [Errno 106] Transport endpoint is already connected
+        if not self.wait_text("CAP * ACK :sasl"):
+            logger.warn("Failed to get the correct response from server for CAP REQ :sasl")
+            return False
 
+        self.sendCommand("AUTHENTICATE PLAIN")
+        if not self.wait_text("AUTHENTICATE +"):
+            logger.warn("Failed to get the correct response from server for AUTHENTICATE PLAIN")
+            return False
+
+        creds = '{username}\0{username}\0{password}'.format(username=botnick, password=botpass)
+        self.sendCommand('AUTHENTICATE {}'.format(base64.b64encode(creds.encode('utf8')).decode('utf8')))
+        if not self.wait_text("{} :SASL authentication successful".format(botnick)):
+            logger.warn("Failed to get the correct response for SASL authentication with the user of {}".format(botnick))
+            return False
+
+        self.sendCommand("CAP END")
+        if not self.wait_text("001 {} :Welcome to the freenode Internet Relay Chat Network {}".format(botnick, botnick)):
+            logger.warn("Failed to get the correct response for welcome for the user of {}".format(botnick))
+            return False
+        else:
+            logger.info("Welcome, {}".format(botnick))
+
+
+    def authenticate(self, botnick, botpass):
         # Perform user authentication
         self.irc_socket.send(bytes("USER " + botnick + " " + botnick +" " + botnick + " :python\n", "UTF-8"))
         logger.info("after send command USER to: " + server)
@@ -173,6 +202,8 @@ class IRC:
                 time.sleep(3)
                 sleep_time = sleep_time + 3
 
+
+    def join(self, channel):
         # continue to try, but the result won't be as expected
         # join the channel
         logger.info("Try to join: " + channel)
@@ -181,33 +212,54 @@ class IRC:
         joined = False
         sleep_time = 0
         while not joined:
-            if sleep_time > 25:
+            if sleep_time > 120:
                 logger.info("Failed to join %s " % self.channel)
                 break
-            text = self.irc_socket.recv(2040).decode("UTF-8")
+            text = self.get_response()
             if text.find(str_joined) != -1:
                 logger.info("found joined message")
                 joined = True
             else:
                 logger.debug("%d not found joined message" % sleep_time)
-                time.sleep(3)
-                sleep_time = sleep_time + 3
-        logger.info("joined to: " + channel)
+                time.sleep(10)
+                sleep_time = sleep_time + 10
+        if joined:
+            logger.info("joined to: " + channel)
+            return True
+        else:
+            return False
 
 
-    def connect(self):
-        self.connectWithConfigs(self.server, self.port, self.channel, self.botnick, self.botpass)
+    def connectOnly(self, server, port):
+        if self.irc_socket is None:
+            self.irc_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            if str(port) == '6697':
+                self.irc_socket = ssl.wrap_socket(self.irc_socket)
+
+        # Connect to the server
+        logger.info("Connecting to: " + server)
+        self.irc_socket.connect((server, int(port))) # OSError: [Errno 106] Transport endpoint is already connected
+
+    def connectAuthenticate(self, server, port, botnick, botpass, using_sasl=False):
+        self.connectOnly(server, port)
+        if using_sasl:
+            self.authenticateWithASAL(botnick, botpass)
+        else:
+            self.authenticate(botnick, botpass)
+
+
+    def connectAuthenticateJoin(self, server, port, channel, botnick, botpass, using_sasl=False):
+        self.connectAuthenticate(server, port, botnick, botpass, using_sasl=using_sasl)
+        self.join(channel)
+
+
+    def connect(self, using_sasl=False):
+        self.connectAuthenticateJoin(self.server, self.port, self.channel, self.botnick, self.botpass, using_sasl=using_sasl)
 
 
     # only deal with the message to this irc nick and channel
-    def get_response(self):
-        if self.irc_socket is None:
-            return None
-
-        time.sleep(1)
-        # Get the response
-        resp = self.irc_socket.recv(2040).decode("UTF-8")
-
+    def getPingOrPRIMSG(self):
+        resp = self.get_response()
         if resp.find("PING :") != -1:
             return resp
 
@@ -220,19 +272,63 @@ class IRC:
         return resp
 
 
+    def get_response(self):
+        if self.irc_socket is None:
+            logger.info("RESPONSE: irc_socket is None")
+            return None
+
+        try:
+            reader = getattr(self.irc_socket, 'read', self.irc_socket.recv)
+            new_data = reader(2 ** 14)
+        except socket.error:
+            # The server hung up.
+            self.disconnect("Connection reset by peer")
+            return None
+        if not new_data:
+            # Read nothing: connection must be down.
+            logger.info("Nothing read, the connection might be down")
+            return None
+
+        resp = new_data.decode("UTF-8")
+        logger.debug("RESPONSE: %s" % resp)
+        return resp
+
+
+    def wait_text(self, target_text, timeout=10):
+        wait_time = timeout
+        while wait_time >= 0:
+            text = self.get_response()
+            if text.find(target_text) != -1:
+                return True
+            time.sleep(3)
+            wait_time = wait_time -3
+        return False
+
+
+    def sendCommand(self, commandStr):
+        logger.debug("send command %s" % commandStr)
+        self.irc_socket.send( bytes(commandStr, "UTF-8")+ b'\r\n')
+
+
 def func_hello(irc=None, text=""):
     if irc is not None and text:
         # :liuyq!liuyq@gateway/shell/linaro/x-ykpaytiswxaohqwr PRIVMSG #liuyq-test :lkft-android-bot PING
         irc.send('Hello %s, the time is %s now:' % (text.split('!')[0].strip(':'), str(datetime.datetime.now())))
 
+
 def main():
     irc = IRC.getInstance()
 
-    func_listener = {
-        'hello': func_hello,
-    }
+    #func_listener = {
+    #    'hello': func_hello,
+    #}
 
-    irc.addFunctions(func_listener)
+    #irc.addFunctions(func_listener)
+    irc.connectOnly('chat.freenode.net', 6697)
+    irc.authenticateWithASAL(irc_botnick, irc_botpass)
+    irc.join(irc_channel)
+    irc.send(msgStrOrAry=["Hello, finally finished {}!".format(datetime.datetime.now(tz=None).isoformat())])
+    irc.quit()
 
 if __name__ == "__main__":
     main()
