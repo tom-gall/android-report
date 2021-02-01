@@ -5,7 +5,7 @@ from __future__ import unicode_literals
 from django import forms
 from django.db.models import Q
 from django.http import HttpResponse
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 
 import collections
 import concurrent.futures
@@ -1859,6 +1859,7 @@ def list_describe_kernel_changes(request, branch, describe):
     kernel_change['number_total'] = db_kernel_change.number_total
     kernel_change['modules_done'] = db_kernel_change.modules_done
     kernel_change['modules_total'] = db_kernel_change.modules_total
+    kernel_change['reported'] = db_kernel_change.reported
 
     trigger_build = {}
     trigger_build['name'] = db_trigger_build.name
@@ -1944,6 +1945,15 @@ def list_describe_kernel_changes(request, branch, describe):
                             'resubmitted_jobs': resubmitted_jobs,
                         }
             )
+
+
+@login_required
+def mark_kernel_changes_reported(request, branch, describe):
+    db_kernel_change = KernelChange.objects.get(branch=branch, describe=describe)
+    db_kernel_change.reported = (not db_kernel_change.reported)
+    db_kernel_change.save()
+    return redirect("/lkft/kernel-changes/{}/{}/".format(branch, describe))
+
 
 ########################################
 ### Register for IRC functions

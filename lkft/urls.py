@@ -12,6 +12,7 @@ urlpatterns = [
     url(r'^kernel-changes/(%s)/$' % (basic_pat), views.list_branch_kernel_changes, name='list_branch_kernel_changes'),
     # newchanges/$branch/$describe/
     url(r'^kernel-changes/(%s)/(%s)/$' % (basic_pat, basic_pat), views.list_describe_kernel_changes, name='list_describe_kernel_changes'),
+    url(r'^changereportstatus/(%s)/(%s)/$' % (basic_pat, basic_pat), views.mark_kernel_changes_reported, name='mark_kernel_changes_reported'),
     url(r'^builds/.*$', views.list_builds, name='list_builds'),
     url(r'^jobs/.*$', views.list_jobs, name='list_jobs'),
     url(r'^alljobs/.*$', views.list_all_jobs, name='list_all_jobs'),

@@ -22,6 +22,10 @@
         <td>{{kernel_change.result}}</td>
     </tr>
     <tr>
+        <th>Reported Status</th>
+        <td>{{kernel_change.reported|yesno:"True,False"}}， <a href="/lkft/changereportstatus/{{kernel_change.branch}}/{{kernel_change.describe}}">want to revert?</a></td>
+    </tr>
+    <tr>
         <th>Trigger</th>
         <td><a href="https://ci.linaro.org/job/{{kernel_change.trigger_name}}/{{kernel_change.trigger_number}}">{{kernel_change.trigger_name}}#{{kernel_change.trigger_number}}</a></td>
     </tr>
