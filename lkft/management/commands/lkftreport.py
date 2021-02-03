@@ -195,6 +195,8 @@ class Command(BaseCommand):
             kernel_change.number_total = test_numbers.number_total
             kernel_change.modules_done = test_numbers.modules_done
             kernel_change.modules_total = test_numbers.modules_total
+            kernel_change.jobs_finished = test_numbers.jobs_finished
+            kernel_change.jobs_total = test_numbers.jobs_total
             kernel_change.save()
 
             # Try to cache report build informtion to database
@@ -228,6 +230,8 @@ class Command(BaseCommand):
                     report_build.number_total = result_numbers.get('number_total')
                     report_build.modules_done = result_numbers.get('modules_done')
                     report_build.modules_total = result_numbers.get('modules_total')
+                    report_build.jobs_finished = result_numbers.get('jobs_finished')
+                    report_build.jobs_total = result_numbers.get('jobs_total')
                     report_build.started_at = trigger_build.get('start_timestamp')
                     report_build.fetched_at = qareport_build.get('last_fetched_timestamp')
                     report_build.qa_build_id = qareport_build.get('id')
@@ -244,6 +248,8 @@ class Command(BaseCommand):
                                         number_total=result_numbers.get('number_total'),
                                         modules_done=result_numbers.get('modules_done'),
                                         modules_total=result_numbers.get('modules_total'),
+                                        jobs_finished=result_numbers.get('jobs_finished'),
+                                        jobs_total=result_numbers.get('jobs_total'),
                                         started_at=trigger_build.get('start_timestamp'),
                                         fetched_at=qareport_build.get('last_fetched_timestamp'),
                                         status=qareport_build.get('build_status'),
@@ -347,15 +353,22 @@ class Command(BaseCommand):
             status = kernel_change_report.get('kernel_change_status')
             index = index + 1
             if status == "ALL_COMPLETED":
-                ircMsg = "%d/%d: %s %s %s %s, %s/%s passed, %s/%s done" % (index, num_kernelchanges,
+                ircMsg = "%d/%d: %s/%s %s %s, %s/%s passed, %s/%s modules done, %s/%s jobs finished" % (index, num_kernelchanges,
                                      kernel_change.branch,
                                      kernel_change.describe,
                                      kernel_change.result,
                                      timesince(kernel_change.timestamp),
                                      kernel_change.number_passed, kernel_change.number_total,
-                                     kernel_change.modules_done, kernel_change.modules_total)
+                                     kernel_change.modules_done, kernel_change.modules_total,
+                                     kernel_change.jobs_finished, kernel_change.jobs_total,
+                                     )
             else:
-                ircMsg = "%d/%d: %s %s %s %s" % (index, num_kernelchanges, kernel_change.branch, kernel_change.describe, kernel_change.result, timesince(kernel_change.timestamp))
+                ircMsg = "%d/%d: %s/%s %s %s" % (index, num_kernelchanges, kernel_change.branch, kernel_change.describe, kernel_change.result, timesince(kernel_change.timestamp))
+
+            if kernel_change.jobs_finished != kernel_change.jobs_total \
+                    or status == "CI_BUILDS_ALL_FAILED" \
+                    or status == "CI_BUILDS_HAS_FAILED":
+                ircMsg = ircMsg + ", liuyq"
 
             if irc_report_type == 'ALL':
                 ircMsgList.append(ircMsg)

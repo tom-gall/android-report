@@ -390,6 +390,9 @@ class QAReportApi(RESTFullApi):
         api_url = 'api/forceresubmit/%s' % qa_job_id
         return self.call_with_api_url(api_url=api_url, method='POST', returnResponse=True)
 
+    '''
+        Possible job status: Submitted, Complete, Incomplete
+    '''
     def set_job_status(self, job):
         if job.get('job_status') is None and \
             job.get('submitted') and \

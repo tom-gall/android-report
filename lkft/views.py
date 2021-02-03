@@ -347,8 +347,10 @@ def get_testcases_number_for_job(job):
             except zipfile.BadZipFile:
                 logger.info("File is not a zip file: %s" % result_file_path)
 
+    elif job.get('job_status') == 'Complete':
+        finished_successfully = True
     else:
-         finished_successfully = True
+        finished_successfully = False
 
     job['numbers'] = {
             'number_passed': int(job_number_passed),
@@ -1787,6 +1789,8 @@ def get_kernel_changes_info_wrapper_for_display(db_kernelchanges=[]):
             kernelchange_return['number_total'] = db_kernelchange.number_total
             kernelchange_return['modules_done'] = db_kernelchange.modules_done
             kernelchange_return['modules_total'] = db_kernelchange.modules_total
+            kernelchange_return['jobs_finished'] = db_kernelchange.jobs_finished
+            kernelchange_return['jobs_total'] = db_kernelchange.jobs_total
         else:
             test_numbers = kernelchange.get('test_numbers')
             kernelchange_return['start_timestamp'] = kernelchange.get('start_timestamp')
@@ -1800,6 +1804,8 @@ def get_kernel_changes_info_wrapper_for_display(db_kernelchanges=[]):
             kernelchange_return['number_total'] = test_numbers.number_total
             kernelchange_return['modules_done'] = test_numbers.modules_done
             kernelchange_return['modules_total'] = test_numbers.modules_total
+            kernelchange_return['jobs_finished'] = test_numbers.jobs_finished
+            kernelchange_return['jobs_total'] = test_numbers.jobs_total
 
         kernelchanges_return.append(kernelchange_return)
 
@@ -1859,6 +1865,8 @@ def list_describe_kernel_changes(request, branch, describe):
     kernel_change['number_total'] = db_kernel_change.number_total
     kernel_change['modules_done'] = db_kernel_change.modules_done
     kernel_change['modules_total'] = db_kernel_change.modules_total
+    kernel_change['jobs_finished'] = db_kernel_change.jobs_finished
+    kernel_change['jobs_total'] = db_kernel_change.jobs_total
     kernel_change['reported'] = db_kernel_change.reported
 
     trigger_build = {}
@@ -1891,6 +1899,8 @@ def list_describe_kernel_changes(request, branch, describe):
         report_build['number_total'] = db_report_build.number_total
         report_build['modules_done'] = db_report_build.modules_done
         report_build['modules_total'] = db_report_build.modules_total
+        report_build['jobs_finished'] = db_report_build.jobs_finished
+        report_build['jobs_total'] = db_report_build.jobs_total
         report_build['qa_build_id'] = db_report_build.qa_build_id
         report_build['status'] = db_report_build.status
         if db_report_build.fetched_at and db_report_build.started_at:

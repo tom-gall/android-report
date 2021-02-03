@@ -29,6 +29,8 @@ class KernelChange(models.Model):
     number_total = models.IntegerField(default=0)
     modules_done = models.IntegerField(default=0)
     modules_total = models.IntegerField(default=0)
+    jobs_finished = models.IntegerField(default=0)
+    jobs_total = models.IntegerField(default=0)
 
 
     def __str__(self):
@@ -101,6 +103,8 @@ class ReportBuild(models.Model):
     number_total = models.IntegerField(default=0)
     modules_done = models.IntegerField(default=0)
     modules_total = models.IntegerField(default=0)
+    jobs_finished = models.IntegerField(default=0)
+    jobs_total = models.IntegerField(default=0)
 
     # the time the trigger build was started
     started_at = models.DateTimeField(null=True)

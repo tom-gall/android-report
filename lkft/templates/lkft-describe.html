@@ -61,6 +61,14 @@
         <th>Modules Total</th>
         <td align='right'>{{kernel_change.modules_total}}</td>
     </tr>
+    <tr>
+        <th>Jobs Finished</th>
+        <td align='right'>{{kernel_change.jobs_finished}}</td>
+    </tr>
+    <tr>
+        <th>Jobs Total</th>
+        <td align='right'>{{kernel_change.jobs_total}}</td>
+    </tr>
 </table>
 
 </div>
@@ -126,6 +134,8 @@
         <th>Total</th>
         <th>Modules Done</th>
         <th>Modules Total</th>
+        <th>Jobs Finished</th>
+        <th>Jobs Total</th>
 </tr>
 {% for report_build in report_builds %}
 <tr>
@@ -143,6 +153,8 @@
     <td align='right'><a href="/lkft/jobs/?build_id={{report_build.qa_build_id}}">{{report_build.number_total}}</a></td>
     <td align='right'><a href="/lkft/jobs/?build_id={{report_build.qa_build_id}}">{{report_build.modules_done}}</a></td>
     <td align='right'><a href="/lkft/jobs/?build_id={{report_build.qa_build_id}}">{{report_build.modules_total}}</a></td>
+    <td align='right'><a href="/lkft/jobs/?build_id={{report_build.qa_build_id}}">{{report_build.jobs_finished}}</a></td>
+    <td align='right'><a href="/lkft/jobs/?build_id={{report_build.qa_build_id}}">{{report_build.jobs_total}}</a></td>
 </tr>
 {% endfor %}
 </table>

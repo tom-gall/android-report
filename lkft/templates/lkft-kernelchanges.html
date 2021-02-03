@@ -20,6 +20,7 @@
         <th>Total</th>
         <th>Modules Done</th>
         <th>Modules Total</th>
+        <th>JobsFinished/JobsTotal</th>
 </tr>
 {% for kernelchange in kernelchanges %}
 <tr>
@@ -49,6 +50,7 @@
     <td align='right'>{{kernelchange.number_total}}</td>
     <td align='right'>{{kernelchange.modules_done}}</td>
     <td align='right'>{{kernelchange.modules_total}}</td>
+    <td align='right'>{{kernelchange.jobs_finished}}/{{kernelchange.jobs_total}}</td>
 </tr>
 {% endfor %}
 </table>
