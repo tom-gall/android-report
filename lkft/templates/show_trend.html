@@ -1,0 +1,87 @@
+{% load static%}
+{% load getatindex%}
+
+{% with one_benchmark_job.trend_data as trend_data %}
+
+{% block javascript %}
+{% if trend_data %}
+<!-- http://www.chartjs.org/docs/latest/charts/line.html -->
+<script src="{% static "report/Chart.min.js" %}"></script>
+<!-- http://google.github.io/palette.js/ -->
+<script src="{% static "report/palette.js" %}"></script>
+{% endif %}
+{% endblock %}
+
+
+{% block content %}
+{% if trend_data %}
+<h2>Trend Chart for {{one_benchmark_job.benchmark_job_name}}</h2>
+<canvas id="myChart-{{one_benchmark_job.benchmark_job_name}}"></canvas>
+<script type="text/javascript">
+var ctx = document.getElementById('myChart-{{one_benchmark_job.benchmark_job_name}}').getContext('2d');
+var colors = palette('mpn65', {{ one_benchmark_job.all_testcases|length }}).map(function(hex) {
+            return '#' + hex;
+            });
+var chart = new Chart(ctx, {
+    // The type of chart we want to create
+    type: 'line',
+
+    // The data for our dataset
+    data: {
+        labels: [
+                {% for one_build in trend_data reversed %}
+                "{{ one_build.build_no }}",
+                {% endfor %}
+                ],
+        datasets: [
+            {% for test_case in one_benchmark_job.all_testcases %}
+            {
+                label: "{{ test_case }} ",
+                borderColor: colors[{{forloop.counter0}}],
+                "lineTension": 0,
+                "fill":false,
+                data: [
+                {% for one_build in trend_data reversed %}
+                    {% with one_build.test_cases_res|get_at_index:forloop.parentloop.counter0 as test_case_res %}
+                        "{{ test_case_res.measurement }}",
+                    {% endwith %}
+                {% endfor %}
+                ],
+            },
+            {% endfor %}
+        ],
+    },
+    // Configuration options go here
+    options: {}
+});
+</script>
+<h2>Data List for {{one_benchmark_job.benchmark_job_name}}</h2>
+<table border=2>
+<tr>
+    <th>Index</th>
+    <th>Build Number</th>
+    {% for test_case in one_benchmark_job.all_testcases %}
+    <th>{{ test_case }}</th>
+    {% endfor %}
+</tr>
+{% for one_build in trend_data %}
+<tr>
+    <td align="left"> {{forloop.counter }}</td>
+	<td align="left"> <a href="/lkft/jobs?build_id={{one_build.qa_build_id}}">{{ one_build.build_no }}</a></td>
+	{% with one_build.test_cases_res as test_cases_res %}
+	{% for test_case_res in test_cases_res %}
+	<td align="right"> <a href="{{test_case_res.job_lava_url}}">{{test_case_res.measurement}}</a> </td>
+	{% endfor %}
+	{% endwith %}
+</tr>
+{% endfor %}
+</table>
+{% else %}
+<div>
+	No history data yet.<br/>
+	Please go to the test report page to check: <a href="/report/test-report/?build_name={{ build_name }}">{{ build_name }}</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% endwith %}

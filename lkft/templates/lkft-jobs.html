@@ -103,6 +103,33 @@
 </div>
 <hr/>
 
+<h2>Benchmarks</h2>
+{% if benchmarks_res %}
+<table border="2">
+<tr>
+    <th>Index</th>
+    <th>Benchmarks</th>
+    <th>Test Suite</th>
+    <th>Test Case</th>
+    <th>Unit</th>
+    <th>Measurement</th>
+</tr>
+{% for test_info in benchmarks_res %}
+<tr>
+    <td> {{ forloop.counter }}</td>
+    <td nowrap> <a href="{{test_info.job_external_url}}">{{test_info.job_name}} </a></td>
+    <td> {{ test_info.test_suite }}</td>
+    <td> {{ test_info.test_case }}</td>
+    <td> {{ test_info.unit }}</td>
+    <td align='right'> {{ test_info.measurement }}</td>
+</tr>
+{% endfor %}
+</table>
+{% else %}
+No result for benchmark test jobs.
+{% endif %}
+<hr/>
+
 <div>
 <h2>Bug Status(<a href="https://bugs.linaro.org/buglist.cgi?quicksearch={{project.name}}">List on Bugzilla</a>):</h2>
 {% if open_bugs %}

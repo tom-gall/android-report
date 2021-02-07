@@ -6,6 +6,79 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
+benchmarks_common = {  # job_name: {'test_suite':['test_case',]},
+                "boottime": {
+                              #'boottime-analyze': ['KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg' ],
+                              'boottime-first-analyze': ['KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg' ],
+                              'boottime-second-analyze': ['KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg' ],
+                            },
+                # "basic": {
+                #             "meminfo-first": [ 'MemTotal', 'MemFree', 'MemAvailable'],
+                #             #"meminfo": [ 'MemTotal', 'MemFree', 'MemAvailable'],
+                #             "meminfo-second": [ 'MemTotal', 'MemFree', 'MemAvailable'],
+                #          },
+
+                # 'monkey': { 'monkey': ['monkey-network-stats'] },
+                # 'andebenchpro2015': {'andebenchpro2015':[] },
+                # 'antutu6': { 'antutu6': ['antutu6-sum-mean'] },
+                'benchmarkpi': {'benchmarkpi': ['benchmarkpi',]},
+                'caffeinemark': {'caffeinemark': ['Caffeinemark-Collect-score', 'Caffeinemark-Float-score', 'Caffeinemark-Loop-score',
+                                      'Caffeinemark-Method-score', 'Caffeinemark-score', 'Caffeinemark-Sieve-score', 'Caffeinemark-String-score']},
+                'cf-bench': {'cf-bench': ['cfbench-Overall-Score', 'cfbench-Java-Score', 'cfbench-Native-Score']},
+                'gearses2eclair': {'gearses2eclair': ['gearses2eclair',]},
+                # 'geekbench4': {'geekbench4': ['Geekbench4-Multi-Core-mean', 'Geekbench4-Single-Core-mean']},
+                # #'geekbench3': {'geekbench3': ['geekbench-multi-core-mean', 'geekbench-single-core-mean']},
+                'javawhetstone': {'javawhetstone': ['javawhetstone-MWIPS', 'javawhetstone-N1-float', 'javawhetstone-N2-float', 'javawhetstone-N3-if', 'javawhetstone-N4-fixpt',
+                                       'javawhetstone-N5-cos', 'javawhetstone-N6-float', 'javawhetstone-N7-equal', 'javawhetstone-N8-exp',]},
+                'jbench': {'jbench': ['jbench',]},
+                'linpack': {'linpack': ['Linpack-MFLOPSSingleScore', 'Linpack-MFLOPSMultiScore', 'Linpack-TimeSingleScore', 'Linpack-TimeMultiScore']},
+                'quadrantpro': {'quadrantpro': ['quadrandpro-benchmark-memory', 'quadrandpro-benchmark', 'quadrandpro-benchmark-g2d', 'quadrandpro-benchmark-io',
+                                     'quadrandpro-benchmark-cpu', 'quadrandpro-benchmark-g3d',]},
+                'rl-sqlite': {'rl-sqlite': ['RL-sqlite-Overall',]},
+                'scimark': {'scimark': ['scimark-FFT-1024', 'scimark-LU-100x100', 'scimark-SOR-100x100', 'scimark-Monte-Carlo', 'scimark-Composite-Score',]},
+                'vellamo3': {'vellamo3': ['vellamo3-Browser-total', 'vellamo3-Metal-total', 'vellamo3-Multi-total', 'vellamo3-total-score',]},
+
+                # 'glbenchmark25': {'glbenchmark25': ['Fill-rate-C24Z16-mean', 'Fill-rate-C24Z16-Offscreen-mean',
+                #                     'GLBenchmark-2.1-Egypt-Classic-C16Z16-mean', 'GLBenchmark-2.1-Egypt-Classic-C16Z16-Offscreen-mean',
+                #                     'GLBenchmark-2.5-Egypt-HD-C24Z16-Fixed-timestep-mean', 'GLBenchmark-2.5-Egypt-HD-C24Z16-Fixed-timestep-Offscreen-mean',
+                #                     'GLBenchmark-2.5-Egypt-HD-C24Z16-mean', 'GLBenchmark-2.5-Egypt-HD-C24Z16-Offscreen-mean',
+                #                     'Triangle-throughput-Textured-C24Z16-Fragment-lit-mean', 'Triangle-throughput-Textured-C24Z16-Offscreen-Fragment-lit-mean',
+                #                     'Triangle-throughput-Textured-C24Z16-mean', 'Triangle-throughput-Textured-C24Z16-Offscreen-mean',
+                #                     'Triangle-throughput-Textured-C24Z16-Vertex-lit-mean', 'Triangle-throughput-Textured-C24Z16-Offscreen-Vertex-lit-mean',
+                #                    ],},
+             }
+less_is_better_measurement = [
+                              'KERNEL_BOOT_TIME_avg', 'ANDROID_BOOT_TIME_avg', 'TOTAL_BOOT_TIME_avg',
+                              'benchmarkpi-mean',
+                              'Linpack-TimeSingleScore-mean', 'Linpack-TimeMultiScore-mean', 'RL-sqlite-Overall-mean'
+                             ]
+
+
+def get_expected_benchmarks():
+    return benchmarks_common
+
+def get_benchmark_testjob_names():
+    return benchmarks_common.keys()
+
+def get_benchmark_testsuites(lava_job_name):
+    b_name = get_benchmark_job_name(lava_job_name)
+    if b_name is not None:
+        return benchmarks_common.get(b_name)
+    else:
+        return None
+
+def get_benchmark_job_name(lava_job_name):
+    for b_job_name in get_benchmark_testjob_names():
+        if lava_job_name.endswith(b_job_name):
+            return b_job_name
+    return None
+
+
+def is_benchmark_job(lava_job_name):
+    benchmark_job_name = get_benchmark_job_name(lava_job_name)
+    return benchmark_job_name is not None
+
 '''
     {
         trigger_build: {
@@ -48,6 +121,8 @@ citrigger_lkft = {
         '4.14-stable-master-hikey960-lkft': 'lkft-generic-mirror-build',
         '4.19-stable-master-hikey-lkft': 'lkft-generic-mirror-build',
         '4.19-stable-master-hikey960-lkft': 'lkft-generic-mirror-build',
+        '4.14-stable-android11-hikey960-lkft': 'lkft-generic-mirror-build',
+        '4.19-stable-android11-hikey960-lkft': 'lkft-generic-mirror-build',
         },
 
     'trigger-lkft-android-common': {

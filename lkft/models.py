@@ -127,6 +127,7 @@ class ReportJob(models.Model):
     job_name = models.CharField(max_length=100)
     job_url = models.URLField(null=True)
     attachment_url = models.URLField(null=True)
+    results_cached = models.BooleanField(default=False)
 
     qa_job_id = models.IntegerField(default=0)
 
@@ -148,9 +149,31 @@ class ReportJob(models.Model):
     modules_total = models.IntegerField(default=0)
 
     def __str__(self):
-        return "%s#%s" % (self.job_name, self.report_build.version)
+        if self.report_build:
+            return "%s#%s" % (self.job_name, self.report_build.version)
+        else:
+            return "%s#%s" % (self.job_name, self.job_url)
 
     def __unicode__(self):
-        return "%s#%s" % (self.job_name, self.report_build.version)
+        if self.report_build:
+            return "%s#%s" % (self.job_name, self.report_build.version)
+        else:
+            return "%s#%s" % (self.job_name, self.job_url)
 
     objects = models.Manager()
+
+
+class TestCase(models.Model):
+    name = models.CharField(max_length=256)
+    result = models.CharField(max_length=16)
+    measurement = models.DecimalField( max_digits=20, decimal_places=2, null=True)
+    unit = models.CharField(max_length=128, null=True)
+    suite = models.CharField(max_length=64)
+    job_id = models.CharField(max_length=16)
+    lava_nick = models.CharField(max_length=64)
+
+    def __unicode__(self):
+        if self.measurement:
+            return "%s %s %s %s" % (self.name, self.result, self.measurement, self.unit)
+        else:
+            return "%s %s" % (self.name, self.result)

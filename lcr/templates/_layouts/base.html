@@ -1,4 +1,5 @@
 {% load static%}
+{% load getatindex%}
 
 <!DOCTYPE>
 <html>
@@ -87,6 +88,7 @@
         </div>
     </footer>
     <script src="{% static "report/jquery.min.js" %}"></script>
+    <script src="{% static "report/bootstrap.min.js" %}"></script>
     {% block js %}{% endblock js %}
 </body>
 </html>

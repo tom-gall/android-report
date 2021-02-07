@@ -230,13 +230,29 @@ class JenkinsApi(RESTFullApi):
 
 
 class LAVAApi(RESTFullApi):
-    def get_api_url_prefix(self):
-        return 'https://%s/api/v0.1/' % self.domain
+    username = None
 
+    def __init__(self, lava_config=None):
+        self.username = lava_config.get('username')
+        super().__init__(lava_config.get('hostname'), lava_config.get('token'))
+
+    def get_api_url_prefix(self):
+        return 'https://%s/api/v0.2/' % self.domain
 
     def get_job(self, job_id=None):
         api_url = "/jobs/%s" % job_id
         return self.call_with_api_url(api_url=api_url)
+
+    def get_job_results(self, job_id=None, lava_config=None):
+        url_result_yaml = "https://%s/results/%s/yaml?user=%s&token=%s" % (self.domain, job_id, self.username, self.api_token)
+        r = self.call_with_full_url(request_url=url_result_yaml, returnResponse=True)
+        if not r.ok and r.status_code == 404:
+            raise UrlNotFoundException(r)
+        elif not r.ok or r.status_code != 200:
+            raise Exception(r.url, r.reason, r.status_code)
+
+        results = yaml.safe_load(r.content)
+        return results
 
 
 class QAReportApi(RESTFullApi):
@@ -391,7 +407,7 @@ class QAReportApi(RESTFullApi):
         return self.call_with_api_url(api_url=api_url, method='POST', returnResponse=True)
 
     '''
-        Possible job status: Submitted, Complete, Incomplete
+        Possible job status: Submitted, Complete, Incomplete, Running
     '''
     def set_job_status(self, job):
         if job.get('job_status') is None and \
@@ -430,7 +446,7 @@ class QAReportApi(RESTFullApi):
 
     def get_job_definition(self, url_definition=None):
         response = self.call_with_full_url(request_url=url_definition, returnResponse=True)
-        job_definition = yaml.load(response.content)
+        job_definition = yaml.safe_load(response.content)
         return job_definition
 
     def get_lkft_qa_report_projects(self, include_archived=False):

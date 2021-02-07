@@ -37,8 +37,9 @@ from lcr.utils import download_urllib
 from lkft.lkft_config import find_citrigger, find_cibuild, get_hardware_from_pname, get_version_from_pname, get_kver_with_pname_env
 from lkft.lkft_config import find_expect_cibuilds
 from lkft.lkft_config import get_qa_server_project, get_supported_branches
+from lkft.lkft_config import is_benchmark_job, get_benchmark_testsuites, get_expected_benchmarks
 
-from .models import KernelChange, CiBuild, ReportBuild, ReportProject, ReportJob
+from .models import KernelChange, CiBuild, ReportBuild, ReportProject, ReportJob, TestCase
 
 qa_report_def = QA_REPORT[QA_REPORT_DEFAULT]
 qa_report_api = qa_report.QAReportApi(qa_report_def.get('domain'), qa_report_def.get('token'))
@@ -120,7 +121,13 @@ def get_attachment_urls(jobs=[]):
 
         attachment_url_key = 'tradefed_results_url_%s' % job.get('job_id')
         attachment_url = target_build_metadata.get(attachment_url_key)
-        job['attachment_url'] = attachment_url
+        if attachment_url is not None:
+            job['attachment_url'] = attachment_url
+        elif is_benchmark_job(job.get('name')):
+            #get_benchmark_testsuites
+            pass
+        else:
+            pass
 
 
 def extract_save_result(tar_path, result_zip_path):
@@ -153,38 +160,97 @@ def download_attachments_save_result(jobs=[]):
     for job in jobs:
         if not job.get('lava_config'):
             continue
+        if is_benchmark_job(job.get('name')):
+            try:
+                report_job = ReportJob.objects.get(job_url=job.get('external_url'))
+                if report_job.results_cached:
+                    continue
+            except ReportJob.DoesNotExist:
+                report_job = ReportJob.objects.create(job_url=job.get('external_url'),
+                                    job_name=job.get('name'),
+                                    attachment_url=job.get('attachment_url'),
+                                    qa_job_id=job.get('id'),
+                                    parent_job= job.get('parent_job'),
+                                    status=job.get('job_status'),
+                                    )
 
-        lava_nick = job.get('lava_config').get('nick')
-        job_id = job.get('job_id')
-        job_url = job.get('external_url')
-        result_file_path = get_result_file_path(job)
-        if not result_file_path:
-            logger.info("Skip to get the attachment as the result_file_path is not found: %s %s" % (job_url, job.get('url')))
-            continue
-        if not os.path.exists(result_file_path):
-            if job.get('job_status') != 'Complete':
-                logger.info("Skip to get the attachment as the job is not Complete: %s %s" % (job_url, job.get('name')))
-                continue
+            # for benchmark jobs
+            lava_config = job.get('lava_config')
+            job_id = job.get('job_id')
+            job_results = qa_report.LAVAApi(lava_config=lava_config).get_job_results(job_id=job_id)
+            for test in job_results:
+                if test.get("suite") == "lava":
+                    continue
+                # if pat_ignore.match(test.get("name")):
+                #     continue
 
-            attachment_url = job.get('attachment_url')
-            if not attachment_url:
-                logger.info("No attachment for job: %s %s" % (job_url, job.get('name')))
-                continue
-
-            (temp_fd, temp_path) = tempfile.mkstemp(suffix='.tar.xz', text=False)
-            logger.info("Start downloading result file for job %s %s: %s" % (job_url, job.get('name'), temp_path))
-            ret_err = download_urllib(attachment_url, temp_path)
-            if ret_err:
-                logger.info("There is a problem with the size of the file: %s" % attachment_url)
-                continue
-            else:
-                tar_f = temp_path.replace(".xz", '')
-                ret = os.system("xz -d %s" % temp_path)
-                if ret == 0 :
-                    extract_save_result(tar_f, result_file_path)
-                    os.unlink(tar_f)
+                # if test.get("name") in names_ignore:
+                #     continue
+                if test.get("measurement") and test.get("measurement") == "None":
+                    test["measurement"] = None
                 else:
-                    logger.info("Failed to decompress %s with xz -d command for job: %s " % (temp_path, job_url))
+                    test["measurement"] = "{:.2f}".format(float(test.get("measurement")))
+                need_cache = False
+                try:
+                    # not set again if already cached
+                    TestCase.objects.get(name=test.get("name"),
+                                         suite=test.get("suite"),
+                                         lava_nick=lava_config.get('nick'),
+                                         job_id=job_id)
+                except TestCase.DoesNotExist:
+                    need_cache = True
+                except TestCase.MultipleObjectsReturned:
+                    TestCase.objects.filter(name=test.get("name"),
+                                            suite=test.get("suite"),
+                                            lava_nick=lava_config.get('nick'),
+                                            job_id=job_id).delete()
+                    need_cache = True
+
+                if need_cache:
+                    TestCase.objects.create(name=test.get("name"),
+                                            result=test.get("result"),
+                                            measurement=test.get("measurement"),
+                                            unit=test.get("unit"),
+                                            suite=test.get("suite"),
+                                            lava_nick=lava_config.get('nick'),
+                                            job_id=job_id)
+
+
+            report_job.results_cached = True
+            report_job.save()
+
+        else:
+            # for cts /vts jobs
+            job_id = job.get('job_id')
+            job_url = job.get('external_url')
+            result_file_path = get_result_file_path(job)
+            if not result_file_path:
+                logger.info("Skip to get the attachment as the result_file_path is not found: %s %s" % (job_url, job.get('url')))
+                continue
+            if not os.path.exists(result_file_path):
+                if job.get('job_status') != 'Complete':
+                    logger.info("Skip to get the attachment as the job is not Complete: %s %s" % (job_url, job.get('name')))
+                    continue
+
+                attachment_url = job.get('attachment_url')
+                if not attachment_url:
+                    logger.info("No attachment for job: %s %s" % (job_url, job.get('name')))
+                    continue
+
+                (temp_fd, temp_path) = tempfile.mkstemp(suffix='.tar.xz', text=False)
+                logger.info("Start downloading result file for job %s %s: %s" % (job_url, job.get('name'), temp_path))
+                ret_err = download_urllib(attachment_url, temp_path)
+                if ret_err:
+                    logger.info("There is a problem with the size of the file: %s" % attachment_url)
+                    continue
+                else:
+                    tar_f = temp_path.replace(".xz", '')
+                    ret = os.system("xz -d %s" % temp_path)
+                    if ret == 0 :
+                        extract_save_result(tar_f, result_file_path)
+                        os.unlink(tar_f)
+                    else:
+                        logger.info("Failed to decompress %s with xz -d command for job: %s " % (temp_path, job_url))
 
 
 def remove_xml_unsupport_character(etree_content=""):
@@ -790,6 +856,115 @@ def get_build_info(db_reportproject=None, build=None):
     return build
 
 
+def get_measurements_of_project(project_id=None, project_name=None, project_group=None, benchmark_jobs=[], testsuites=[], testcases=[]):
+    # if project_id is not None:
+    #     db_report_project = ReportProject.objects.get(project_id=project_id)
+    # elif project_group is None:
+    #     db_report_project = ReportProject.objects.get(name=project_name)
+    # else:
+    #     db_report_project = ReportProject.objects.get(group=project_group, name=project_name)
+
+    # db_report_builds = ReportBuild.objects.filter(qa_project=db_report_project)
+    project =  qa_report_api.get_project(project_id)
+    project_full_name = project.get('full_name')
+    if project_full_name.find("android-lkft-benchmarks") < 0:
+        return {}
+
+    builds = qa_report_api.get_all_builds(project_id)
+
+    benchmark_tests = get_expected_benchmarks()
+    expected_benchmark_jobs = sorted(benchmark_tests.keys())
+    if benchmark_jobs and len(benchmark_jobs) > 0:
+        expected_benchmark_jobs = benchmark_jobs
+
+    allbenchmarkjobs_result_dict = {}
+    # for db_report_build in db_report_builds:
+    for build in builds[:BUILD_WITH_JOBS_NUMBER]:
+        jobs = qa_report_api.get_jobs_for_build(build.get("id"))
+        jobs_to_be_checked = get_classified_jobs(jobs=jobs).get('final_jobs')
+        download_attachments_save_result(jobs_to_be_checked)
+
+        for benchmark_job_name in expected_benchmark_jobs:
+            target_job = None
+            for job in jobs_to_be_checked:
+                if job.get('name').endswith(benchmark_job_name):
+                    target_job = job
+                    break
+
+            onebuild_onejob_testcases_res = []
+            onejob_testcases = []
+            test_suites = benchmark_tests.get(benchmark_job_name)
+            expected_testsuites = sorted(test_suites.keys())
+            if testsuites and len(testsuites) > 0:
+                expected_testsuites = testsuites
+            for testsuite in expected_testsuites:
+                expected_testcases = test_suites.get(testsuite)
+                if testcases and len(testcases) > 0:
+                    expected_testcases = testcases
+                for testcase in expected_testcases:
+                    testsuite_testcase = "%s#%s" % (testsuite, testcase)
+                    if testsuite_testcase not in onejob_testcases:
+                        onejob_testcases.append(testsuite_testcase)
+                    # which is actually ordered by the job id
+                    # final_jobs = ReportJob.objects.filter(report_build=db_report_build, resubmitted=False, status='Complete', job_name__endswith='-%s' % benchmark_job_name).order_by('job_url')
+                    # if final_jobs.count() <= 0:
+
+                    if target_job is None:
+                        # theere isn't any job finished successfully
+                        unit = '--'
+                        measurement = '--'
+                        job_lava_id = '--'
+                        job_lava_url = '--'
+                        lava_nick = '--'
+                    else:
+                        # only use the result from the latest job
+                        # final_job = final_jobs[-1]
+                        # job_lava_id = qa_report_api.get_qa_job_id_with_url(final_job.job_url)
+                        # lava_nick = find_lava_config(final_job.job_url).get('nick')
+                        job_lava_id = target_job.get('job_id')
+                        lava_nick = target_job.get('lava_config').get('nick')
+                        job_lava_url = target_job.get('external_url')
+                        try:
+                            test_case_res = TestCase.objects.get(job_id=job_lava_id, lava_nick=lava_nick, suite__endswith='_%s' % testsuite, name=testcase)
+                            unit = test_case_res.unit
+                            measurement = test_case_res.measurement
+                        except TestCase.DoesNotExist:
+                            unit = '--'
+                            measurement = '--'
+
+                    onebuild_onejob_testcases_res.append({
+                        'unit': unit,
+                        'measurement': measurement,
+                        'testcase': testcase,
+                        'testsuite': testsuite,
+                        # 'build_version': db_report_build.version,
+                        'build_version': build.get('version'),
+                        'qa_build_id': build.get('id'),
+                        'job_lava_id': job_lava_id,
+                        'job_lava_url': job_lava_url,
+                        'lava_nick': lava_nick,
+                        })
+
+            onebuild_onejob_result = {
+                "build_no": build.get('version'),
+                "qa_build_id": build.get('id'),
+                "build_name": project.get('full_name'),
+                'test_cases_res': onebuild_onejob_testcases_res,
+                }
+
+            benchmark_job_results = allbenchmarkjobs_result_dict.get(benchmark_job_name)
+            if benchmark_job_results is None:
+                allbenchmarkjobs_result_dict[benchmark_job_name] = {
+                        'benchmark_job_name': benchmark_job_name,
+                        'trend_data': [onebuild_onejob_result],
+                        'all_testcases': onejob_testcases,
+                    }
+            else:
+                benchmark_job_results.get('trend_data').append(onebuild_onejob_result)
+
+    return allbenchmarkjobs_result_dict
+
+
 @login_required
 def list_builds(request):
     project_id = request.GET.get('project_id', None)
@@ -817,10 +992,13 @@ def list_builds(request):
 #        executor.map(func, builds_result)
 
     logger.info("Finished getting information for all builds: %d ", len(builds_result))
+
+    benchmark_jobs_data_dict = get_measurements_of_project(project_id=project_id)
     return render(request, 'lkft-builds.html',
                            {
                                 "builds": builds_result,
                                 'project': project,
+                                "benchmark_jobs_data": benchmark_jobs_data_dict.values(),
                             })
 
 
@@ -965,35 +1143,68 @@ def list_jobs(request):
     download_attachments_save_result(jobs=jobs)
     failures = {}
     resubmitted_job_urls = []
+    benchmarks_res = []
     for job in jobs_to_be_checked:
-        qa_job_id = qa_report_api.get_qa_job_id_with_url(job_url=job.get('url'))
-        job['qa_job_id'] = qa_job_id
+        if is_benchmark_job(job.get('name')):
+            expected_testsuites = get_benchmark_testsuites(job.get('name'))
+            # local_job_name = job.get("name").replace("%s-%s-" % (build_name, build_no), "")
+            # job["name"] = local_job_name
+            # job["lava_nick"] = lava.nick
+            lava_nick = job.get('lava_config').get('nick')
+            job_id = job.get('job_id')
+            job_name = job.get('name')
 
-        short_desc = "%s: %s job failed to get test result with %s" % (project_name, job.get('name'), build.get('version'))
-        new_bug_url = '%s&rep_platform=%s&version=%s&short_desc=%s' % ( bugzilla_instance.get_new_bug_url_prefix(),
-                                                                          get_hardware_from_pname(pname=project_name, env=job.get('environment')),
-                                                                          get_version_from_pname(pname=project_name),
-                                                                          short_desc)
-        job['new_bug_url'] = new_bug_url
+            for test_suite in sorted(expected_testsuites.keys()):
+                test_cases = expected_testsuites.get(test_suite)
+                for test_case in test_cases:
+                    try:
+                        test_case_res = TestCase.objects.get(job_id=job_id, lava_nick=lava_nick, suite__endswith='_%s' % test_suite, name=test_case)
+                        unit = test_case_res.unit
+                        measurement = test_case_res.measurement
+                    except TestCase.DoesNotExist:
+                        unit = '--'
+                        measurement = '--'
 
-        result_file_path = get_result_file_path(job=job)
-        if not result_file_path or not os.path.exists(result_file_path):
-            continue
+                    benchmarks_res.append({'job_name': job_name,
+                                           'job_id': job_id,
+                                           'job_external_url': job.get('external_url'),
+                                           'lava_nick': lava_nick,
+                                           'test_case': test_case,
+                                           'test_suite': test_suite,
+                                           'unit': unit,
+                                           'measurement': measurement,
+                                          })
+            continue # to check the next job
+        else:
+            # for cts/vts jobs
+            qa_job_id = qa_report_api.get_qa_job_id_with_url(job_url=job.get('url'))
+            job['qa_job_id'] = qa_job_id
 
-        kernel_version = get_kver_with_pname_env(prj_name=project_name, env=job.get('environment'))
+            short_desc = "%s: %s job failed to get test result with %s" % (project_name, job.get('name'), build.get('version'))
+            new_bug_url = '%s&rep_platform=%s&version=%s&short_desc=%s' % ( bugzilla_instance.get_new_bug_url_prefix(),
+                                                                              get_hardware_from_pname(pname=project_name, env=job.get('environment')),
+                                                                              get_version_from_pname(pname=project_name),
+                                                                              short_desc)
+            job['new_bug_url'] = new_bug_url
 
-        platform = job.get('environment').split('_')[0]
+            result_file_path = get_result_file_path(job=job)
+            if not result_file_path or not os.path.exists(result_file_path):
+                continue
 
-        metadata = {
-            'job_id': job.get('job_id'),
-            'qa_job_id': qa_job_id,
-            'result_url': job.get('attachment_url'),
-            'lava_nick': job.get('lava_config').get('nick'),
-            'kernel_version': kernel_version,
-            'platform': platform,
-            }
-        numbers = extract(result_file_path, failed_testcases_all=failures, metadata=metadata)
-        job['numbers'] = numbers
+            kernel_version = get_kver_with_pname_env(prj_name=project_name, env=job.get('environment'))
+
+            platform = job.get('environment').split('_')[0]
+
+            metadata = {
+                'job_id': job.get('job_id'),
+                'qa_job_id': qa_job_id,
+                'result_url': job.get('attachment_url'),
+                'lava_nick': job.get('lava_config').get('nick'),
+                'kernel_version': kernel_version,
+                'platform': platform,
+                }
+            numbers = extract(result_file_path, failed_testcases_all=failures, metadata=metadata)
+            job['numbers'] = numbers
 
     bugs = get_lkft_bugs(summary_keyword=project_name, platform=get_hardware_from_pname(project_name))
     bugs_reproduced = []
@@ -1070,6 +1281,7 @@ def list_jobs(request):
                                 'bugs_not_reproduced': bugs_not_reproduced,
                                 'project': project,
                                 'bugzilla_show_bug_prefix': bugzilla_show_bug_prefix,
+                                'benchmarks_res': benchmarks_res,
                             }
                 )
 
