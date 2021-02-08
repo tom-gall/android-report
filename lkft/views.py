@@ -161,6 +161,9 @@ def download_attachments_save_result(jobs=[]):
         if not job.get('lava_config'):
             continue
         if is_benchmark_job(job.get('name')):
+            if job.get('job_status') != 'Complete':
+                continue
+
             try:
                 report_job = ReportJob.objects.get(job_url=job.get('external_url'))
                 if report_job.results_cached:
