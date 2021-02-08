@@ -1145,6 +1145,7 @@ def list_jobs(request):
     resubmitted_job_urls = []
     benchmarks_res = []
     for job in jobs_to_be_checked:
+        job['qa_job_id'] = job.get('id')
         if is_benchmark_job(job.get('name')):
             expected_testsuites = get_benchmark_testsuites(job.get('name'))
             # local_job_name = job.get("name").replace("%s-%s-" % (build_name, build_no), "")
@@ -1177,9 +1178,6 @@ def list_jobs(request):
             continue # to check the next job
         else:
             # for cts/vts jobs
-            qa_job_id = qa_report_api.get_qa_job_id_with_url(job_url=job.get('url'))
-            job['qa_job_id'] = qa_job_id
-
             short_desc = "%s: %s job failed to get test result with %s" % (project_name, job.get('name'), build.get('version'))
             new_bug_url = '%s&rep_platform=%s&version=%s&short_desc=%s' % ( bugzilla_instance.get_new_bug_url_prefix(),
                                                                               get_hardware_from_pname(pname=project_name, env=job.get('environment')),
