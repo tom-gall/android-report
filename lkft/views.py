@@ -1198,7 +1198,7 @@ def list_jobs(request):
 
             metadata = {
                 'job_id': job.get('job_id'),
-                'qa_job_id': qa_job_id,
+                'qa_job_id': job.get('id'),
                 'result_url': job.get('attachment_url'),
                 'lava_nick': job.get('lava_config').get('nick'),
                 'kernel_version': kernel_version,
