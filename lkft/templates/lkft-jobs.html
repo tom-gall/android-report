@@ -25,9 +25,10 @@
     <th> FailureMsg </th>
     <th> Passed </th>
     <th> Failed </th>
+    <th> AssumptionF</th>
+    <th> Ignored</th>
     <th> Total </th>
-    <th> ModulesDone </th>
-    <th> ModulesTotal </th>
+    <th> Modules Done/Total </th>
     <th> Report Bug </th>
 </tr>
 {% for job in final_jobs %}
@@ -55,10 +56,12 @@
     {% if job.numbers %}
     <td align="right">{{job.numbers.number_passed}}</td>
     <td align="right">{{job.numbers.number_failed}}</td>
+    <td align="right">{{job.numbers.number_assumption_failure}}</td>
+    <td align="right">{{job.numbers.number_ignored}}</td>
     <td align="right">{{job.numbers.number_total}}</td>
-    <td align="right">{{job.numbers.modules_done}}</td>
-    <td align="right">{{job.numbers.modules_total}}</td>
+    <td align="right">{{job.numbers.modules_done}}/{{job.numbers.modules_total}}</td>
     {% else %}
+    <td align="right"> - </td>
     <td align="right"> - </td>
     <td align="right"> - </td>
     <td align="right"> - </td>
@@ -187,6 +190,7 @@ No result for benchmark test jobs.
     <th>Index</th>
     <th>Module</th>
     <th>Test</th>
+    <th>Result</th>
     <th>Platforms</th>
     <th>Kernels</th>
     <th>Abis(Trend)</th>
@@ -197,6 +201,7 @@ No result for benchmark test jobs.
 	<td>{{forloop.counter}}</td>
 	<td class="testname">{{failure.module_name}}</td>
     <td class="testname">{{failure.test_name}}</td>
+    <td class="testname">{{failure.result}}</td>
     <td class="testname" nowrap>
         {% with failure.platforms as platforms %}
         {% for platform in platforms %}
@@ -264,6 +269,7 @@ No result for benchmark test jobs.
 <tr>
     <th>Index</th>
     <th>Test</th>
+    <th>Result</th>
     <th>Platforms</th>
     <th>Kernels</th>
     <th>Abis(Trend)</th>
@@ -277,6 +283,7 @@ No result for benchmark test jobs.
 <tr>
     <td> {{ forloop.counter }}</td>
     <td class="testname">{{failure.test_name}}</td>
+    <td class="testname">{{failure.result}}</td>
     <td class="testname" nowrap>
         {% with failure.platforms as platforms %}
         {% for platform in platforms %}

@@ -26,6 +26,8 @@ class KernelChange(models.Model):
 
     number_passed = models.IntegerField(default=0)
     number_failed = models.IntegerField(default=0)
+    number_assumption_failure = models.IntegerField(default=0)
+    number_ignored = models.IntegerField(default=0)
     number_total = models.IntegerField(default=0)
     modules_done = models.IntegerField(default=0)
     modules_total = models.IntegerField(default=0)
@@ -100,6 +102,8 @@ class ReportBuild(models.Model):
 
     number_passed = models.IntegerField(default=0)
     number_failed = models.IntegerField(default=0)
+    number_assumption_failure = models.IntegerField(default=0)
+    number_ignored = models.IntegerField(default=0)
     number_total = models.IntegerField(default=0)
     modules_done = models.IntegerField(default=0)
     modules_total = models.IntegerField(default=0)
@@ -144,6 +148,8 @@ class ReportJob(models.Model):
 
     number_passed = models.IntegerField(default=0)
     number_failed = models.IntegerField(default=0)
+    number_assumption_failure = models.IntegerField(default=0)
+    number_ignored = models.IntegerField(default=0)
     number_total = models.IntegerField(default=0)
     modules_done = models.IntegerField(default=0)
     modules_total = models.IntegerField(default=0)

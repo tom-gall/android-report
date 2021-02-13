@@ -294,6 +294,8 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
     number_total = 0
     number_passed = 0
     number_failed = 0
+    number_assumption_failure = 0
+    number_ignored = 0
     modules_done = 0
     modules_total = 0
 
@@ -301,11 +303,17 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
     vts_abi_suffix_pat = re.compile(r"_32bit$|_64bit$")
     with zipfile.ZipFile(result_zip_path, 'r') as f_zip_fd:
         try:
+            # https://docs.python.org/3/library/xml.etree.elementtree.html
             root = ET.fromstring(remove_xml_unsupport_character(f_zip_fd.read(TEST_RESULT_XML_NAME).decode('utf-8')))
             summary_node = root.find('Summary')
             number_passed = int(summary_node.attrib['pass'])
             number_failed = int(summary_node.attrib['failed'])
-            number_total = number_passed + number_failed
+            assumption_failures = root.findall(".//Module/TestCase/Test[@result='ASSUMPTION_FAILURE']")
+            number_assumption_failure = len(assumption_failures)
+            ignored_testcases = root.findall(".//Module/TestCase/Test[@result='IGNORED']")
+            number_ignored = len(ignored_testcases)
+            all_testcases = root.findall(".//Module/TestCase/Test")
+            number_total = len(all_testcases)
             modules_done = int(summary_node.attrib['modules_done'])
             modules_total = int(summary_node.attrib['modules_total'])
 
@@ -322,9 +330,11 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
                 test_cases = elem.findall('.//TestCase')
                 for test_case in test_cases:
                     failed_tests = test_case.findall('.//Test[@result="fail"]')
-                    for failed_test in failed_tests:
+                    assumption_failures = test_case.findall('.//Test[@result="ASSUMPTION_FAILURE"]')
+                    for failed_test in failed_tests + assumption_failures:
                         #test_name = '%s#%s' % (test_case.get("name"), vts_abi_suffix_pat.sub('', failed_test.get("name")))
                         mod_name = test_case.get("name")
+                        test_result = failed_test.get('result')
                         test_name = failed_test.get("name")
                         if test_name.endswith('_64bit') or test_name.endswith('_32bit'):
                             test_name = '%s#%s' % (mod_name, test_name)
@@ -350,6 +360,7 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
                             failed_tests_module[test_name]= {
                                                                 'test_name': test_name,
                                                                 'module_name': module_name,
+                                                                'result': test_result,
                                                                 'test_class': test_case.get("name"),
                                                                 'test_method': failed_test.get("name"),
                                                                 'abi_stacktrace': {abi: stacktrace},
@@ -367,6 +378,8 @@ def extract(result_zip_path, failed_testcases_all={}, metadata={}):
                 'number_total': number_total,
                 'number_passed': number_passed,
                 'number_failed': number_failed,
+                'number_assumption_failure': number_assumption_failure,
+                'number_ignored': number_ignored,
                 'modules_done': modules_done,
                 'modules_total': modules_total,
             }
@@ -385,6 +398,8 @@ def get_last_trigger_build(project=None):
 def get_testcases_number_for_job(job):
     job_number_passed = 0
     job_number_failed = 0
+    job_number_assumption_failure = 0
+    job_number_ignored = 0
     job_number_total = 0
     modules_total = 0
     modules_done = 0
@@ -403,6 +418,12 @@ def get_testcases_number_for_job(job):
                         summary_node = root.find('Summary')
                         job_number_passed = summary_node.attrib['pass']
                         job_number_failed = summary_node.attrib['failed']
+                        assumption_failures = root.findall(".//Module/TestCase/Test[@result='ASSUMPTION_FAILURE']")
+                        job_number_assumption_failure = len(assumption_failures)
+                        ignored_testcases = root.findall(".//Module/TestCase/Test[@result='IGNORED']")
+                        job_number_ignored = len(ignored_testcases)
+                        all_testcases = root.findall(".//Module/TestCase/Test")
+                        job_number_total = len(all_testcases)
                         modules_total = summary_node.attrib['modules_total']
                         modules_done = summary_node.attrib['modules_done']
                         if int(modules_total) > 0:
@@ -424,7 +445,9 @@ def get_testcases_number_for_job(job):
     job['numbers'] = {
             'number_passed': int(job_number_passed),
             'number_failed': int(job_number_failed),
-            'number_total': int(job_number_passed) + int(job_number_failed),
+            'number_assumption_failure': int(job_number_assumption_failure),
+            'number_ignored': int(job_number_ignored),
+            'number_total': job_number_total,
             'modules_total': int(modules_total),
             'modules_done': int(modules_done),
             'finished_successfully': finished_successfully
@@ -494,6 +517,8 @@ def get_test_result_number_for_build(build, jobs=None):
     return {
         'number_passed': test_numbers.number_passed,
         'number_failed': test_numbers.number_failed,
+        'number_assumption_failure': test_numbers.number_assumption_failure,
+        'number_ignored': test_numbers.number_ignored,
         'number_total': test_numbers.number_total,
         'modules_done': test_numbers.modules_done,
         'modules_total': test_numbers.modules_total,
@@ -785,13 +810,14 @@ def get_build_info(db_reportproject=None, build=None):
         build['numbers'] = {
             'number_passed': db_report_build.number_passed,
             'number_failed': db_report_build.number_failed,
+            'number_assumption_failure': db_report_build.number_assumption_failure,
+            'number_ignored': db_report_build.number_ignored,
             'number_total': db_report_build.number_total,
             'modules_done': db_report_build.modules_done,
             'modules_total': db_report_build.modules_total,
             'jobs_finished': finished_cts_vts_jobs + finished_other_jobs,
             'jobs_total': len(final_jobs),
             }
-
         build['created_at'] = db_report_build.started_at
         build['build_status'] = db_report_build.status
         build['last_fetched_timestamp'] = db_report_build.fetched_at
@@ -825,6 +851,8 @@ def get_build_info(db_reportproject=None, build=None):
         build['numbers'] = {
                             'number_passed': build_numbers.number_passed,
                             'number_failed': build_numbers.number_failed,
+                            'number_assumption_failure': build_numbers.number_assumption_failure,
+                            'number_ignored': build_numbers.number_ignored,
                             'number_total': build_numbers.number_total,
                             'modules_done': build_numbers.modules_done,
                             'modules_total': build_numbers.modules_total,

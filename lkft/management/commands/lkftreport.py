@@ -192,6 +192,8 @@ class Command(BaseCommand):
             kernel_change.duration = (finished_timestamp - start_timestamp).total_seconds()
             kernel_change.number_passed = test_numbers.number_passed
             kernel_change.number_failed = test_numbers.number_failed
+            kernel_change.number_assumption_failure = test_numbers.number_assumption_failure
+            kernel_change.number_ignored = test_numbers.number_ignored
             kernel_change.number_total = test_numbers.number_total
             kernel_change.modules_done = test_numbers.modules_done
             kernel_change.modules_total = test_numbers.modules_total
@@ -227,6 +229,8 @@ class Command(BaseCommand):
                     report_build.ci_trigger_build = trigger_dbci_build
                     report_build.number_passed = result_numbers.get('number_passed')
                     report_build.number_failed = result_numbers.get('number_failed')
+                    report_build.number_assumption_failure = result_numbers.get('number_assumption_failure')
+                    report_build.number_ignored = result_numbers.get('number_ignored')
                     report_build.number_total = result_numbers.get('number_total')
                     report_build.modules_done = result_numbers.get('modules_done')
                     report_build.modules_total = result_numbers.get('modules_total')
@@ -245,6 +249,8 @@ class Command(BaseCommand):
                                         ci_trigger_build=trigger_dbci_build,
                                         number_passed=result_numbers.get('number_passed'),
                                         number_failed=result_numbers.get('number_failed'),
+                                        number_assumption_failure=result_numbers.get('number_assumption_failure'),
+                                        number_ignored=result_numbers.get('number_ignored'),
                                         number_total=result_numbers.get('number_total'),
                                         modules_done=result_numbers.get('modules_done'),
                                         modules_total=result_numbers.get('modules_total'),
@@ -264,6 +270,8 @@ class Command(BaseCommand):
                         test_numbers = {
                             'number_passed': 0,
                             'number_failed': 0,
+                            'number_assumption_failure': 0,
+                            'number_ignored': 0,
                             'number_total': 0,
                             'modules_done': 0,
                             'modules_total': 0,
@@ -319,6 +327,8 @@ class Command(BaseCommand):
 
                         report_job.number_passed = test_numbers.get('number_passed')
                         report_job.number_failed = test_numbers.get('number_failed')
+                        report_job.number_assumption_failure = test_numbers.get('number_assumption_failure')
+                        report_job.number_ignored = test_numbers.get('number_ignored')
                         report_job.number_total = test_numbers.get('number_total')
                         report_job.modules_done = test_numbers.get('modules_done')
                         report_job.modules_total = test_numbers.get('modules_total')
@@ -336,6 +346,8 @@ class Command(BaseCommand):
                                             resubmitted=resubmitted,
                                             number_passed=test_numbers.get('number_passed'),
                                             number_failed=test_numbers.get('number_failed'),
+                                            number_assumption_failure=test_numbers.get('number_assumption_failure'),
+                                            number_ignored=test_numbers.get('number_ignored'),
                                             number_total=test_numbers.get('number_total'),
                                             modules_done=test_numbers.get('modules_done'),
                                             modules_total=test_numbers.get('modules_total'),

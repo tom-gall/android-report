@@ -489,6 +489,8 @@ class QAReportApi(RESTFullApi):
 class TestNumbers():
     number_passed = 0
     number_failed = 0
+    number_assumption_failure = 0
+    number_ignored = 0
     number_total = 0
     modules_done = 0
     modules_total = 0
@@ -499,6 +501,8 @@ class TestNumbers():
     def addWithHash(self, numbers_of_result):
         self.number_passed = self.number_passed + numbers_of_result.get('number_passed')
         self.number_failed = self.number_failed + numbers_of_result.get('number_failed')
+        self.number_assumption_failure = self.number_assumption_failure + numbers_of_result.get('number_assumption_failure', 0)
+        self.number_ignored = self.number_ignored + numbers_of_result.get('number_ignored', 0)
         self.number_total = self.number_total + numbers_of_result.get('number_total')
         self.modules_done = self.modules_done + numbers_of_result.get('modules_done')
         self.modules_total = self.modules_total + numbers_of_result.get('modules_total')
@@ -511,6 +515,8 @@ class TestNumbers():
     def addWithTestNumbers(self, testNumbers):
         self.number_passed = self.number_passed + testNumbers.number_passed
         self.number_failed = self.number_failed + testNumbers.number_failed
+        self.number_assumption_failure = self.number_assumption_failure + testNumbers.number_assumption_failure
+        self.number_ignored = self.number_ignored + testNumbers.number_ignored
         self.number_total = self.number_total + testNumbers.number_total
         self.modules_done = self.modules_done + testNumbers.modules_done
         self.modules_total = self.modules_total + testNumbers.modules_total

@@ -31,8 +31,10 @@
         <th>Jobs Finished/Total</th>
         <th>Pass</th>
         <th>Fail</th>
+        <th>AssumptionF</th>
+        <th>Ignored</th>
         <th>Total</th>
-        <th>ModulesDone</th>
+        <th>Modules Done/Total</th>
 <th>ModulesTotal</th>
 {% for build in builds %}
 <tr>
@@ -70,13 +72,14 @@
     <td align="right">{{numbers.jobs_finished}}/{{numbers.jobs_total}}</td>
     <td align="right">{{numbers.number_passed}}</td>
     <td align="right">{{numbers.number_failed}}</td>
+    <td align="right">{{numbers.number_assumption_failure}}</td>
+    <td align="right">{{numbers.number_ignored}}</td>
     <td align="right">{{numbers.number_total}}</td>
-    <td align="right">{{numbers.modules_done}}</td>
     <td align="right">
         {% if numbers.modules_total == 0 %}
-        <p style="background-color: red">{{ numbers.modules_total}} </p>
+        <p style="background-color: red">{{numbers.modules_done}}/{{ numbers.modules_total}} </p>
         {% else %}
-        <p>{{ numbers.modules_total}} </p>
+        <p>{{numbers.modules_done}}/{{ numbers.modules_total}} </p>
         {% endif %}
     </td>
     {% endwith %}
