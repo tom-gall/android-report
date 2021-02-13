@@ -17,9 +17,10 @@
         <th>CI Trigger</th>
         <th>Pass</th>
         <th>Fail</th>
+        <th>AssumptionF</th>
+        <th>Ignored</th>
         <th>Total</th>
-        <th>Modules Done</th>
-        <th>Modules Total</th>
+        <th>Modules Done/Total</th>
         <th>JobsFinished/JobsTotal</th>
 </tr>
 {% for kernelchange in kernelchanges %}
@@ -47,9 +48,10 @@
     <td><a href="https://ci.linaro.org/job/{{kernelchange.trigger_name}}/{{kernelchange.trigger_number}}">{{kernelchange.trigger_name}}#{{kernelchange.trigger_number}}</a></td>
     <td align='right'>{{kernelchange.number_passed}}</td>
     <td align='right'>{{kernelchange.number_failed}}</td>
+    <td align='right'>{{kernelchange.number_assumption_failure}}</td>
+    <td align='right'>{{kernelchange.number_ignored}}</td>
     <td align='right'>{{kernelchange.number_total}}</td>
-    <td align='right'>{{kernelchange.modules_done}}</td>
-    <td align='right'>{{kernelchange.modules_total}}</td>
+    <td align='right'>{{kernelchange.modules_done}}/{{kernelchange.modules_total}}</td>
     <td align='right'>{{kernelchange.jobs_finished}}/{{kernelchange.jobs_total}}</td>
 </tr>
 {% endfor %}

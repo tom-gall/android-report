@@ -2027,6 +2027,8 @@ def get_kernel_changes_info_wrapper_for_display(db_kernelchanges=[]):
             kernelchange_return['status'] = db_kernelchange.result
             kernelchange_return['number_passed'] = db_kernelchange.number_passed
             kernelchange_return['number_failed'] = db_kernelchange.number_failed
+            kernelchange_return['number_assumption_failure'] = db_kernelchange.number_assumption_failure
+            kernelchange_return['number_ignored'] = db_kernelchange.number_ignored
             kernelchange_return['number_total'] = db_kernelchange.number_total
             kernelchange_return['modules_done'] = db_kernelchange.modules_done
             kernelchange_return['modules_total'] = db_kernelchange.modules_total
@@ -2042,6 +2044,8 @@ def get_kernel_changes_info_wrapper_for_display(db_kernelchanges=[]):
 
             kernelchange_return['number_passed'] = test_numbers.number_passed
             kernelchange_return['number_failed'] = test_numbers.number_failed
+            kernelchange_return['number_assumption_failure'] = test_numbers.number_assumption_failure
+            kernelchange_return['number_ignored'] = test_numbers.number_ignored
             kernelchange_return['number_total'] = test_numbers.number_total
             kernelchange_return['modules_done'] = test_numbers.modules_done
             kernelchange_return['modules_total'] = test_numbers.modules_total
@@ -2103,6 +2107,8 @@ def list_describe_kernel_changes(request, branch, describe):
     kernel_change['duration'] = datetime.timedelta(seconds=db_kernel_change.duration)
     kernel_change['number_passed'] = db_kernel_change.number_passed
     kernel_change['number_failed'] = db_kernel_change.number_failed
+    kernel_change['number_assumption_failure'] = db_kernel_change.number_assumption_failure
+    kernel_change['number_ignored'] = db_kernel_change.number_ignored
     kernel_change['number_total'] = db_kernel_change.number_total
     kernel_change['modules_done'] = db_kernel_change.modules_done
     kernel_change['modules_total'] = db_kernel_change.modules_total
@@ -2137,6 +2143,8 @@ def list_describe_kernel_changes(request, branch, describe):
         report_build['started_at'] = db_report_build.started_at
         report_build['number_passed'] = db_report_build.number_passed
         report_build['number_failed'] = db_report_build.number_failed
+        report_build['number_assumption_failure'] = db_report_build.number_assumption_failure
+        report_build['number_ignored'] = db_report_build.number_ignored
         report_build['number_total'] = db_report_build.number_total
         report_build['modules_done'] = db_report_build.modules_done
         report_build['modules_total'] = db_report_build.modules_total
@@ -2177,6 +2185,8 @@ def list_describe_kernel_changes(request, branch, describe):
 
         report_job['number_passed'] = db_report_job.number_passed
         report_job['number_failed'] = db_report_job.number_failed
+        report_job['number_assumption_failure'] = db_report_job.number_assumption_failure
+        report_job['number_ignored'] = db_report_job.number_ignored
         report_job['number_total'] = db_report_job.number_total
         report_job['modules_done'] = db_report_job.modules_done
         report_job['modules_total'] = db_report_job.modules_total
