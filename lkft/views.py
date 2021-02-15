@@ -537,14 +537,14 @@ def get_lkft_build_status(build, jobs):
     else:
         last_fetched_timestamp = build.get('created_at')
     has_unsubmitted = False
-    has_cancelled = False
+    has_canceled = False
     is_inprogress = False
     for job in jobs_to_be_checked:
         if not job.get('submitted'):
             has_unsubmitted = True
             break
         if job.get('job_status') == 'Canceled':
-            has_cancelled = True
+            has_canceled = True
             break
 
         if job.get('fetched'):
@@ -560,8 +560,8 @@ def get_lkft_build_status(build, jobs):
         build['build_status'] = "JOBSNOTSUBMITTED"
     elif is_inprogress:
         build['build_status'] = "JOBSINPROGRESS"
-    elif has_cancelled:
-        build['build_status'] = "CANCELLED"
+    elif has_canceled:
+        build['build_status'] = "CANCELED"
     else:
         build['build_status'] = "JOBSCOMPLETED"
         build['last_fetched_timestamp'] = last_fetched_timestamp
@@ -569,7 +569,7 @@ def get_lkft_build_status(build, jobs):
     return {
         'is_inprogress': is_inprogress,
         'has_unsubmitted': has_unsubmitted,
-        'has_cancelled': has_cancelled,
+        'has_canceled': has_canceled,
         'last_fetched_timestamp': last_fetched_timestamp,
         }
 
@@ -1952,7 +1952,7 @@ def get_kernel_changes_info(db_kernelchanges=[]):
 
         qa_report_builds = []
         has_jobs_not_submitted = False
-        has_jobs_cancelled = False
+        has_jobs_canceled = False
         has_jobs_in_progress = False
         all_jobs_finished = False
 
@@ -1994,8 +1994,8 @@ def get_kernel_changes_info(db_kernelchanges=[]):
                     has_jobs_not_submitted = True
                 elif build_status['is_inprogress']:
                     has_jobs_in_progress = True
-                elif build_status['has_cancelled']:
-                    has_jobs_cancelled = True
+                elif build_status['has_canceled']:
+                    has_jobs_canceled = True
                 else:
                     if kernel_change_finished_timestamp is None or \
                         kernel_change_finished_timestamp < build_status['last_fetched_timestamp']:
@@ -2031,8 +2031,8 @@ def get_kernel_changes_info(db_kernelchanges=[]):
                 kernel_change_status = 'HAS_JOBS_NOT_SUBMITTED'
             elif has_jobs_in_progress:
                 kernel_change_status = 'HAS_JOBS_IN_PROGRESS'
-            elif has_jobs_cancelled:
-                kernel_change_status = 'HAS_JOBS_CANCELLED'
+            elif has_jobs_canceled:
+                kernel_change_status = 'HAS_JOBS_CANCELED'
             else:
                 kernel_change_status = 'ALL_COMPLETED'
 
