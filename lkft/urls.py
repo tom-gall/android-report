@@ -3,6 +3,7 @@ from django.conf.urls import url
 from . import views
 
 basic_pat = '[a-zA-Z0-9][a-zA-Z0-9_.-]+'
+numerical_pat = '[1-9][0-9]+'
 urlpatterns = [
     url(r'^$', views.list_projects, name='home'),
     url(r'^rc-projects/.*$', views.list_rc_projects, name='list_rc_projects'),
@@ -18,6 +19,8 @@ urlpatterns = [
     url(r'^alljobs/.*$', views.list_all_jobs, name='list_all_jobs'),
     url(r'^file-bug/.*$', views.file_bug, name='file_bug'),
     url(r'^resubmit-job/.*$', views.resubmit_job, name='resubmit_job'),
+    url(r'^cancel-job/(%s)/$' % (numerical_pat), views.cancel_job, name='cancel_job'),
+    url(r'^cancel-build/(%s)/$' % (numerical_pat), views.cancel_build, name='cancel_build'),
     # newchanges/$branch/$describe/$build_name/$build_number
     url(r'^newchanges/(%s)/(%s)/(%s)/([0-9]+)' % (basic_pat, basic_pat, basic_pat), views.new_kernel_changes),
     # newchanges/$branch/$describe/$build_name/$build_number

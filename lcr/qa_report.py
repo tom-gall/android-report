@@ -254,6 +254,11 @@ class LAVAApi(RESTFullApi):
         results = yaml.safe_load(r.content)
         return results
 
+    def cancel_job(self, lava_job_id=None):
+        ## e.g. http://validation.linaro.org/api/v0.2/jobs/2345786/cancel/
+        api_url = '/jobs/%s/cancel/' % lava_job_id
+        return self.call_with_api_url(api_url=api_url, method='POST', returnResponse=True)
+
 
 class QAReportApi(RESTFullApi):
     def get_api_url_prefix(self):
@@ -406,8 +411,16 @@ class QAReportApi(RESTFullApi):
         api_url = 'api/forceresubmit/%s' % qa_job_id
         return self.call_with_api_url(api_url=api_url, method='POST', returnResponse=True)
 
+
     '''
-        Possible job status: Submitted, Complete, Incomplete, Running
+        not work yet, not exported by the qa-report api yet
+    '''
+    def canceljob(self, qa_job_id):
+        api_url = 'api/cancel/%s' % qa_job_id
+        return self.call_with_api_url(api_url=api_url, method='POST', returnResponse=True)
+
+    '''
+        Possible job status: Submitted, Running, Complete, Incomplete, Canceled
     '''
     def set_job_status(self, job):
         if job.get('job_status') is None and \

@@ -44,8 +44,10 @@
     <td>
         {% if build.build_status == "JOBSNOTSUBMITTED" %}
         <p style="background-color: yellow">{{ build.build_status}} <br/>{{ build.created_at|date:'M. d, Y, H:i'}}, &nbsp;{{ build.created_at|timesince}} </p>
+        <a target='_blank' href="/lkft/cancel-build/{{build.id}}/">Want to Cancel?</a>
         {% elif build.build_status == "JOBSINPROGRESS" %}
         <p style="background-color: green">{{ build.build_status}} <br/>{{ build.created_at|date:'M. d, Y, H:i'}}, &nbsp;{{ build.created_at|timesince}} </p>
+        <a target='_blank' href="/lkft/cancel-build/{{build.id}}/">Want to Cancel?</a>
         {% else %}
         <p>{{ build.build_status}} <br/>{{ build.created_at|date:'M. d, Y, H:i'}}, &nbsp;{{ build.created_at|timesince}} </p>
         {% endif %}

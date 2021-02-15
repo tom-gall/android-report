@@ -115,7 +115,8 @@ def get_attachment_urls(jobs=[]):
                 job['lava_config'] = lava_config
 
         if not job.get('job_status') or job.get('job_status') == 'Submitted' \
-                or job.get('job_status') == 'Running' :
+                or job.get('job_status') == 'Running' \
+                or job.get('job_status') == 'Canceled' :
             # the job is still in queue, so it should not have attachment yet
             continue
 
@@ -536,11 +537,16 @@ def get_lkft_build_status(build, jobs):
     else:
         last_fetched_timestamp = build.get('created_at')
     has_unsubmitted = False
+    has_cancelled = False
     is_inprogress = False
     for job in jobs_to_be_checked:
         if not job.get('submitted'):
             has_unsubmitted = True
             break
+        if job.get('job_status') == 'Canceled':
+            has_cancelled = True
+            break
+
         if job.get('fetched'):
             if job.get('fetched_at'):
                 job_last_fetched_timestamp = qa_report_api.get_aware_datetime_from_str(job.get('fetched_at'))
@@ -554,6 +560,8 @@ def get_lkft_build_status(build, jobs):
         build['build_status'] = "JOBSNOTSUBMITTED"
     elif is_inprogress:
         build['build_status'] = "JOBSINPROGRESS"
+    elif has_cancelled:
+        build['build_status'] = "CANCELLED"
     else:
         build['build_status'] = "JOBSCOMPLETED"
         build['last_fetched_timestamp'] = last_fetched_timestamp
@@ -561,6 +569,7 @@ def get_lkft_build_status(build, jobs):
     return {
         'is_inprogress': is_inprogress,
         'has_unsubmitted': has_unsubmitted,
+        'has_cancelled': has_cancelled,
         'last_fetched_timestamp': last_fetched_timestamp,
         }
 
@@ -1665,6 +1674,40 @@ def resubmit_job(request):
     )
 
 
+@login_required
+def cancel_job(request, qa_job_id):
+    qa_job = qa_report_api.get_job_with_id(qa_job_id)
+    if qa_job.get('job_status') == 'Submitted' \
+            or qa_job.get('job_status') == 'Running':
+        lava_config = find_lava_config(qa_job.get('external_url'))
+        if not lava_config:
+            logger.error('lava server is not found for job: %s' % job.get('url'))
+        else:
+            res = qa_report.LAVAApi(lava_config=lava_config).cancel_job(lava_job_id=qa_job.get('job_id'))
+            logger.info("Tried to canncel job with res.status_code=%s: %s" % (res.status_code, qa_job.get('external_url')))
+    return redirect(qa_job.get('external_url'))
+
+
+@login_required
+def cancel_build(request, qa_build_id):
+    qa_jobs = qa_report_api.get_jobs_for_build(qa_build_id)
+    for qa_job in qa_jobs:
+        if qa_job.get('job_status') != 'Submitted' \
+                and qa_job.get('job_status') != 'Running':
+            continue
+
+        if qa_job.get('external_url') is None:
+            continue
+
+        lava_config = find_lava_config(qa_job.get('external_url'))
+        if not lava_config:
+            continue
+
+        res = qa_report.LAVAApi(lava_config=lava_config).cancel_job(lava_job_id=qa_job.get('job_id'))
+        logger.info("Tried to canncel job with res.status_code=%s: %s" % (res.status_code, qa_job.get('external_url')))
+    return redirect("/lkft/jobs/?build_id={}".format(qa_build_id))
+
+
 def new_kernel_changes(request, branch, describe, trigger_name, trigger_number):
 
     supported_branches = get_supported_branches()
@@ -1909,6 +1952,7 @@ def get_kernel_changes_info(db_kernelchanges=[]):
 
         qa_report_builds = []
         has_jobs_not_submitted = False
+        has_jobs_cancelled = False
         has_jobs_in_progress = False
         all_jobs_finished = False
 
@@ -1950,6 +1994,8 @@ def get_kernel_changes_info(db_kernelchanges=[]):
                     has_jobs_not_submitted = True
                 elif build_status['is_inprogress']:
                     has_jobs_in_progress = True
+                elif build_status['has_cancelled']:
+                    has_jobs_cancelled = True
                 else:
                     if kernel_change_finished_timestamp is None or \
                         kernel_change_finished_timestamp < build_status['last_fetched_timestamp']:
@@ -1985,6 +2031,8 @@ def get_kernel_changes_info(db_kernelchanges=[]):
                 kernel_change_status = 'HAS_JOBS_NOT_SUBMITTED'
             elif has_jobs_in_progress:
                 kernel_change_status = 'HAS_JOBS_IN_PROGRESS'
+            elif has_jobs_cancelled:
+                kernel_change_status = 'HAS_JOBS_CANCELLED'
             else:
                 kernel_change_status = 'ALL_COMPLETED'
 
