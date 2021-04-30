@@ -22,6 +22,7 @@ from django.utils.timesince import timesince
 from lkft.models import KernelChange, CiBuild, ReportBuild
 
 from lcr import qa_report
+from lcr.qa_report import TestNumbers
 
 from lcr.settings import QA_REPORT, QA_REPORT_DEFAULT, BUILD_WITH_JOBS_NUMBER
 
@@ -489,7 +490,10 @@ def versiontoMME(versionString):
 
 def tallyNumbers(build, jobTransactionStatus):
     buildNumbers = build['numbers']
-    if 'numbers' in jobTransactionStatus['vts-job']:
+    if 'name' in jobTransactionStatus['vts-job']:
+        if not 'numbers' in jobTransactionStatus['vts-job']:
+            numbers = TestNumbers()
+            jobTransactionStatus['vts-job']['numbers']=numbers
         buildNumbers['failed_number'] += jobTransactionStatus['vts-job']['numbers'].number_failed
         buildNumbers['passed_number'] += jobTransactionStatus['vts-job']['numbers'].number_passed
         buildNumbers['ignored_number'] += jobTransactionStatus['vts-job']['numbers'].number_ignored
@@ -516,7 +520,10 @@ def tallyNumbers(build, jobTransactionStatus):
                 buildNumbers['modules_done'] += jobTransactionStatus['vts-v8-job']['numbers'].modules_done
                 buildNumbers['modules_total'] += jobTransactionStatus['vts-v8-job']['numbers'].modules_total
 
-    if 'numbers' in jobTransactionStatus['cts-job']:
+    if 'name' in jobTransactionStatus['cts-job']:
+        if not 'numbers' in jobTransactionStatus['cts-job']:
+            numbers = TestNumbers()
+            jobTransactionStatus['cts-job']['numbers']=numbers
         buildNumbers['failed_number'] += jobTransactionStatus['cts-job']['numbers'].number_failed
         buildNumbers['passed_number'] += jobTransactionStatus['cts-job']['numbers'].number_passed
         buildNumbers['ignored_number'] += jobTransactionStatus['cts-job']['numbers'].number_ignored
@@ -524,7 +531,6 @@ def tallyNumbers(build, jobTransactionStatus):
         buildNumbers['total_number'] += jobTransactionStatus['cts-job']['numbers'].number_total
         buildNumbers['modules_done'] += jobTransactionStatus['cts-job']['numbers'].modules_done
         buildNumbers['modules_total'] += jobTransactionStatus['cts-job']['numbers'].modules_total
-
 
 def markjob(job, jobTransactionStatus):
     vtsSymbol = re.compile('-vts-')
