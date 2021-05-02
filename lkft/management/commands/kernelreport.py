@@ -86,8 +86,8 @@ rawkernels = {
             '5.10-gki-aosp-master-hikey960',
             ],
    'EAP510':[ 
-            '5.10-gki-private-android12-db845c',
-            '5.10-gki-private-android12-hikey960',
+            '5.10-gki-private-android13-db845c',
+            '5.10-gki-private-android13-hikey960',
             ],
    'EAP54':[ 
             '5.4-gki-private-android12-db845c',
@@ -310,27 +310,27 @@ projectids = {
                      'kern' : '5.4',
                      'branch' : 'Android-5.4',},
    '5.10-gki-aosp-master-hikey960':
-                    {'project_id': 607, 
+                    {'project_id': 731, 
                      'hardware': 'HiKey960',
                      'OS' : 'AOSP',
                      'kern' : '5.10',
                      'branch' : 'Android-5.10',},
    '5.10-gki-aosp-master-db845c':
-                    {'project_id': 606,
+                    {'project_id': 730,
                      'hardware': 'db845',
                      'OS' : 'AOSP',
                      'kern' : '5.10',
                      'branch' : 'Android-5.10',},
-   '5.10-gki-private-android12-db845c':
+   '5.10-gki-private-android13-db845c':
                     {'project_id': 617,
                      'hardware': 'db845',
-                     'OS' : 'Android12',
+                     'OS' : 'Android13',
                      'kern' : '5.10',
                      'branch' : 'Android-5.10',},
-   '5.10-gki-private-android12-hikey960':
+   '5.10-gki-private-android13-hikey960':
                     {'project_id': 616,
                      'hardware': 'HiKey960',
-                     'OS' : 'Android12',
+                     'OS' : 'Android13',
                      'kern' : '5.10',
                      'branch' : 'Android-5.10',},
    '5.4-gki-private-android12-db845c':
@@ -413,10 +413,12 @@ def process_flakey_file(flakefile):
                    continue
             a = allmatch.search(Line)
             if a:
-               testentry['androidrel'].append('Android8')
-               testentry['androidrel'].append('Android9')
-               testentry['androidrel'].append('Android10')
-               testentry['androidrel'].append('Android11')
+               testentry['androidrel'].append('Android8') #O
+               testentry['androidrel'].append('Android9') #P
+               testentry['androidrel'].append('Android10') #Q
+               testentry['androidrel'].append('Android11') #R
+               testentry['androidrel'].append('Android12') #S
+               testentry['androidrel'].append('Android13') #T
                testentry['androidrel'].append('AOSP')
             else:
                a = androidmatch.findall(Line)
